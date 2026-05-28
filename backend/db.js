@@ -19,9 +19,19 @@ db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 db.exec('PRAGMA busy_timeout = 5000');
 
-// Apply schema migration (idempotent — all statements are CREATE IF NOT EXISTS).
-const schemaSql = readFileSync(resolve(HERE, 'migrations', '001_init.sql'), 'utf-8');
-db.exec(schemaSql);
+// Apply schema migrations. 001 is idempotent (CREATE IF NOT EXISTS).
+// Later ones (ALTER TABLE) can't be — we track applied versions in a
+// _migrations table and skip what's already done.
+db.exec("CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at TEXT)");
+const applied = new Set(db.prepare('SELECT id FROM _migrations').all().map(r => r.id));
+const MIGRATIONS = ['001_init.sql', '002_uploads.sql'];
+for (const m of MIGRATIONS) {
+  if (applied.has(m)) continue;
+  const sql = readFileSync(resolve(HERE, 'migrations', m), 'utf-8');
+  db.exec(sql);
+  db.prepare('INSERT INTO _migrations (id, applied_at) VALUES (?, ?)')
+    .run(m, new Date().toISOString());
+}
 
 // ---------------------------------------------------------------------------
 // Tiny helpers: row coercion. SQLite stores 0/1 INTEGER for bools; we cast to

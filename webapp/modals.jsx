@@ -15,11 +15,15 @@ function AddStudentModal({ open, onClose, onSave }) {
     classId: "", feePlanId: "", promotionId: "", responsibleStaffId: "",
   });
   const [docs, setDocs] = React.useState({ cccd: false, gksk: false, donDeNghi: false, the3x4: false });
+  // Captured File objects (per doc key). Uploaded after the student is
+  // created — we need the student id before POSTing to /students/:id/docs/:key.
+  const [docFiles, setDocFiles] = React.useState({});
   const [ocrToast, setOcrToast] = React.useState(false);
 
   // when CCCD slot is filled, OCR auto-fills basic info
-  const handleDocDrop = (key) => {
+  const handleDocDrop = (key, file) => {
     setDocs(prev => ({ ...prev, [key]: true }));
+    if (file) setDocFiles(prev => ({ ...prev, [key]: file }));
     if (key === "cccd" && !form.idNumber) {
       // simulate OCR: populate name + gender + dob + idNumber + address +
       // queQuan + ngày cấp + nơi cấp
@@ -62,6 +66,7 @@ function AddStudentModal({ open, onClose, onSave }) {
     if (!open) {
       setForm({ name: "", gender: "", dob: "", idNumber: "", address: "", phone: "", queQuan: "", ngayCapCCCD: "", noiCapCCCD: "", notes: "", classId: "", feePlanId: "", promotionId: "", responsibleStaffId: "" });
       setDocs({ cccd: false, gksk: false, donDeNghi: false, the3x4: false });
+      setDocFiles({});
     }
   }, [open]);
 
@@ -72,7 +77,7 @@ function AddStudentModal({ open, onClose, onSave }) {
   return (
     <Modal open={open} onClose={onClose} width={880}
            primaryLabel="Lưu học viên"
-           primaryAction={() => { onSave && onSave({ form, docs, profileComplete }); onClose(); }}
+           primaryAction={() => { onSave && onSave({ form, docs, profileComplete, docFiles }); onClose(); }}
            primaryDisabled={!form.name || !form.classId || !form.responsibleStaffId}
            footerStart={
              !profileComplete && (
@@ -206,6 +211,7 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
   const D = window.MGT_DATA;
   const [form, setForm] = React.useState({ studentId: "", amount: "", method: "", bienLaiId: "" });
   const [bienLaiPhoto, setBienLaiPhoto] = React.useState(false);
+  const [bienLaiFile, setBienLaiFile] = React.useState(null);
 
   React.useEffect(() => {
     if (open) setForm({
@@ -213,7 +219,7 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
       amount: defaultAmount != null ? String(defaultAmount) : "",
       method: "", bienLaiId: "",
     });
-    if (!open) setBienLaiPhoto(false);
+    if (!open) { setBienLaiPhoto(false); setBienLaiFile(null); }
   }, [open, defaultStudentId, defaultAmount]);
 
   const student = form.studentId ? D.getStudent(form.studentId) : null;
@@ -228,7 +234,7 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
     <Modal open={open} onClose={onClose} width={620}
            title="Ghi nhận thanh toán"
            primaryLabel="Lưu thanh toán"
-           primaryAction={() => { onSave && onSave({ ...form, amount, bienLaiPhoto }); onClose(); }}
+           primaryAction={() => { onSave && onSave({ ...form, amount, bienLaiPhoto, bienLaiFile }); onClose(); }}
            primaryDisabled={!form.studentId || !amount || !form.method || !form.bienLaiId}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <StudentSearchPicker label="Học viên"
@@ -257,8 +263,8 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
           <div style={{ marginTop: 6 }}>
             <DocSlot doc={{ key: "bienLai", label: "Biên lai", hint: "Kéo & thả ảnh biên lai" }}
                      filled={bienLaiPhoto}
-                     onDrop={() => setBienLaiPhoto(true)}
-                     onClear={() => setBienLaiPhoto(false)}
+                     onDrop={(_k, file) => { setBienLaiPhoto(true); if (file) setBienLaiFile(file); }}
+                     onClear={() => { setBienLaiPhoto(false); setBienLaiFile(null); }}
                      compact/>
           </div>
         </div>

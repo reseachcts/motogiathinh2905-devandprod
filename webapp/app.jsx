@@ -141,11 +141,28 @@ function AppRoot() {
       </main>
 
       <AddStudentModal open={addStudent} onClose={() => setAddStudent(false)}
-                       onSave={(payload) => D.api.createStudent(payload).catch(e => alert('Lỗi: ' + e.message))}/>
+                       onSave={async (payload) => {
+                         try {
+                           const { docFiles, ...rest } = payload;
+                           const created = await D.api.createStudent(rest);
+                           // Then upload any captured files. Independent so a
+                           // failed upload doesn't block the rest.
+                           await Promise.all(Object.entries(docFiles || {}).map(
+                             ([key, file]) => file ? D.api.uploadStudentDoc(created.id, key, file).catch(e => console.warn('upload failed', key, e)) : null
+                           ));
+                         } catch (e) { alert("Lỗi: " + e.message); }
+                       }}/>
       <AddPaymentModal open={addPayment.open} defaultStudentId={addPayment.studentId}
                        defaultAmount={addPayment.amount}
                        onClose={() => setAddPayment({ open: false, studentId: null, amount: null })}
-                       onSave={(payload) => D.api.createPayment(payload).catch(e => alert('Lỗi: ' + e.message))}/>
+                       onSave={async (payload) => {
+                         try {
+                           const { bienLaiFile, ...rest } = payload;
+                           const created = await D.api.createPayment(rest);
+                           if (bienLaiFile) await D.api.uploadBienLai(created.id, bienLaiFile)
+                             .catch(e => console.warn('biên lai upload failed', e));
+                         } catch (e) { alert("Lỗi: " + e.message); }
+                       }}/>
       <AddClassModal   open={addClass} onClose={() => setAddClass(false)}
                        onSave={(payload) => D.api.createClass(payload).catch(e => alert('Lỗi: ' + e.message))}/>
     </div>

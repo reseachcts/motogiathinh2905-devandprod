@@ -16,6 +16,7 @@ import { startRecomputeTimer, stopRecomputeTimer } from './notifications.js';
 import authRoutes from './routes/auth.js';
 import entityRoutes from './routes/entities.js';
 import writeRoutes from './routes/writes.js';
+import uploadRoutes from './routes/uploads.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -65,6 +66,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', authRoutes);     // /api/auth/* + /api/me
 app.use('/api', entityRoutes);   // /api/branches, /api/students, …
 app.use('/api', writeRoutes);    // POST/PATCH
+app.use('/api', uploadRoutes);   // multipart uploads + GET /api/files/*
 
 // Catch unhandled API errors as JSON (not HTML).
 app.use('/api', (err, _req, res, _next) => {

@@ -330,12 +330,17 @@ function FilterChip({ active, onClick, icon, label, color = "cyan" }) {
 // --------------------------------------------------------------------
 // Document slot — drag-and-drop placeholder for student documents
 // --------------------------------------------------------------------
-function DocSlot({ doc, filled, onDrop, onClear, compact = false }) {
+function DocSlot({ doc, filled, onDrop, onClear, compact = false, previewUrl }) {
   const [hover, setHover] = React.useState(false);
+  // Click-to-pick via hidden <input type=file> alongside DnD. Both invoke
+  // onDrop(key, file?) — second arg is the File for callers who upload it.
+  const fileRef = React.useRef(null);
+  const pick = (file) => { setHover(false); onDrop && onDrop(doc.key, file || null); };
   return (
     <div onDragOver={e => { e.preventDefault(); setHover(true); }}
          onDragLeave={() => setHover(false)}
-         onDrop={e => { e.preventDefault(); setHover(false); onDrop && onDrop(doc.key); }}
+         onDrop={e => { e.preventDefault(); pick(e.dataTransfer?.files?.[0]); }}
+         onClick={() => fileRef.current && fileRef.current.click()}
          style={{
            borderRadius: 16, padding: compact ? 14 : 18,
            border: `1px dashed ${filled ? "var(--neon-lime)" : hover ? "var(--neon-cyan)" : "var(--glass-stroke-strong)"}`,
@@ -346,6 +351,10 @@ function DocSlot({ doc, filled, onDrop, onClear, compact = false }) {
            minHeight: compact ? 80 : 132, position: "relative", cursor: "pointer",
            transition: "all 140ms var(--ease-out)",
          }}>
+      <input ref={fileRef} type="file" accept="image/*,application/pdf"
+             onChange={(e) => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = ''; }}
+             onClick={(e) => e.stopPropagation()}
+             style={{ display: "none" }}/>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <Icon name={filled ? "check" : "plus"} size={14}
               color={filled ? "var(--neon-lime)" : "var(--fg-3)"}
@@ -368,12 +377,15 @@ function DocSlot({ doc, filled, onDrop, onClear, compact = false }) {
       )}
       {filled && (
         <div style={{ flex: 1, minHeight: 30, marginTop: 4, borderRadius: 8,
-                      background: "linear-gradient(135deg, rgba(0,229,255,0.08), rgba(139,108,255,0.08))",
+                      background: previewUrl ? "transparent" : "linear-gradient(135deg, rgba(0,229,255,0.08), rgba(139,108,255,0.08))",
                       border: "1px solid var(--glass-stroke)",
-                      display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.1em" }}>
-            {doc.key.toUpperCase()}.JPG
-          </span>
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      overflow: "hidden" }}>
+          {previewUrl
+            ? <img src={previewUrl} alt={doc.label} style={{ maxWidth: "100%", maxHeight: 120, objectFit: "contain" }}/>
+            : <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.1em" }}>
+                {doc.key.toUpperCase()}.JPG
+              </span>}
         </div>
       )}
     </div>

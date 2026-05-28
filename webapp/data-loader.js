@@ -98,9 +98,7 @@
     const TODAY_STR = `${p2(NOW.getDate())}/${p2(NOW.getMonth() + 1)}/${NOW.getFullYear()}`;
 
     promotions.forEach(p => { p.appliesTo = (p.appliesTo_csv || '').split('|').filter(Boolean); });
-    // Field-shape compat: NotificationRow reads `n.detail` but the spec
-    // (BACKEND.md §2.9) names the field `message`. Alias here so the
-    // frozen frontend keeps reading what it expects.
+    // Compat: NotificationRow reads n.detail; spec name is n.message.
     notifications.forEach(n => { if (n.detail == null) n.detail = n.message; });
 
     const classes = classesRaw.map(c => ({ ...c, _openMs: parseDT(c.openDate), _examMs: parseDT(c.examDate) }));
@@ -149,50 +147,34 @@
       const dd = p2(d.getDate()), mm = p2(d.getMonth() + 1), yy = String(d.getFullYear()).slice(2), hh = p2(d.getHours());
       return g === 'hour' ? `${hh}h ${dd}/${mm}` : g === 'day' ? `${dd}/${mm}` : `${mm}/${yy}`;
     }
+    const Y = NOW.getFullYear(), M = NOW.getMonth(), D = NOW.getDate(), H = NOW.getHours();
+    const mkBucket = (start, end, grain) => ({ start, end, label: bucketLabel(start, grain) });
     function bucketRanges(grain, count) {
       const out = [];
       for (let i = count - 1; i >= 0; i--) {
-        let start, end;
         if (grain === 'hour') {
-          end = new Date(NOW); end.setHours(NOW.getHours() - i, 59, 59);
-          start = new Date(end); start.setMinutes(0, 0, 0);
+          const end = new Date(NOW); end.setHours(H - i, 59, 59);
+          const start = new Date(end); start.setMinutes(0, 0, 0);
+          out.push(mkBucket(start, end, grain));
         } else if (grain === 'day') {
-          start = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() - i, 0, 0, 0);
-          end   = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() - i, 23, 59, 59);
+          out.push(mkBucket(new Date(Y, M, D - i, 0, 0, 0), new Date(Y, M, D - i, 23, 59, 59), grain));
         } else {
-          const ref = new Date(NOW.getFullYear(), NOW.getMonth() - i, 1);
-          start = new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0);
-          end   = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59);
+          out.push(mkBucket(new Date(Y, M - i, 1, 0, 0, 0), new Date(Y, M - i + 1, 0, 23, 59, 59), grain));
         }
-        out.push({ start, end, label: bucketLabel(start, grain) });
       }
       return out;
     }
     function periodToDateRanges(grain) {
       const out = [];
       if (grain === 'hour') {
-        for (let h = 0; h <= NOW.getHours(); h++) {
-          const start = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate(), h, 0, 0);
-          const end   = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate(), h, 59, 59);
-          out.push({ start, end, label: bucketLabel(start, 'hour') });
-        }
+        for (let h = 0; h <= H; h++) out.push(mkBucket(new Date(Y, M, D, h, 0, 0), new Date(Y, M, D, h, 59, 59), 'hour'));
       } else if (grain === 'day') {
         const dow = NOW.getDay() === 0 ? 6 : NOW.getDay() - 1;
-        const monday = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() - dow);
-        const days = Math.floor((NOW - monday) / 86400000);
-        for (let i = 0; i <= days; i++) {
-          const start = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i, 0, 0, 0);
-          const end   = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i, 23, 59, 59);
-          out.push({ start, end, label: bucketLabel(start, 'day') });
-        }
+        const days = Math.floor((NOW - new Date(Y, M, D - dow)) / 86400000);
+        for (let i = 0; i <= days; i++)
+          out.push(mkBucket(new Date(Y, M, D - dow + i, 0, 0, 0), new Date(Y, M, D - dow + i, 23, 59, 59), 'day'));
       } else {
-        for (let m = 0; m <= NOW.getMonth(); m++) {
-          out.push({
-            start: new Date(NOW.getFullYear(), m, 1, 0, 0, 0),
-            end:   new Date(NOW.getFullYear(), m + 1, 0, 23, 59, 59),
-            label: bucketLabel(new Date(NOW.getFullYear(), m, 1), 'month'),
-          });
-        }
+        for (let m = 0; m <= M; m++) out.push(mkBucket(new Date(Y, m, 1, 0, 0, 0), new Date(Y, m + 1, 0, 23, 59, 59), 'month'));
       }
       return out;
     }
@@ -350,6 +332,24 @@
           if (i >= 0) notifications.splice(i, 1);
           this._bump();
           return { id };
+        },
+        async _upload(path, file) {
+          const fd = new FormData(); fd.append('file', file);
+          const res = await fetch(API + path, { method: 'POST', credentials: 'include', body: fd });
+          if (!res.ok) throw new Error('upload_failed: ' + res.status);
+          return res.json();
+        },
+        async uploadStudentDoc(studentId, key, file) {
+          const out = await this._upload('/students/' + encodeURIComponent(studentId) + '/docs/' + encodeURIComponent(key), file);
+          const s = studentsById.get(studentId);
+          if (s) { s.docs[key] = true; s['docs_' + key] = true; s['docs_' + key + '_url'] = out.url; }
+          this._bump(); return out;
+        },
+        async uploadBienLai(paymentId, file) {
+          const out = await this._upload('/payments/' + encodeURIComponent(paymentId) + '/bien-lai', file);
+          const p = payments.find(p => p.id === paymentId);
+          if (p) { p.bienLaiPhoto = true; p.bienLaiPhoto_url = out.url; }
+          this._bump(); return out;
         },
         async updateStudent(id, patch) {
           const raw = await api('/students/' + encodeURIComponent(id), { method: 'PATCH', body: patch });
