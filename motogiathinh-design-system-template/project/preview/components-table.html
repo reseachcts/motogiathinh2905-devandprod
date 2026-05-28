@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 20px 24px; background: var(--ink-1); }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--fg-3); text-align: left; padding: 8px 14px 14px; border-bottom: 1px solid var(--ink-4); font-weight: 500;
+  }
+  td { padding: 14px; border-bottom: 1px solid var(--ink-4); font-family: var(--font-ui); font-size: 13px; color: var(--fg-1); }
+  tbody tr:hover td { background: var(--glass-2); }
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .pos { color: var(--neon-lime); }
+  .neg { color: var(--neon-pink); }
+  .avatar { width: 26px; height: 26px; border-radius: 999px; background: linear-gradient(135deg, #00E5FF, #8B6CFF); display: inline-block; vertical-align: middle; margin-right: 10px; box-shadow: 0 0 8px var(--neon-cyan-glow); }
+  .chip {
+    font-family: var(--font-ui); font-size: 11px; font-weight: 600;
+    padding: 3px 8px; border-radius: 999px;
+    background: color-mix(in oklab, var(--c) 14%, transparent);
+    color: var(--c); border: 1px solid color-mix(in oklab, var(--c) 36%, transparent);
+  }
+</style>
+</head>
+<body>
+  <table>
+    <thead><tr><th>Student</th><th>Class</th><th>Status</th><th style="text-align:right;">Balance</th></tr></thead>
+    <tbody>
+      <tr><td><span class="avatar"></span>Trần Văn A</td><td>A1</td><td><span class="chip" style="--c: var(--neon-lime);">Paid</span></td><td class="num" style="text-align:right;">₫0</td></tr>
+      <tr><td><span class="avatar" style="background: linear-gradient(135deg, #FF3D8A, #FFB020);"></span>Nguyễn Thị B</td><td>B2</td><td><span class="chip" style="--c: var(--neon-amber);">Pending</span></td><td class="num neg" style="text-align:right;">₫1.500.000</td></tr>
+      <tr><td><span class="avatar" style="background: linear-gradient(135deg, #B6FF3C, #00E5FF);"></span>Lê Hoàng C</td><td>A2</td><td><span class="chip" style="--c: var(--neon-pink);">Overdue</span></td><td class="num neg" style="text-align:right;">₫3.200.000</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

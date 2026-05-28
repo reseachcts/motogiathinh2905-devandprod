@@ -1,0 +1,6 @@
+id,name,phone,yearsExp,branchId,active
+gv-1,Trần Văn Nguyên,0911 100 100,12,br-1,true
+gv-2,Nguyễn Đức Huy,0911 200 200,7,br-2,true
+gv-3,Lê Hồng Sơn,0911 300 300,5,br-3,true
+gv-4,Phạm Quốc Cường,0911 400 400,9,br-1,true
+gv-5,Vũ Thị Mai,0911 500 500,3,br-2,true

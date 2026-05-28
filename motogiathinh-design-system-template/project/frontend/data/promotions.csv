@@ -1,0 +1,6 @@
+id,name,appliesTo_csv,discount
+promo-none,KHÔNG,fee-a|fee-a1,0
+promo-link,Liên kết,fee-a|fee-a1,200000
+promo-sgnv,SGNV ưu đãi,fee-a,300000
+promo-summer,Hè Vui,fee-a|fee-a1,150000
+promo-loyalty,Khách quen,fee-a,100000

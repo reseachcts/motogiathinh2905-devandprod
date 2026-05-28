@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 24px; background: var(--ink-1); }
+  .row { display: flex; gap: 10px; align-items: stretch; }
+  .swatch {
+    flex: 1;
+    aspect-ratio: 1.4 / 1;
+    border-radius: var(--r-md);
+    border: 1px solid var(--glass-stroke);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+  }
+  .swatch .nm { font-family: var(--font-mono); font-size: 11px; color: var(--fg-1); letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.85; }
+  .swatch .hex { font-family: var(--font-mono); font-size: 10px; color: var(--fg-1); opacity: 0.6; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="swatch" style="background: var(--ink-0);"><span class="nm">ink-0</span><span class="hex">#05060A</span></div>
+    <div class="swatch" style="background: var(--ink-1);"><span class="nm">ink-1</span><span class="hex">#0A0C13</span></div>
+    <div class="swatch" style="background: var(--ink-2);"><span class="nm">ink-2</span><span class="hex">#10131C</span></div>
+    <div class="swatch" style="background: var(--ink-3);"><span class="nm">ink-3</span><span class="hex">#161A25</span></div>
+    <div class="swatch" style="background: var(--ink-4);"><span class="nm">ink-4</span><span class="hex">#1E2330</span></div>
+  </div>
+</body>
+</html>

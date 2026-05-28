@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 24px; background: var(--ink-1); position: relative; overflow: hidden; }
+  body::before {
+    content:""; position: absolute; inset: 0;
+    background:
+      radial-gradient(500px 240px at 12% 30%, var(--neon-cyan-haze), transparent 60%),
+      radial-gradient(500px 240px at 88% 70%, var(--neon-pink-haze), transparent 60%);
+  }
+  .row { display: flex; gap: 14px; position: relative; }
+  .tile {
+    flex: 1; aspect-ratio: 1.4/1;
+    border-radius: var(--r-lg);
+    background: var(--t);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-stroke);
+    padding: 12px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    box-shadow: var(--shadow-2);
+  }
+  .nm { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-1); opacity: 0.9; }
+  .hex { font-family: var(--font-mono); font-size: 10px; color: var(--fg-2); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="tile" style="--t: var(--glass-1);"><span class="nm">glass-1</span><span class="hex">α 0.03 · blur 24</span></div>
+    <div class="tile" style="--t: var(--glass-2);"><span class="nm">glass-2</span><span class="hex">α 0.06 · blur 24</span></div>
+    <div class="tile" style="--t: var(--glass-3);"><span class="nm">glass-3</span><span class="hex">α 0.10 · blur 24</span></div>
+    <div class="tile" style="--t: rgba(255,255,255,0); border-color: var(--glass-stroke-strong);"><span class="nm">stroke</span><span class="hex">α 0.08 / 0.14</span></div>
+  </div>
+</body>
+</html>

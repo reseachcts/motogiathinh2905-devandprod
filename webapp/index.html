@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1440, initial-scale=1">
+  <title>MOTOGIATHINH · CRM</title>
+  <link rel="stylesheet" href="colors_and_type.css">
+  <style>
+    html, body { height: 100%; }
+    #root { min-height: 100%; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: var(--glass-stroke); border-radius: 999px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes mgt-fly-down {
+      0%   { opacity: 0; transform: translateY(-12px) scaleY(0.94); max-height: 0; }
+      100% { opacity: 1; transform: translateY(0)    scaleY(1);     max-height: 1200px; }
+    }
+    @keyframes mgt-fly-up {
+      0%   { opacity: 1; transform: translateY(0)    scaleY(1);     max-height: 1200px; }
+      100% { opacity: 0; transform: translateY(-12px) scaleY(0.94); max-height: 0; }
+    }
+    /* Subtle ambient flash for KPI / class cards — slow, low-amplitude
+       brightness + saturation pulse. Looks like the gradient "breathes". */
+    @keyframes mgt-card-flash {
+      0%, 100% { filter: brightness(1)    saturate(1);    }
+      50%      { filter: brightness(1.05) saturate(1.12); }
+    }
+    .mgt-pulse { animation: mgt-card-flash 5s ease-in-out infinite; }
+    /* Chart expansion direction cues — both cards in a section animate
+       together. Use clip-path + translate (NEVER scale) so content
+       stays at its natural size and text never stretches. */
+    @keyframes mgt-chart-expand-left {
+      /* Card now at full row 1. Reveal rightward from the col-1 half. */
+      0%   { clip-path: inset(0 50% 0 0); }
+      100% { clip-path: inset(0 0 0 0);   }
+    }
+    @keyframes mgt-chart-collapse-left {
+      /* Card stays anchored at top-left. Outer wrapper scales from 2×
+         wide / 1.2× tall down to natural — visually the right and
+         bottom edges retract inward. No translation, no popping. */
+      0%   { transform: scaleX(2) scaleY(1.2); }
+      100% { transform: scaleX(1) scaleY(1);    }
+    }
+    @keyframes mgt-chart-collapse-left-inner {
+      /* Inverse scale on the content wrapper so text + chart stay at
+         their natural rendered size while the outer box retracts. */
+      0%   { transform: scaleX(0.5) scaleY(0.8333); }
+      100% { transform: scaleX(1)   scaleY(1);       }
+    }
+    @keyframes mgt-chart-expand-right {
+      /* Card now at row 2 full width. Start translated up-right to
+         row 1 col 2, clipped to its right half — only that area shows.
+         As the keyframe runs, the card slides down-left into row 2 and
+         the clip opens to reveal the whole card. Content stays put. */
+      0%   { transform: translate3d(50%, -100%, 0); clip-path: inset(0 50% 0 0); opacity: 0.55; }
+      100% { transform: translate3d(0, 0, 0);       clip-path: inset(0 0 0 0);   opacity: 1;    }
+    }
+    @keyframes mgt-chart-collapse-right {
+      /* Card now at row 1 col 2 (half width). Slide up-right from
+         row 2 col 1. Element is small at both states, so no clip-path
+         needed — just translate for direction. */
+      0%   { transform: translate3d(-100%, 100%, 0); opacity: 0.55; }
+      100% { transform: translate3d(0, 0, 0);        opacity: 1;    }
+    }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="data-loader.js"></script>
+  <script type="text/babel" src="atoms.jsx"></script>
+  <script type="text/babel" src="shell.jsx"></script>
+  <script type="text/babel" src="list-tools.jsx"></script>
+  <script type="text/babel" src="screen-dashboard.jsx"></script>
+  <script type="text/babel" src="screen-students.jsx"></script>
+  <script type="text/babel" src="screen-payments.jsx"></script>
+  <script type="text/babel" src="screen-classes.jsx"></script>
+  <script type="text/babel" src="screen-notifs.jsx"></script>
+  <script type="text/babel" src="screen-org.jsx"></script>
+  <script type="text/babel" src="modals.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

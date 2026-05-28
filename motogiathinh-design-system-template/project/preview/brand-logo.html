@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 28px 32px; background: var(--ink-1); }
+  .row { display: flex; gap: 20px; align-items: center; }
+  .col { display: flex; flex-direction: column; gap: 14px; }
+  .mark { width: 88px; height: 88px; }
+  .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-3); }
+  .wm { height: 64px; }
+  .light { padding: 14px; border-radius: 16px; background: #F4F6FB; }
+  .dark { padding: 14px; border-radius: 16px; background: var(--ink-2); border: 1px solid var(--glass-stroke); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="col"><img class="mark" src="../assets/logo-mark.svg" alt="mark"><span class="lbl">Mark · 64×64</span></div>
+    <div class="col" style="flex:1;">
+      <div class="dark"><img class="wm" src="../assets/logo-wordmark.svg" alt="wordmark"></div>
+      <span class="lbl">Wordmark · primary lockup (dark)</span>
+    </div>
+  </div>
+</body>
+</html>

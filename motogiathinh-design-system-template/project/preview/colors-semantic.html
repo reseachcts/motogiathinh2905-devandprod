@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 24px; background: var(--ink-1); }
+  .row { display: flex; gap: 12px; }
+  .sem {
+    flex: 1;
+    border-radius: var(--r-md);
+    padding: 14px;
+    background: var(--ink-2);
+    border: 1px solid var(--glass-stroke);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 999px; background: var(--c); box-shadow: 0 0 14px var(--g); }
+  .label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-3); }
+  .name { font-family: var(--font-display); font-size: 16px; color: var(--fg-1); font-weight: 600; }
+  .use  { font-family: var(--font-ui); font-size: 11px; color: var(--fg-3); }
+  .top { display: flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="sem" style="--c: var(--neon-cyan); --g: var(--neon-cyan-glow);"><div class="top"><span class="dot"></span><span class="label">Action</span></div><span class="name">cyan</span><span class="use">CTAs · focus · links</span></div>
+    <div class="sem" style="--c: var(--neon-lime); --g: var(--neon-lime-glow);"><div class="top"><span class="dot"></span><span class="label">Income</span></div><span class="name">lime</span><span class="use">positive · paid</span></div>
+    <div class="sem" style="--c: var(--neon-pink); --g: var(--neon-pink-glow);"><div class="top"><span class="dot"></span><span class="label">Expense</span></div><span class="name">pink</span><span class="use">negative · danger</span></div>
+    <div class="sem" style="--c: var(--neon-amber); --g: var(--neon-amber-glow);"><div class="top"><span class="dot"></span><span class="label">Pending</span></div><span class="name">amber</span><span class="use">warning · overdue</span></div>
+    <div class="sem" style="--c: var(--neon-violet); --g: var(--neon-violet-glow);"><div class="top"><span class="dot"></span><span class="label">Schedule</span></div><span class="name">violet</span><span class="use">info · class</span></div>
+  </div>
+</body>
+</html>

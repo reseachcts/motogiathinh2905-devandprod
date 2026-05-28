@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 24px; background: var(--ink-1); }
+  .row { display: flex; gap: 10px; }
+  .neon {
+    flex: 1;
+    aspect-ratio: 1.4 / 1;
+    border-radius: var(--r-md);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    background: var(--ink-2);
+    border: 1px solid var(--glass-stroke);
+    overflow: hidden;
+  }
+  .neon::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 38%;
+    background: var(--c); box-shadow: 0 0 32px var(--g); opacity: 0.95;
+  }
+  .neon .nm {
+    font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--ink-0); position: relative; z-index: 1; padding: 2px 6px;
+    align-self: flex-start;
+  }
+  .neon .hex { font-family: var(--font-mono); font-size: 10px; color: var(--fg-2); position: relative; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="neon" style="--c: var(--neon-cyan); --g: var(--neon-cyan-glow);"><span class="nm">cyan</span><span class="hex">#00E5FF</span></div>
+    <div class="neon" style="--c: var(--neon-lime); --g: var(--neon-lime-glow);"><span class="nm">lime</span><span class="hex">#B6FF3C</span></div>
+    <div class="neon" style="--c: var(--neon-pink); --g: var(--neon-pink-glow);"><span class="nm">pink</span><span class="hex">#FF3D8A</span></div>
+    <div class="neon" style="--c: var(--neon-amber); --g: var(--neon-amber-glow);"><span class="nm">amber</span><span class="hex">#FFB020</span></div>
+    <div class="neon" style="--c: var(--neon-violet); --g: var(--neon-violet-glow);"><span class="nm">violet</span><span class="hex">#8B6CFF</span></div>
+  </div>
+</body>
+</html>

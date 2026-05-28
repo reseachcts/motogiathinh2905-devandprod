@@ -1,0 +1,14 @@
+id,type,severity,title,message,studentId,read,createdAt
+n-001,payment,warn,Học viên Quan Vũ V mới đóng 50%,"Còn nợ 282,500đ · Lớp MÔ TÔ 06/2026",hv-1159,true,30/05 09:12
+n-002,payment,warn,Học viên Phụng Tiên Nương Nương V mới đóng 50%,"Còn nợ 207,500đ · Lớp MÔ TÔ 06/2026",hv-1162,false,30/05 09:12
+n-003,payment,warn,Học viên Việt Hương V mới đóng 50%,"Còn nợ 282,500đ · Lớp MÔ TÔ 06/2026",hv-1182,false,30/05 09:12
+n-004,payment,warn,Học viên Đăng Khôi V mới đóng 50%,"Còn nợ 997,500đ · Lớp MÔ TÔ 06/2026",hv-1187,false,30/05 09:12
+n-005,payment,warn,Học viên Trúc Nhân V mới đóng 50%,"Còn nợ 997,500đ · Lớp MÔ TÔ 06/2026",hv-1191,false,30/05 09:12
+n-006,payment,danger,Học viên Lưu Hương Giang V chưa thanh toán,"Còn nợ 1,995,000đ · Lớp MÔ TÔ 06/2026",hv-1175,false,30/05 09:10
+n-007,payment,danger,Học viên Rosé V chưa thanh toán,"Còn nợ 565,000đ · Lớp MÔ TÔ 06/2026",hv-1194,false,30/05 09:10
+n-008,payment,danger,Học viên Hồng Vân V chưa thanh toán,"Còn nợ 415,000đ · Lớp MÔ TÔ 06/2026",hv-1196,false,30/05 09:10
+n-009,payment,danger,Học viên Robert Downey Jr. V chưa thanh toán,"Còn nợ 565,000đ · Lớp MÔ TÔ 06/2026",hv-1197,false,30/05 09:10
+n-010,profile,warn,Hồ sơ Quan Vũ V thiếu GKSK,Đã thiếu 3 ngày,hv-1159,false,29/05 16:40
+n-011,profile,warn,Hồ sơ Quang Dũng V thiếu Thẻ 3×4,Đã thiếu 1 ngày,hv-1167,true,29/05 16:40
+n-012,profile,warn,Hồ sơ Triển Chiêu V thiếu Đơn đề nghị,Đã thiếu 6 ngày,hv-1174,true,29/05 16:40
+n-013,profile,warn,"Hồ sơ Đan Nguyên V thiếu CCCD, Thẻ 3×4",Đã thiếu 4 ngày,hv-1181,true,29/05 16:40

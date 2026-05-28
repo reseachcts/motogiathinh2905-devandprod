@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 28px 32px; background: var(--ink-1); }
+  .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: end; }
+  .blk { display: flex; flex-direction: column; gap: 6px; }
+  .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-3); }
+  .delta { font-family: var(--font-display); font-size: 13px; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="blk">
+      <span class="lbl">Income · today</span>
+      <span class="t-metric">₫4.240.000</span>
+      <span class="delta" style="color: var(--neon-lime);">+12.4% <span style="color: var(--fg-3); font-weight:500;">vs last week</span></span>
+    </div>
+    <div class="blk">
+      <span class="lbl">Active students</span>
+      <span class="t-metric">128</span>
+      <span class="delta" style="color: var(--neon-pink);">−3 <span style="color: var(--fg-3); font-weight:500;">since Monday</span></span>
+    </div>
+  </div>
+</body>
+</html>

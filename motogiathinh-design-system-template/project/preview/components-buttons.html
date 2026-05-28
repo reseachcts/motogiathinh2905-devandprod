@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 28px 32px; background: var(--ink-1); }
+  .grid { display: grid; grid-template-columns: repeat(4, auto); gap: 14px 16px; align-items: center; justify-content: start; }
+  button {
+    font-family: var(--font-ui); font-weight: 600; font-size: 13px;
+    padding: 10px 16px; border-radius: 14px; border: none;
+    cursor: pointer; line-height: 1; letter-spacing: 0.005em;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: all 140ms var(--ease-out);
+  }
+  .primary { background: var(--neon-cyan); color: var(--fg-inverse); box-shadow: 0 0 0 1px var(--neon-cyan), 0 0 24px var(--neon-cyan-glow); }
+  .success { background: var(--neon-lime); color: var(--fg-inverse); box-shadow: 0 0 0 1px var(--neon-lime), 0 0 24px var(--neon-lime-glow); }
+  .danger  { background: var(--neon-pink); color: var(--fg-inverse); box-shadow: 0 0 0 1px var(--neon-pink), 0 0 24px var(--neon-pink-glow); }
+  .secondary { background: var(--glass-2); color: var(--fg-1); border: 1px solid var(--glass-stroke-strong); backdrop-filter: var(--glass-blur-soft); }
+  .ghost { background: transparent; color: var(--fg-2); border: 1px solid var(--glass-stroke); }
+  .iconbtn { padding: 10px; border-radius: 10px; background: var(--glass-2); border: 1px solid var(--glass-stroke); color: var(--fg-1); }
+  .lbl { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); letter-spacing: 0.1em; text-transform: uppercase; }
+  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <button class="primary"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add student</button>
+    <button class="success">Mark paid</button>
+    <button class="danger">Refund</button>
+    <button class="secondary">Cancel</button>
+
+    <span class="lbl">Primary</span>
+    <span class="lbl">Success</span>
+    <span class="lbl">Danger</span>
+    <span class="lbl">Secondary</span>
+
+    <button class="ghost">View report</button>
+    <button class="iconbtn"><svg viewBox="0 0 24 24"><path d="M21 21l-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"/></svg></button>
+    <button class="primary" disabled style="opacity:0.4; box-shadow:none; cursor:not-allowed;">Saving…</button>
+    <button class="secondary" style="background: var(--glass-3); border-color: var(--glass-stroke-strong);">Hover</button>
+
+    <span class="lbl">Ghost</span>
+    <span class="lbl">Icon</span>
+    <span class="lbl">Disabled</span>
+    <span class="lbl">Hover (2°)</span>
+  </div>
+</body>
+</html>

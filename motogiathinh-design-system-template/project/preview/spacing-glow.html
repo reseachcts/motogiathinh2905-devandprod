@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 36px 32px; background: var(--ink-1); }
+  .row { display: flex; gap: 24px; align-items: center; justify-content: space-around; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .box {
+    width: 110px; height: 44px;
+    background: var(--ink-2);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 600; font-size: 13px; color: var(--fg-1);
+  }
+  .cy { box-shadow: 0 0 0 1px var(--neon-cyan), 0 0 24px var(--neon-cyan-glow); }
+  .li { box-shadow: 0 0 0 1px var(--neon-lime), 0 0 24px var(--neon-lime-glow); }
+  .pi { box-shadow: 0 0 0 1px var(--neon-pink), 0 0 24px var(--neon-pink-glow); }
+  .am { box-shadow: 0 0 0 1px var(--neon-amber), 0 0 24px var(--neon-amber-glow); }
+  .nm { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-3); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="col"><div class="box cy">+ student</div><span class="nm">glow-cyan</span></div>
+    <div class="col"><div class="box li">Paid</div><span class="nm">glow-lime</span></div>
+    <div class="col"><div class="box pi">Overdue</div><span class="nm">glow-pink</span></div>
+    <div class="col"><div class="box am">Pending</div><span class="nm">glow-amber</span></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 28px 32px; background: var(--ink-1); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; max-width: 640px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-3); }
+  input, select {
+    font-family: var(--font-ui); font-size: 14px; color: var(--fg-1);
+    background: var(--ink-2); border: 1px solid var(--glass-stroke);
+    border-radius: 10px; padding: 10px 12px; outline: none;
+    transition: border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
+  }
+  input::placeholder { color: var(--fg-4); }
+  .focused { border-color: var(--neon-cyan); box-shadow: 0 0 0 3px var(--neon-cyan-haze); }
+  .err { border-color: var(--neon-pink); }
+  .err-msg { font-family: var(--font-ui); font-size: 11px; color: var(--neon-pink); }
+  .help { font-family: var(--font-ui); font-size: 11px; color: var(--fg-3); }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="field"><label>Full name</label><input value="Trần Văn A"></div>
+    <div class="field"><label>Licence class</label><input class="focused" value="A1"></div>
+    <div class="field"><label>Phone</label><input class="err" value="+84 0901"><span class="err-msg">Phone must be 10 digits.</span></div>
+    <div class="field"><label>Tuition</label><input placeholder="₫ 0" style="font-family: var(--font-mono); font-variant-numeric: tabular-nums;"><span class="help">Excludes test fee.</span></div>
+  </div>
+</body>
+</html>
