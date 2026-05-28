@@ -45,6 +45,25 @@ app.disable('x-powered-by');
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 
+// Request logging: one structured line per request to stdout. Skip noise
+// (static-asset GETs). originalUrl is captured up front because routing
+// middleware mutates req.path/url as it dispatches.
+const LOG_SKIP = /\.(?:js|jsx|css|svg|otf|woff2?|png|jpg|jpeg|gif|ico)(?:\?|$)/i;
+app.use((req, res, next) => {
+  const t0 = process.hrtime.bigint();
+  const url = req.originalUrl;
+  res.on('finish', () => {
+    if (url === '/api/health' || LOG_SKIP.test(url)) return;
+    const ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
+    const uid = req.user?.id || '-';
+    const line = `${req.method} ${url} ${res.statusCode} ${ms}ms ${uid}`;
+    if (res.statusCode >= 500)      console.error('[req]', line);
+    else if (res.statusCode >= 400) console.warn('[req]', line);
+    else                            console.log('[req]', line);
+  });
+  next();
+});
+
 // CORS: same-origin in production (no header needed). Dev / cross-origin
 // front-ends can set CORS_ORIGINS=https://app.example.com,...
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -68,10 +87,12 @@ app.use('/api', entityRoutes);   // /api/branches, /api/students, …
 app.use('/api', writeRoutes);    // POST/PATCH
 app.use('/api', uploadRoutes);   // multipart uploads + GET /api/files/*
 
-// Catch unhandled API errors as JSON (not HTML).
-app.use('/api', (err, _req, res, _next) => {
-  console.error('[api error]', err);
-  res.status(500).json({ error: 'internal_error', message: String(err.message || err) });
+// Catch unhandled API errors as JSON (not HTML). Includes a short request
+// id so server-side log and client error correlate.
+app.use('/api', (err, req, res, _next) => {
+  const rid = 'r-' + Math.random().toString(36).slice(2, 8);
+  console.error(`[api error] rid=${rid} ${req.method} ${req.path}`, err);
+  res.status(500).json({ error: 'internal_error', requestId: rid, message: String(err.message || err) });
 });
 
 // Static webapp — serve the same folder GitHub Pages serves.
