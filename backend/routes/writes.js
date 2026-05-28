@@ -16,6 +16,7 @@ import {
   nextMaHV, nextBienLaiId, genId, coerceBools,
 } from '../db.js';
 import { requireAuth, requireAdmin, hashPassword, publicAccount } from '../auth.js';
+import { recomputeAfterWrite } from '../notifications.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -87,6 +88,7 @@ router.post('/students', (req, res) => {
   }
 
   logActivity(req.user.id, 'student.create', maHV);
+  recomputeAfterWrite(req.user.id, `student ${maHV}`);
   const row = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
   res.status(201).json(coerceBools('students', row));
 });
@@ -117,6 +119,7 @@ router.patch('/students/:id', (req, res) => {
   db.prepare(`UPDATE students SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
 
   logActivity(req.user.id, 'student.update', existing.maHV);
+  recomputeAfterWrite(req.user.id, `student ${existing.maHV}`);
   const row = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
   res.json(coerceBools('students', row));
 });
@@ -155,6 +158,7 @@ router.post('/payments', (req, res) => {
   }
 
   logActivity(req.user.id, 'payment.create', `${blId} (${amt}đ for ${student.maHV})`);
+  recomputeAfterWrite(req.user.id, `payment ${blId}`);
   const row = db.prepare('SELECT * FROM payments WHERE id = ?').get(id);
   res.status(201).json(coerceBools('payments', row));
 });
@@ -190,6 +194,7 @@ router.patch('/classes/:id', requireAdmin, (req, res) => {
   vals.push(id);
   db.prepare(`UPDATE classes SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
   logActivity(req.user.id, 'class.update', existing.code);
+  recomputeAfterWrite(req.user.id, `class ${existing.code}`);
   res.json(db.prepare('SELECT * FROM classes WHERE id = ?').get(id));
 });
 

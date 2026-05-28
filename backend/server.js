@@ -12,6 +12,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { db, countAll, closeDb } from './db.js';
+import { startRecomputeTimer, stopRecomputeTimer } from './notifications.js';
 import authRoutes from './routes/auth.js';
 import entityRoutes from './routes/entities.js';
 import writeRoutes from './routes/writes.js';
@@ -94,10 +95,12 @@ const server = app.listen(PORT, () => {
   if (NODE_ENV !== 'production' && !process.env.JWT_SECRET) {
     console.warn('[server] ⚠ Using insecure dev JWT secret. Set JWT_SECRET in .env for production.');
   }
+  startRecomputeTimer();    // BACKEND.md §9 — keeps notifications fresh
 });
 
 function shutdown(sig) {
   console.log(`\n[server] ${sig} received, shutting down...`);
+  stopRecomputeTimer();
   server.close(() => { closeDb(); process.exit(0); });
   setTimeout(() => process.exit(1), 5000).unref();
 }
