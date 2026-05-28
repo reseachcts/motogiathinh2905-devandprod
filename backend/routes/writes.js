@@ -17,6 +17,7 @@ import {
 } from '../db.js';
 import { requireAuth, requireAdmin, hashPassword, publicAccount } from '../auth.js';
 import { recomputeAfterWrite } from '../notifications.js';
+import { validators as V, check, bad as badV } from '../validation.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -26,6 +27,21 @@ const VALID_METHOD  = ['Tiền mặt', 'Chuyển khoản'];
 
 function bad(res, code, error, extra) { return res.status(code).json({ error, ...extra }); }
 
+// Validate a student form payload (POST + PATCH share most rules).
+function validateStudentForm(form, { isCreate }) {
+  if (isCreate) {
+    const req = check(V.required(form, ['name', 'classId', 'responsibleStaffId']));
+    if (req) return req;
+  }
+  return check(
+    V.phone(form.phone),
+    V.cccd(form.idNumber),
+    V.date('dob', form.dob),
+    V.date('ngayCapCCCD', form.ngayCapCCCD),
+    V.licence(form.licence),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Students
 // ---------------------------------------------------------------------------
@@ -33,9 +49,9 @@ function bad(res, code, error, extra) { return res.status(code).json({ error, ..
 // POST /api/students — modal: AddStudentModal { form, docs, profileComplete }
 router.post('/students', (req, res) => {
   const { form, docs, profileComplete } = req.body || {};
-  if (!form?.name || !form.classId || !form.responsibleStaffId) {
-    return bad(res, 400, 'missing_required_fields');
-  }
+  if (!form) return bad(res, 400, 'missing_form');
+  const vErr = validateStudentForm(form, { isCreate: true });
+  if (vErr) return badV(res, vErr);
 
   const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(form.classId);
   if (!cls) return bad(res, 400, 'invalid_classId');
@@ -101,6 +117,8 @@ router.patch('/students/:id', (req, res) => {
   if (req.user.role !== 'admin' && existing.branchId !== req.user.branchId) {
     return bad(res, 403, 'wrong_branch');
   }
+  const vErr = validateStudentForm(req.body || {}, { isCreate: false });
+  if (vErr) return badV(res, vErr);
 
   const allowed = ['name', 'phone', 'dob', 'gender', 'idNumber', 'address', 'queQuan',
     'ngayCapCCCD', 'noiCapCCCD', 'classId', 'licence', 'feePlanId', 'promotionId',
@@ -130,17 +148,20 @@ router.patch('/students/:id', (req, res) => {
 
 router.post('/payments', (req, res) => {
   const { studentId, amount, method, bienLaiId, bienLaiPhoto, staffId } = req.body || {};
-  if (!studentId || !amount || !method) return bad(res, 400, 'missing_required_fields');
-  if (!VALID_METHOD.includes(method)) return bad(res, 400, 'invalid_method');
+  if (!studentId || !method) return bad(res, 400, 'missing_required_fields');
+  // Compensating-entry support per BACKEND.md §8.5: allow negative amounts
+  // (refund/correction), reject zero/non-integer.
+  const amtErr = V.amount(amount, { allowNegative: true });
+  if (amtErr) return badV(res, amtErr);
+  const methodErr = V.method(method);
+  if (methodErr) return badV(res, methodErr);
 
   const student = db.prepare('SELECT * FROM students WHERE id = ?').get(studentId);
   if (!student) return bad(res, 400, 'invalid_studentId');
   if (req.user.role !== 'admin' && student.branchId !== req.user.branchId) {
     return bad(res, 403, 'wrong_branch');
   }
-
   const amt = parseInt(amount, 10);
-  if (!Number.isFinite(amt) || amt === 0) return bad(res, 400, 'invalid_amount');
 
   const id = genId('PMT');
   const blId = bienLaiId || nextBienLaiId();
@@ -170,6 +191,8 @@ router.post('/payments', (req, res) => {
 router.post('/classes', requireAdmin, (req, res) => {
   const { code, branchId, openDate, examDate } = req.body || {};
   if (!code || !branchId) return bad(res, 400, 'missing_required_fields');
+  const vErr = check(V.date('openDate', openDate), V.date('examDate', examDate));
+  if (vErr) return badV(res, vErr);
   const branch = db.prepare('SELECT id FROM branches WHERE id = ?').get(branchId);
   if (!branch) return bad(res, 400, 'invalid_branchId');
 
@@ -186,6 +209,12 @@ router.patch('/classes/:id', requireAdmin, (req, res) => {
   const id = req.params.id;
   const existing = db.prepare('SELECT * FROM classes WHERE id = ?').get(id);
   if (!existing) return bad(res, 404, 'not_found');
+  const vErr = check(
+    V.date('openDate', req.body?.openDate),
+    V.date('examDate', req.body?.examDate),
+    V.classStatus(req.body?.statusOverride),
+  );
+  if (vErr) return badV(res, vErr);
 
   const allowed = ['code', 'branchId', 'openDate', 'examDate', 'statusOverride'];
   const sets = [], vals = [];
