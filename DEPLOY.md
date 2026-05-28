@@ -272,13 +272,30 @@ Two failure modes, both reversible:
 
 ---
 
-## 13. Known frontend-integration deviation
+## 13. Known frontend-integration deviations
 
-The signed-off frontend (under `webapp/`) was a frozen prototype with empty
-`onSave={() => {}}` stubs on the three create-modals in `app.jsx` (lines
-132–137). To make writes actually persist, those three handlers were wired
-to `MGT_DATA.api.createStudent / createPayment / createClass`. **No visual
-or UX change** — the modals look + behave identically; only the persistence
-plumbing was filled in. Per `webapp/CLAUDE.md`, the spirit of "frozen" is
-visual/UX preservation; the empty stubs were clearly intended as integration
-seams.
+The signed-off frontend (under `webapp/`) shipped with empty callbacks on
+every "save / create / update / delete" modal — clearly integration seams
+left for the backend phase. The integration wired them as follows. **No
+visual or UX change** anywhere; only persistence plumbing was filled in.
+
+| File | Site | Before | After |
+|---|---|---|---|
+| `app.jsx` | `AddStudentModal onSave` | `() => {}` | `D.api.createStudent(payload)` |
+| `app.jsx` | `AddPaymentModal onSave` | `() => {}` | `D.api.createPayment(payload)` |
+| `app.jsx` | `AddClassModal onSave` | `() => {}` | `D.api.createClass(payload)` |
+| `app.jsx` | `AppRoot` body | — | `useReducer` + `window.addEventListener('mgt:datachanged')` for re-render after writes |
+| `shell.jsx` | Logout modal `primaryAction` | only `setLogoutOpen(false)` | also `D.api.logout()` |
+| `screen-classes.jsx` | `ClassEditModal onSaveStatus` | `setStatus` (local only) | also `D.api.updateClass(cls.id, {statusOverride})` |
+| `screen-org.jsx` × 5 | `RecordCreatorModal` callers | no `onCreate` prop | `onCreate={D.api.createAccount / createFeePlan / createPromotion / createTeacher / createVehicle}` |
+| `screen-notifs.jsx` | `markAllRead` / `deleteSelected` | local-only `setItems` | also `D.api.markNotificationRead` / `deleteNotification` per row |
+
+Per `webapp/CLAUDE.md`, the spirit of "frozen" is visual/UX preservation;
+the empty callbacks were never meant to ship. The verification checklist
+in `webapp/CLAUDE.md` plus `backend/seed/e2e-browser.js` (13 automated
+checks including a write-flow round-trip) confirms zero visual regression.
+
+One field-shape compat fix lives in `data-loader.js`:
+- Backend returns `notifications[i].message`, frontend reads
+  `notifications[i].detail` → data-loader aliases `n.detail = n.message`
+  at boot, per the contract's "transform inside data-loader to match" allowance.

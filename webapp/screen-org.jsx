@@ -235,6 +235,7 @@ function AccountsTab() {
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
         title="Tạo tài khoản mới"
+        onCreate={(d) => window.MGT_DATA.api.createAccount(d).catch(e => alert("Lỗi: " + e.message))}
         fields={[
           { id: "name",     label: "Họ tên",        type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
           { id: "phone",    label: "Số điện thoại", type: "text",   placeholder: "090 123 4567" },
@@ -293,6 +294,7 @@ function FeesTab() {
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
         title="Tạo gói học phí"
+        onCreate={(d) => window.MGT_DATA.api.createFeePlan(d).catch(e => alert("Lỗi: " + e.message))}
         fields={[
           { id: "name",     label: "Tên gói",  type: "text",   placeholder: "A — Trọn gói" },
           { id: "licence",  label: "Bằng",     type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
@@ -328,6 +330,15 @@ function PromosTab() {
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
         title="Tạo khuyến mãi"
+        onCreate={(d) => {
+          // multipill option ids are fee-plan ids; spec stores licences (A/A1).
+          // Resolve fee-plan ids → distinct licences before sending.
+          const licences = Array.from(new Set(
+            (d.appliesTo || []).map(id => D.getFeePlan(id)?.licence).filter(Boolean)
+          ));
+          window.MGT_DATA.api.createPromotion({ ...d, appliesTo: licences })
+            .catch(e => alert("Lỗi: " + e.message));
+        }}
         fields={[
           { id: "name",      label: "Tên chương trình",  type: "text",      placeholder: "Hè Vui — Giảm 200K", fullWidth: true },
           { id: "discount",  label: "Số tiền giảm (đ)",  type: "text",      placeholder: "200000",             fullWidth: true },
@@ -372,6 +383,7 @@ function TeachersTab() {
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
         title="Thêm giáo viên"
+        onCreate={(d) => window.MGT_DATA.api.createTeacher(d).catch(e => alert("Lỗi: " + e.message))}
         fields={[
           { id: "name",     label: "Họ tên",        type: "text",   placeholder: "Trần Văn B" },
           { id: "phone",    label: "Số điện thoại", type: "text",   placeholder: "09…" },
@@ -428,6 +440,7 @@ function VehiclesTab() {
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
         title="Thêm phương tiện"
+        onCreate={(d) => window.MGT_DATA.api.createVehicle(d).catch(e => alert("Lỗi: " + e.message))}
         fields={[
           { id: "name",     label: "Tên xe",   type: "text",   placeholder: "Honda Wave Alpha" },
           { id: "licence",  label: "Bằng",     type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },

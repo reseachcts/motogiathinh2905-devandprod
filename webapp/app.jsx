@@ -16,6 +16,17 @@ function AppRoot() {
   const D = window.MGT_DATA;
   const isAdmin = D.currentUser.role === "admin";
 
+  // Re-render whenever data-loader fires 'mgt:datachanged' (after any
+  // successful create/update/delete). The frozen screens read D.<arrays>
+  // directly with no React state binding, so without this they'd only
+  // refresh on tab-bounce.
+  const [, _bump] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => {
+    const fn = () => _bump();
+    window.addEventListener("mgt:datachanged", fn);
+    return () => window.removeEventListener("mgt:datachanged", fn);
+  }, []);
+
   // route: { tab: "students"|"payments"|..., detail: null | { type, id } }
   const [tab, setTab]       = React.useState("dashboard");
   const [detail, setDetail] = React.useState(null);

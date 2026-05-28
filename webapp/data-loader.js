@@ -98,6 +98,10 @@
     const TODAY_STR = `${p2(NOW.getDate())}/${p2(NOW.getMonth() + 1)}/${NOW.getFullYear()}`;
 
     promotions.forEach(p => { p.appliesTo = (p.appliesTo_csv || '').split('|').filter(Boolean); });
+    // Field-shape compat: NotificationRow reads `n.detail` but the spec
+    // (BACKEND.md §2.9) names the field `message`. Alias here so the
+    // frozen frontend keeps reading what it expects.
+    notifications.forEach(n => { if (n.detail == null) n.detail = n.message; });
 
     const classes = classesRaw.map(c => ({ ...c, _openMs: parseDT(c.openDate), _examMs: parseDT(c.examDate) }));
     const setClassStatus = (c) => {
@@ -309,32 +313,72 @@
       PROFILE_DOCS: profileDocs,
 
       api: {
-        async createStudent(payload) { return patchStudentIn(await api('/students', { method: 'POST', body: payload })); },
-        async createPayment(payload) { return patchPaymentIn(await api('/payments', { method: 'POST', body: payload })); },
-        async createClass(payload)   { return patchClassIn(  await api('/classes',  { method: 'POST', body: payload })); },
+        // Fired after every successful write; AppRoot listens and re-renders
+        // so the new/updated row becomes visible without a tab-bounce.
+        _bump() { try { window.dispatchEvent(new Event('mgt:datachanged')); } catch {} },
+        async createStudent(payload) { const r = patchStudentIn(await api('/students', { method: 'POST', body: payload })); this._bump(); return r; },
+        async createPayment(payload) { const r = patchPaymentIn(await api('/payments', { method: 'POST', body: payload })); this._bump(); return r; },
+        async createClass(payload)   { const r = patchClassIn(  await api('/classes',  { method: 'POST', body: payload })); this._bump(); return r; },
+        async createAccount(payload) {
+          const raw = await api('/accounts', { method: 'POST', body: payload });
+          accounts.push(raw); accountsById.set(raw.id, raw); this._bump(); return raw;
+        },
+        async createFeePlan(payload) {
+          const body = { ...payload, amount: parseInt(payload.amount, 10) || 0 };
+          const raw = await api('/fee-plans', { method: 'POST', body });
+          feePlans.push(raw); feePlansById.set(raw.id, raw); this._bump(); return raw;
+        },
+        async createPromotion(payload) {
+          const body = { ...payload, discount: parseInt(payload.discount, 10) || 0 };
+          const raw = await api('/promotions', { method: 'POST', body });
+          raw.appliesTo = (raw.appliesTo_csv || '').split('|').filter(Boolean);
+          promotions.push(raw); promotionsById.set(raw.id, raw); this._bump(); return raw;
+        },
+        async createTeacher(payload) {
+          const body = { ...payload, yearsExp: parseInt(payload.yearsExp, 10) || 0 };
+          const raw = await api('/teachers', { method: 'POST', body });
+          teachers.push(raw); this._bump(); return raw;
+        },
+        async createVehicle(payload) {
+          const body = { ...payload, year: parseInt(payload.year, 10) || null };
+          const raw = await api('/vehicles', { method: 'POST', body });
+          vehicles.push(raw); this._bump(); return raw;
+        },
+        async deleteNotification(id) {
+          await api('/notifications/' + encodeURIComponent(id), { method: 'DELETE' });
+          const i = notifications.findIndex(n => n.id === id);
+          if (i >= 0) notifications.splice(i, 1);
+          this._bump();
+          return { id };
+        },
         async updateStudent(id, patch) {
           const raw = await api('/students/' + encodeURIComponent(id), { method: 'PATCH', body: patch });
           const ex = studentsById.get(id);
-          if (!ex) return raw;
-          Object.assign(ex, raw, {
-            createdAtMs: parseDT(raw.createdAt),
-            docs: { cccd: !!raw.docs_cccd, gksk: !!raw.docs_gksk, donDeNghi: !!raw.docs_donDeNghi, the3x4: !!raw.docs_the3x4 },
-          });
-          recomputeDerived(ex);
-          return ex;
+          if (ex) {
+            Object.assign(ex, raw, {
+              createdAtMs: parseDT(raw.createdAt),
+              docs: { cccd: !!raw.docs_cccd, gksk: !!raw.docs_gksk, donDeNghi: !!raw.docs_donDeNghi, the3x4: !!raw.docs_the3x4 },
+            });
+            recomputeDerived(ex);
+          }
+          this._bump();
+          return ex || raw;
         },
         async updateClass(id, patch) {
           const raw = await api('/classes/' + encodeURIComponent(id), { method: 'PATCH', body: patch });
           const ex = classesById.get(id);
-          if (!ex) return raw;
-          Object.assign(ex, raw, { _openMs: parseDT(raw.openDate), _examMs: parseDT(raw.examDate) });
-          setClassStatus(ex);
-          return ex;
+          if (ex) {
+            Object.assign(ex, raw, { _openMs: parseDT(raw.openDate), _examMs: parseDT(raw.examDate) });
+            setClassStatus(ex);
+          }
+          this._bump();
+          return ex || raw;
         },
         async markNotificationRead(id, read = true) {
           const raw = await api('/notifications/' + encodeURIComponent(id), { method: 'PATCH', body: { read } });
           const ex = notifications.find(n => n.id === id);
-          if (ex) Object.assign(ex, raw);
+          if (ex) Object.assign(ex, raw, { detail: raw.message ?? ex.detail });
+          this._bump();
           return raw;
         },
         async logout() {

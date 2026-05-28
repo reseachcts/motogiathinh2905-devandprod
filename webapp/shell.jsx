@@ -117,7 +117,7 @@ function Sidebar({ active, onNav, onQuickAdd, unreadCount, collapsed }) {
 
       <Modal open={logoutOpen} onClose={() => setLogoutOpen(false)}
              title="Đăng xuất khỏi tài khoản?"
-             primaryAction={() => setLogoutOpen(false)}
+             primaryAction={() => { setLogoutOpen(false); D.api.logout(); }}
              primaryLabel="Đăng xuất"
              primaryIcon="logout"
              width={460}/>

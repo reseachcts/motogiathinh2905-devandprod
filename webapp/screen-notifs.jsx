@@ -17,10 +17,17 @@ function NotificationsScreen({ onOpenStudent }) {
   const selectAll = () => {
     setSelected(selected.size === items.length ? new Set() : new Set(items.map(i => i.id)));
   };
-  const markAllRead = () => setItems(items.map(i => ({ ...i, read: true })));
+  const markAllRead = () => {
+    const unread = items.filter(i => !i.read);
+    setItems(items.map(i => ({ ...i, read: true })));
+    // Fire and forget; data-loader bumps mgt:datachanged for the rest of the UI.
+    unread.forEach(i => D.api.markNotificationRead(i.id, true).catch(() => {}));
+  };
   const deleteSelected = () => {
+    const ids = Array.from(selected);
     setItems(items.filter(i => !selected.has(i.id)));
     setSelected(new Set());
+    ids.forEach(id => D.api.deleteNotification(id).catch(() => {}));
   };
 
   return (

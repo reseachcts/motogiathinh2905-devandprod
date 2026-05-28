@@ -134,18 +134,44 @@ async function run() {
   const sidebarBtnCount = await page.locator('aside button').count();
   log(sidebarBtnCount >= 8, '9: vehicle/theme toggles present in sidebar', `${sidebarBtnCount} buttons in sidebar`);
 
-  // ----- Step 10: Filter dialog opens on a list -----
+  // ----- Step 10: write-flow — Tổ chức → Giáo viên → Thêm → verify persists -----
+  // (moved before the filter test so the filter overlay doesn't block navigation)
+  await page.locator('aside button:has-text("Tổ chức")').click();
+  await page.waitForSelector('button:has-text("Giáo viên")', { timeout: 5000 });
+  await page.locator('button:has-text("Giáo viên")').first().click();
+  const teachersBefore = await page.evaluate(() => window.MGT_DATA.teachers.length);
+  await page.locator('button:has-text("Thêm giáo viên")').click();
+  // Wait for the modal to actually open — Tạo mới only exists in RecordCreatorModal.
+  await page.waitForSelector('button:has-text("Tạo mới")', { timeout: 5000 });
+  // Use a unique name + a salt so re-runs don't collide.
+  const uniqueName = 'E2E Test Teacher ' + Math.random().toString(36).slice(2, 7);
+  // Input atoms render the <label> as a sibling of the input, but the
+  // <label> in the *parent screen* (PillTabs etc.) sometimes intercepts.
+  // Focus via JS then type — fully bypasses pointer actionability.
+  await page.locator('input[placeholder="Trần Văn B"]').evaluate((el) => el.focus());
+  await page.keyboard.type(uniqueName);
+  await page.locator('input[placeholder="09…"]').evaluate((el) => el.focus());
+  await page.keyboard.type('0900000001');
+  await page.locator('button:has-text("Tạo mới")').click({ force: true });
+  const teachersAfter = await page.waitForFunction(
+    (before) => window.MGT_DATA.teachers.length > before,
+    teachersBefore, { timeout: 5000 }
+  ).then(() => page.evaluate(() => window.MGT_DATA.teachers.length)).catch(() => teachersBefore);
+  const renderedInDom = await page.locator(`text=${uniqueName}`).count();
+  log(teachersAfter === teachersBefore + 1 && renderedInDom > 0,
+    '10: write-flow Thêm giáo viên persists + UI updates',
+    `${teachersBefore} → ${teachersAfter} (DOM: ${renderedInDom})`);
+
+  // ----- Step 11: Filter dialog opens on a list (done last; panel is sticky) -----
   await page.locator('aside button:has-text("Học viên")').click();
   await page.waitForSelector('text=Lọc', { timeout: 5000 });
-  // Click the Lọc button — there's only one
   await page.locator('button:has-text("Lọc")').first().click();
-  // Filter panel renders "XÓA" + "Bộ lọc" somewhere
   const filterOpen = await page.waitForFunction(
     () => /XÓA|Bộ lọc/i.test(document.body.innerText),
     null, { timeout: 5000 }
   ).then(() => true).catch(() => false);
   if (SNAPSHOT) await page.screenshot({ path: resolve(SHOTS, '05-filter.png'), fullPage: true });
-  log(filterOpen, '10: Lọc → advanced filter panel opens');
+  log(filterOpen, '11: Lọc → advanced filter panel opens');
 
   await browser.close();
 

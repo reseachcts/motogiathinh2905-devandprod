@@ -336,7 +336,12 @@ function ClassDetail({ classId, onBack, onOpenStudent, isAdmin }) {
       </GlassCard>
 
       <ClassEditModal open={editOpen} onClose={() => setEditOpen(false)} cls={cls}
-                      currentStatus={status} onSaveStatus={setStatus}/>
+                      currentStatus={status}
+                      onSaveStatus={(s) => {
+                        setStatus(s);
+                        window.MGT_DATA.api.updateClass(cls.id, { statusOverride: s })
+                          .catch(e => alert("Lỗi: " + e.message));
+                      }}/>
 
       <GlassCard padding={0}>
         <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)", display: "flex", alignItems: "center", gap: 10 }}>
