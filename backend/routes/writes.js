@@ -268,4 +268,83 @@ router.patch('/notifications/:id', (req, res) => {
   res.json(coerceBools('notifications', db.prepare('SELECT * FROM notifications WHERE id = ?').get(id)));
 });
 
+// DELETE /api/notifications/:id — user dismisses a notification.
+router.delete('/notifications/:id', (req, res) => {
+  const id = req.params.id;
+  const existing = db.prepare('SELECT * FROM notifications WHERE id = ?').get(id);
+  if (!existing) return bad(res, 404, 'not_found');
+  db.prepare('DELETE FROM notifications WHERE id = ?').run(id);
+  logActivity(req.user.id, 'notification.delete', id);
+  res.json({ ok: true, id });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH for support tables. Per-table whitelist of mutable columns; same
+// generic body that writes.js uses for student/class patches.
+// ---------------------------------------------------------------------------
+
+const PATCHABLE = {
+  accounts:   ['name', 'role', 'branchId', 'phone', 'email', 'active'],
+  fee_plans:  ['name', 'licence', 'amount'],
+  promotions: ['name', 'appliesTo', 'discount'],
+  teachers:   ['name', 'phone', 'yearsExp', 'branchId', 'active'],
+  vehicles:   ['name', 'licence', 'plate', 'year', 'branchId', 'status'],
+};
+
+const BOOL_PATCH_FIELDS = { accounts: ['active'], teachers: ['active'] };
+
+function makeAdminPatcher(table) {
+  return (req, res) => {
+    const id = req.params.id;
+    const existing = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+    if (!existing) return bad(res, 404, 'not_found');
+    const allowed = PATCHABLE[table];
+    const sets = [], vals = [];
+    for (const k of allowed) {
+      if (!(k in req.body)) continue;
+      let v = req.body[k];
+      // promotions.appliesTo on the wire is an array; persist as pipe-string.
+      if (table === 'promotions' && k === 'appliesTo') {
+        v = Array.isArray(v) ? v.join('|') : (v || '');
+        sets.push('appliesTo_csv = ?');
+        vals.push(v);
+        continue;
+      }
+      if ((BOOL_PATCH_FIELDS[table] || []).includes(k)) v = v ? 1 : 0;
+      sets.push(`${k} = ?`); vals.push(v);
+    }
+    if (!sets.length) return bad(res, 400, 'no_fields_to_update');
+    vals.push(id);
+    try {
+      db.prepare(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    } catch (e) {
+      if (String(e.message).includes('UNIQUE')) return bad(res, 409, 'duplicate', { detail: e.message });
+      throw e;
+    }
+    logActivity(req.user.id, `${table}.update`, id);
+    const fresh = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+    coerceBools(table, fresh);
+    res.json(table === 'accounts' ? publicAccount(fresh) : fresh);
+  };
+}
+
+router.patch('/accounts/:id',   requireAdmin, makeAdminPatcher('accounts'));
+router.patch('/fee-plans/:id',  requireAdmin, makeAdminPatcher('fee_plans'));
+router.patch('/promotions/:id', requireAdmin, makeAdminPatcher('promotions'));
+router.patch('/teachers/:id',   requireAdmin, makeAdminPatcher('teachers'));
+router.patch('/vehicles/:id',   requireAdmin, makeAdminPatcher('vehicles'));
+
+// Admin password reset for any account (separate from /auth/password which
+// requires the caller's current password).
+router.post('/accounts/:id/reset-password', requireAdmin, (req, res) => {
+  const id = req.params.id;
+  const existing = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+  if (!existing) return bad(res, 404, 'not_found');
+  const { newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 8) return bad(res, 400, 'password_too_short');
+  db.prepare('UPDATE accounts SET passwordHash = ? WHERE id = ?').run(hashPassword(newPassword), id);
+  logActivity(req.user.id, 'accounts.reset_password', id);
+  res.json({ ok: true });
+});
+
 export default router;
