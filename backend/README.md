@@ -47,6 +47,11 @@ backend/
 | `SEED_ADMIN_EMAIL` | `admin@motogiathinh.local` | Default admin email |
 | `SEED_ADMIN_PASSWORD` | `changeme` | **Change immediately** after first login |
 | `CORS_ORIGINS` | (empty) | Comma-separated; leave empty when API + webapp share an origin |
+| `UPLOAD_DIR` | `./data/uploads` | Where multer writes uploaded files (student docs + biên lai). Must be writable by the service user. |
+| `MIN_PASSWORD_LENGTH` | 10 | Min length for `POST /api/auth/password`. Lower bound is 8. |
+| `LOGIN_LIMIT` | 5 | Failed-login attempts per email per `LOGIN_WINDOW_MIN`. |
+| `LOGIN_WINDOW_MIN` | 15 | Sliding window for the login limiter. |
+| `LOGIN_LOCKOUT_MIN` | 60 | Hard lockout duration once `2 × LOGIN_LIMIT` failures pile up. |
 
 ## Contract
 
