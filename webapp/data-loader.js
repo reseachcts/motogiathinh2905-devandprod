@@ -41,9 +41,11 @@
   };
 
   // Login overlay — vanilla DOM, only shown if /api/me returns 401.
+  // Attaches to document.body (NOT #root) so React's reconciler doesn't
+  // overwrite it on the loading-state render.
   function showLoginOverlay() {
     return new Promise((resolve) => {
-      const root = document.getElementById('root') || document.body;
+      const root = document.body;
       const css = `.mgt-login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg-0,#0b0d12);z-index:99999;font-family:var(--font-ui,system-ui,sans-serif)}
 .mgt-login-card{padding:32px 28px;min-width:340px;max-width:380px;border-radius:20px;background:var(--glass-2,rgba(255,255,255,.04));border:1px solid var(--glass-stroke,rgba(255,255,255,.08));box-shadow:0 24px 60px rgba(0,0,0,.4),0 0 24px color-mix(in oklab,var(--neon-cyan,#4ad6ff) 18%,transparent)}
 .mgt-login h2{margin:0;font-family:var(--font-display,inherit);font-size:22px;font-weight:600;color:var(--fg-1,#fff);letter-spacing:-.015em}
