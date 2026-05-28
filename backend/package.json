@@ -9,8 +9,12 @@
   },
   "scripts": {
     "start": "node server.js",
+    "dev": "node --watch server.js",
     "seed": "node seed/seed-from-csv.js",
-    "reset-db": "node seed/seed-from-csv.js --reset"
+    "reset-db": "node seed/seed-from-csv.js --reset",
+    "test": "node --test \"test/**/*.test.js\"",
+    "smoke": "node seed/smoke-test.js",
+    "e2e": "node seed/e2e-browser.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
