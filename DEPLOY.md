@@ -272,7 +272,49 @@ Two failure modes, both reversible:
 
 ---
 
-## 13. Known frontend-integration deviations
+## 13. Operational quick reference (polished build)
+
+| Concern | Where it lives | How to inspect |
+|---|---|---|
+| API health | `GET /api/health` | `curl http://localhost:3001/api/health` |
+| Request logs | stdout (`journalctl -u motogiathinh -f`) | `[req] METHOD path status ms userId` per request |
+| Notifications auto-recompute | `backend/notifications.js`, fires every 5min + after each write | Watch logs for `[notifications] recompute: +X ~Y -Z` |
+| File uploads | `backend/data/uploads/{students,payments}/<id>/<key>-<ts>.<ext>` | Listed dir; URL form `/api/files/<kind>/<id>/<file>` |
+| Login rate-limit state | In-memory map, resets on restart | After 5 wrong tries an email gets 429 for 15min |
+| Tests | `cd backend && npm test` | Built-in `node:test` — 21 cases (~535ms) |
+| Smoke / E2E | `npm run smoke` / `npm run e2e` | Smoke = pure HTTP. E2E = headless Chromium walking all 6 screens |
+| DB backup | `sqlite3 data/motogiathinh.db ".backup ./bk.db"` while service runs | One file. Compress + offsite. |
+
+### Endpoint surface (post-polish)
+
+Reads (auth required):
+- `GET /api/{branches,accounts,classes,students,payments,fee-plans,promotions,teachers,vehicles,notifications,activity-log}`
+- `GET /api/constants/profile-docs` · `GET /api/now`
+- `GET /api/me` · `GET /api/files/<kind>/<recId>/<filename>` (branch-scoped)
+
+Writes:
+- `POST /api/auth/login` (rate-limited) · `/auth/logout` · `/auth/password`
+- `POST /api/students` (any role, branch-scoped) · `PATCH /api/students/:id`
+- `POST /api/students/:id/docs/:key` (multipart, ≤8MB)
+- `POST /api/payments` (any role, immutable) · `POST /api/payments/:id/bien-lai`
+- `POST /api/classes` · `PATCH /api/classes/:id` (admin only)
+- `POST + PATCH /api/{accounts,fee-plans,promotions,teachers,vehicles}` (admin)
+- `POST /api/accounts/:id/reset-password` (admin)
+- `PATCH /api/notifications/:id` · `DELETE /api/notifications/:id`
+
+### Per-table indexes (already in migrations)
+
+```
+students:  (branchId), (classId), (createdAt)
+payments:  (studentId), (branchId), (createdAt)
+classes:   (branchId), (code)
+notifs:    (read)
+activity:  (at)
+```
+
+---
+
+## 14. Known frontend-integration deviations
 
 The signed-off frontend (under `webapp/`) shipped with empty callbacks on
 every "save / create / update / delete" modal — clearly integration seams
