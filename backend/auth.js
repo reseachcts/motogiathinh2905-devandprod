@@ -64,6 +64,66 @@ export function hashPassword(plain) {
   return bcrypt.hashSync(plain, 10);
 }
 
+// -- password complexity ----------------------------------------------------
+// 10+ chars, at least one letter, one digit. Tweak via env if needed.
+const MIN_PW_LEN = Math.max(8, Number(process.env.MIN_PASSWORD_LENGTH) || 10);
+export function passwordPolicy(pw) {
+  if (typeof pw !== 'string') return { ok: false, code: 'password_required', message: 'Mật khẩu là bắt buộc.' };
+  if (pw.length < MIN_PW_LEN) return { ok: false, code: 'password_too_short',
+    message: `Mật khẩu phải có ít nhất ${MIN_PW_LEN} ký tự.` };
+  if (!/[A-Za-z]/.test(pw)) return { ok: false, code: 'password_needs_letter',
+    message: 'Mật khẩu phải có ít nhất một chữ cái.' };
+  if (!/\d/.test(pw)) return { ok: false, code: 'password_needs_digit',
+    message: 'Mật khẩu phải có ít nhất một chữ số.' };
+  return { ok: true };
+}
+
+// -- login rate limiting ----------------------------------------------------
+// Sliding window per email: max LIMIT failed attempts in WINDOW_MS, then
+// LOCKOUT_MS cooldown. In-memory; resets on restart (fine for single-node).
+const LIMIT       = Number(process.env.LOGIN_LIMIT)       || 5;
+const WINDOW_MS   = (Number(process.env.LOGIN_WINDOW_MIN) || 15) * 60_000;
+const LOCKOUT_MS  = (Number(process.env.LOGIN_LOCKOUT_MIN) || 60) * 60_000;
+const _failures = new Map();    // email → { attempts: number[], lockUntil: number }
+
+function _now() { return Date.now(); }
+function _key(email) { return String(email || '').toLowerCase().trim(); }
+
+export function checkLoginAttempt(email) {
+  const k = _key(email);
+  const rec = _failures.get(k);
+  if (!rec) return { allowed: true };
+  if (rec.lockUntil && rec.lockUntil > _now()) {
+    return { allowed: false, code: 'account_locked',
+      message: `Tài khoản tạm khóa. Thử lại sau ${Math.ceil((rec.lockUntil - _now())/60000)} phút.`,
+      retryAfter: rec.lockUntil - _now() };
+  }
+  // Drop attempts outside the window.
+  rec.attempts = rec.attempts.filter(t => _now() - t < WINDOW_MS);
+  if (rec.attempts.length >= LIMIT) {
+    return { allowed: false, code: 'too_many_attempts',
+      message: `Quá ${LIMIT} lần thử trong ${Math.round(WINDOW_MS/60000)} phút. Vui lòng đợi.` };
+  }
+  return { allowed: true };
+}
+
+export function recordLoginFailure(email) {
+  const k = _key(email);
+  const rec = _failures.get(k) || { attempts: [], lockUntil: 0 };
+  rec.attempts.push(_now());
+  rec.attempts = rec.attempts.filter(t => _now() - t < WINDOW_MS);
+  // Hard lockout after double the per-window limit.
+  if (rec.attempts.length >= LIMIT * 2) {
+    rec.lockUntil = _now() + LOCKOUT_MS;
+    rec.attempts = [];
+  }
+  _failures.set(k, rec);
+}
+
+export function clearLoginFailures(email) {
+  _failures.delete(_key(email));
+}
+
 const touchActive = db.prepare('UPDATE accounts SET lastActive = ? WHERE id = ?');
 export function bumpLastActive(accountId) {
   touchActive.run(nowDdMmYyyyHHMMSS(), accountId);

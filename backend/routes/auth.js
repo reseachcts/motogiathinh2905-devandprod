@@ -4,6 +4,7 @@ import { Router } from 'express';
 import {
   COOKIE_NAME, cookieOptions, findAccountByEmail, findAccountById,
   hashPassword, publicAccount, requireAuth, signToken, verifyPassword,
+  passwordPolicy, checkLoginAttempt, recordLoginFailure, clearLoginFailures,
 } from '../auth.js';
 import { db, logActivity } from '../db.js';
 
@@ -13,11 +14,20 @@ router.post('/auth/login', (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'missing_credentials' });
 
+  const gate = checkLoginAttempt(email);
+  if (!gate.allowed) {
+    logActivity(null, 'auth.login_blocked', `${email} (${gate.code})`);
+    return res.status(429).json({ error: gate.code, message: gate.message, retryAfter: gate.retryAfter });
+  }
+
   const account = findAccountByEmail(email);
   if (!account || !verifyPassword(password, account.passwordHash)) {
+    recordLoginFailure(email);
+    logActivity(null, 'auth.login_fail', email);
     return res.status(401).json({ error: 'invalid_credentials' });
   }
 
+  clearLoginFailures(email);
   const token = signToken(account);
   res.cookie(COOKIE_NAME, token, cookieOptions());
   logActivity(account.id, 'auth.login', account.email);
@@ -34,12 +44,13 @@ router.get('/me', requireAuth, (req, res) => {
   res.json({ user: publicAccount(req.user) });
 });
 
-// Self-service password change. Admin can also change other users' passwords
-// via PATCH /accounts/:id (see routes/accounts.js).
+// Self-service password change. Admin can reset any user's password via
+// POST /accounts/:id/reset-password (see routes/writes.js).
 router.post('/auth/password', requireAuth, (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
   if (!currentPassword || !newPassword) return res.status(400).json({ error: 'missing_fields' });
-  if (newPassword.length < 8) return res.status(400).json({ error: 'password_too_short' });
+  const pol = passwordPolicy(newPassword);
+  if (!pol.ok) return res.status(400).json({ error: pol.code, message: pol.message });
   if (!verifyPassword(currentPassword, req.user.passwordHash)) {
     return res.status(401).json({ error: 'invalid_credentials' });
   }
