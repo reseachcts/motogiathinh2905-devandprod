@@ -70,7 +70,7 @@ function BranchesTab({ onOpenClass }) {
         subtitle={editing?.name}
         initialValues={editing || {}}
         fields={branchFields}
-        onSave={(d) => window.MGT_DATA.api.updateBranch(editingId, d).catch(e => reportWriteError(e, "Lỗi cập nhật"))}/>
+        onSave={(d) => window.MGT_DATA.api.updateBranch(editingId, d)}/>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
         {D.branches.map(b => {
           // Use index maps — O(1) per branch instead of three full scans.
@@ -299,7 +299,7 @@ function AccountsTab() {
       <EditRecordModal open={!!editing} onClose={() => setEditingId(null)}
         title="Sửa tài khoản" subtitle={editing?.name}
         initialValues={editing || {}} fields={accountEditFields}
-        onSave={(d) => window.MGT_DATA.api.updateAccount(editingId, d).catch(e => reportWriteError(e, "Lỗi cập nhật"))}/>
+        onSave={(d) => window.MGT_DATA.api.updateAccount(editingId, d)}/>
       <PasswordResetModal open={!!pwAccount} onClose={() => setPwId(null)}
         account={pwAccount}
         onSubmit={(pw) => window.MGT_DATA.api.resetPassword(pwId, pw).catch(e => reportWriteError(e, "Lỗi đặt lại mật khẩu"))}/>
@@ -374,7 +374,7 @@ function FeesTab() {
       <EditRecordModal open={!!editing} onClose={() => setEditingId(null)}
         title="Sửa gói học phí" subtitle={editing?.name}
         initialValues={editing || {}} fields={feeFields}
-        onSave={(d) => window.MGT_DATA.api.updateFeePlan(editingId, d).catch(e => reportWriteError(e, "Lỗi cập nhật"))}/>
+        onSave={(d) => window.MGT_DATA.api.updateFeePlan(editingId, d)}/>
       {D.feePlans.map((f, i) => (
         <div key={f.id} style={{
           display: "grid", gridTemplateColumns: "1fr 80px 200px 40px",
@@ -409,7 +409,16 @@ function PromosTab() {
     { id: "appliesTo", label: "Áp dụng cho bằng",   type: "multipill", color: "lime",
       options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
   ];
+  // Normalize appliesTo at modal entry: some legacy rows store fee-plan
+  // ids (e.g. "fee-a"); the edit form expects licences ("A"/"A1"). Map
+  // through getFeePlan() for ids; pass-through anything already A/A1.
   const editing = editingId ? D.getPromotion(editingId) : null;
+  const editingNorm = editing ? {
+    ...editing,
+    appliesTo: Array.from(new Set((editing.appliesTo || []).map(v =>
+      v === "A" || v === "A1" ? v : (D.getFeePlan(v)?.licence || null)
+    ).filter(Boolean))),
+  } : null;
   return (
     <GlassCard padding={0}>
       <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)", display: "flex", alignItems: "center" }}>
@@ -435,8 +444,8 @@ function PromosTab() {
         ]}/>
       <EditRecordModal open={!!editing} onClose={() => setEditingId(null)}
         title="Sửa khuyến mãi" subtitle={editing?.name}
-        initialValues={editing || {}} fields={promoEditFields}
-        onSave={(d) => window.MGT_DATA.api.updatePromotion(editingId, d).catch(e => reportWriteError(e, "Lỗi cập nhật"))}/>
+        initialValues={editingNorm || {}} fields={promoEditFields}
+        onSave={(d) => window.MGT_DATA.api.updatePromotion(editingId, d)}/>
       {D.promotions.map((p, i) => (
         <div key={p.id} style={{
           display: "grid", gridTemplateColumns: "1fr 180px 200px 40px",
@@ -489,7 +498,7 @@ function TeachersTab() {
       <EditRecordModal open={!!editing} onClose={() => setEditingId(null)}
         title="Sửa giáo viên" subtitle={editing?.name}
         initialValues={editing || {}} fields={teacherFields}
-        onSave={(d) => window.MGT_DATA.api.updateTeacher(editingId, d).catch(e => reportWriteError(e, "Lỗi cập nhật"))}/>
+        onSave={(d) => window.MGT_DATA.api.updateTeacher(editingId, d)}/>
       <div style={{
         display: "grid", gridTemplateColumns: "1.6fr 160px 1fr 100px 40px",
         padding: "12px 22px", gap: 12, borderBottom: "1px solid var(--ink-4)",
@@ -563,7 +572,7 @@ function VehiclesTab() {
       <EditRecordModal open={!!editing} onClose={() => setEditingId(null)}
         title="Sửa phương tiện" subtitle={editing?.name}
         initialValues={editing || {}} fields={vehicleFields}
-        onSave={(d) => window.MGT_DATA.api.updateVehicle(editingId, d).catch(e => reportWriteError(e, "Lỗi cập nhật"))}/>
+        onSave={(d) => window.MGT_DATA.api.updateVehicle(editingId, d)}/>
       <div style={{
         display: "grid", gridTemplateColumns: "1.4fr 80px 160px 100px 1fr 120px 40px",
         padding: "12px 22px", gap: 12, borderBottom: "1px solid var(--ink-4)",
@@ -620,7 +629,7 @@ function ActivityTab() {
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>Nhật ký hoạt động</span>
       </div>
       {D.activityLog.map((log, i) => {
-        const user = D.getStaff(log.userId);
+        const user = D.getStaff(log.userId) || { name: "Hệ thống", role: "system" };
         return (
           <div key={log.id} style={{
             display: "grid", gridTemplateColumns: "120px 1fr 1.6fr 1fr",
@@ -635,7 +644,7 @@ function ActivityTab() {
             <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-2)" }}>
               <span style={{ color: "var(--neon-cyan)" }}>{log.action}</span> · {log.target}
             </span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)" }}>{user.role === "admin" ? "Admin" : "Nhân viên"}</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)" }}>{user.role === "admin" ? "Admin" : user.role === "system" ? "Hệ thống" : "Nhân viên"}</span>
           </div>
         );
       })}
@@ -742,14 +751,36 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
     return seed;
   };
   const [draft, setDraft] = React.useState(buildSeed);
-  React.useEffect(() => { if (open) setDraft(buildSeed()); }, [open, initialValues]);  // eslint-disable-line
+  const [busy, setBusy]   = React.useState(false);
+  const [err, setErr]     = React.useState(null);
+  React.useEffect(() => { if (open) { setDraft(buildSeed()); setBusy(false); setErr(null); } }, [open, initialValues]);  // eslint-disable-line
   const set = (id, v) => setDraft(prev => ({ ...prev, [id]: v }));
-  const submit = () => { onSave && onSave(draft); onClose(); };
+  // Await onSave; only close on success so failures stay visible inline
+  // instead of vanishing with the dialog.
+  const submit = async () => {
+    try {
+      setBusy(true); setErr(null);
+      await onSave?.(draft);
+      onClose();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   const useGrid = (fields || []).length >= 4;
   return (
     <Modal open={open} onClose={onClose}
            title={title} subtitle={subtitle}
-           primaryAction={submit} primaryLabel="Lưu thay đổi" primaryIcon="check"
+           primaryAction={submit}
+           primaryLabel={busy ? "Đang lưu…" : "Lưu thay đổi"}
+           primaryIcon="check"
+           primaryDisabled={busy}
+           footerStart={err ? (
+             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>
+               Lỗi: {err}
+             </span>
+           ) : null}
            width={560}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <h4 style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>
