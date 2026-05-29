@@ -78,13 +78,17 @@ function AddStudentModal({ open, onClose, onSave }) {
     <Modal open={open} onClose={onClose} width={880}
            primaryLabel="Lưu học viên"
            primaryAction={() => { onSave && onSave({ form, docs, profileComplete, docFiles }); onClose(); }}
-           primaryDisabled={!form.name || !form.classId || !form.responsibleStaffId}
+           primaryDisabled={!form.name || !form.classId || !form.responsibleStaffId || openClasses.length === 0}
            footerStart={
-             !profileComplete && (
+             openClasses.length === 0 ? (
+               <span style={{ fontFamily: "var(--font-ui)", fontSize: 11, color: "var(--neon-pink)" }}>
+                 Không có lớp đang mở — hãy tạo lớp trước.
+               </span>
+             ) : !profileComplete ? (
                <span style={{ fontFamily: "var(--font-ui)", fontSize: 11, color: "var(--neon-amber)" }}>
                  Còn {4 - docsCount} ô tài liệu và {REQUIRED_FIELDS.filter(k=>!form[k]).length} trường chưa điền.
                </span>
-             )
+             ) : null
            }>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {/* OCR toast — pinned at top */}
@@ -134,9 +138,9 @@ function AddStudentModal({ open, onClose, onSave }) {
                 <Input label="SĐT" value={form.phone} onChange={v => setForm({ ...form, phone: v })} placeholder="090 123 4567" mono/>
               </div>
               <Select label="Lớp" value={form.classId} onChange={v => setForm({ ...form, classId: v })}
-                      placeholder="Chọn lớp đang mở"
+                      placeholder={openClasses.length === 0 ? "Chưa có lớp đang mở" : "Chọn lớp đang mở"}
                       options={openClasses.map(c => ({ value: c.id, label: c.code }))}
-                      note={openClasses.length === 0 ? "Chưa có lớp nào đang mở." : null}/>
+                      note={openClasses.length === 0 ? "Không có lớp đang mở — hãy tạo lớp trước." : null}/>
               <Select label="Nhân viên" value={form.responsibleStaffId} onChange={v => setForm({ ...form, responsibleStaffId: v })}
                       placeholder="Chọn nhân viên"
                       options={D.accounts.filter(a => a.role === "staff").map(a => ({ value: a.id, label: a.name }))}/>
@@ -227,7 +231,7 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
   const newPaid = student ? student.paid + amount : 0;
   const newBalance = student ? student.totalFee - newPaid : 0;
   const newStatus = student
-    ? (newPaid >= student.totalFee ? "FULL" : newPaid > 0 ? "50%" : "0%")
+    ? (newPaid >= student.totalFee ? "100%" : newPaid > 0 ? "50%" : "0%")
     : "—";
 
   return (
