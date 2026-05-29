@@ -156,15 +156,19 @@ function AppRoot() {
                        defaultAmount={addPayment.amount}
                        onClose={() => setAddPayment({ open: false, studentId: null, amount: null })}
                        onSave={async (payload) => {
-                         try {
-                           const { bienLaiFile, ...rest } = payload;
-                           const created = await D.api.createPayment(rest);
-                           if (bienLaiFile) await D.api.uploadBienLai(created.id, bienLaiFile)
-                             .catch(e => console.warn('biên lai upload failed', e));
-                         } catch (e) { alert("Lỗi: " + e.message); }
+                         // Let errors propagate so AddPaymentModal can render
+                         // them inline (busy/err pattern). The previous
+                         // try/catch+alert+swallowed-upload-warn made create
+                         // and upload failures invisible to the user.
+                         const { bienLaiFile, ...rest } = payload;
+                         const created = await D.api.createPayment(rest);
+                         if (bienLaiFile) {
+                           try { await D.api.uploadBienLai(created.id, bienLaiFile); }
+                           catch (e) { throw new Error('Đã lưu thanh toán nhưng tải ảnh biên lai thất bại: ' + e.message); }
+                         }
                        }}/>
       <AddClassModal   open={addClass} onClose={() => setAddClass(false)}
-                       onSave={(payload) => D.api.createClass(payload).catch(e => alert('Lỗi: ' + e.message))}/>
+                       onSave={(payload) => D.api.createClass(payload)}/>
     </div>
   );
 }

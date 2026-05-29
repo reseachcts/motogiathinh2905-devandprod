@@ -402,7 +402,15 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
                           transition: "border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out)",
                         }}
                         onFocus={e => { e.target.style.borderColor = "var(--neon-cyan)"; e.target.style.boxShadow = "0 0 14px var(--neon-cyan-haze)"; }}
-                        onBlur={e => { e.target.style.borderColor = "var(--glass-stroke)"; e.target.style.boxShadow = "none"; }}/>
+                        onBlur={e => {
+                          e.target.style.borderColor = "var(--glass-stroke)";
+                          e.target.style.boxShadow = "none";
+                          // Persist on blur so notes survive tab-switch / reload.
+                          // Skip the round-trip if nothing actually changed.
+                          if ((notes || "") !== (s.notes || "")) {
+                            D.api.updateStudent(s.id, { notes }).catch(err => alert("Lỗi lưu ghi chú: " + err.message));
+                          }
+                        }}/>
             </div>
           </div>
         </GlassCard>
@@ -418,7 +426,14 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
             {D.PROFILE_DOCS.map(doc => (
               <DocSlot key={doc.key} doc={doc} filled={docs[doc.key]}
-                       onDrop={(k) => setDocs({ ...docs, [k]: true })}
+                       previewUrl={s['docs_' + doc.key + '_url']}
+                       onDrop={(k, file) => {
+                         setDocs(prev => ({ ...prev, [k]: true }));
+                         if (file) {
+                           D.api.uploadStudentDoc(s.id, k, file)
+                             .catch(err => alert("Lỗi tải tài liệu: " + err.message));
+                         }
+                       }}
                        onClear={(k) => setDocs({ ...docs, [k]: false })}/>
             ))}
           </div>

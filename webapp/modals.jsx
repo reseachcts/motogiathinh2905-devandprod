@@ -216,13 +216,18 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
   const [form, setForm] = React.useState({ studentId: "", amount: "", method: "", bienLaiId: "" });
   const [bienLaiPhoto, setBienLaiPhoto] = React.useState(false);
   const [bienLaiFile, setBienLaiFile] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr]   = React.useState(null);
 
   React.useEffect(() => {
-    if (open) setForm({
-      studentId: defaultStudentId || "",
-      amount: defaultAmount != null ? String(defaultAmount) : "",
-      method: "", bienLaiId: "",
-    });
+    if (open) {
+      setForm({
+        studentId: defaultStudentId || "",
+        amount: defaultAmount != null ? String(defaultAmount) : "",
+        method: "", bienLaiId: "",
+      });
+      setBusy(false); setErr(null);
+    }
     if (!open) { setBienLaiPhoto(false); setBienLaiFile(null); }
   }, [open, defaultStudentId, defaultAmount]);
 
@@ -234,12 +239,29 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
     ? (newPaid >= student.totalFee ? "100%" : newPaid > 0 ? "50%" : "0%")
     : "—";
 
+  const submit = async () => {
+    try {
+      setBusy(true); setErr(null);
+      await (onSave && onSave({ ...form, amount, bienLaiPhoto, bienLaiFile }));
+      onClose();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Modal open={open} onClose={onClose} width={620}
            title="Ghi nhận thanh toán"
-           primaryLabel="Lưu thanh toán"
-           primaryAction={() => { onSave && onSave({ ...form, amount, bienLaiPhoto, bienLaiFile }); onClose(); }}
-           primaryDisabled={!form.studentId || !amount || !form.method || !form.bienLaiId}>
+           primaryLabel={busy ? "Đang lưu…" : "Lưu thanh toán"}
+           primaryAction={submit}
+           primaryDisabled={busy || !form.studentId || !amount || !form.method || !form.bienLaiId}
+           footerStart={err ? (
+             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>
+               Lỗi: {err}
+             </span>
+           ) : null}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <StudentSearchPicker label="Học viên"
                              value={form.studentId}
@@ -422,13 +444,34 @@ function StudentSearchPicker({ label, value, onChange }) {
 function AddClassModal({ open, onClose, onSave }) {
   const D = window.MGT_DATA;
   const [form, setForm] = React.useState({ code: "", openDate: "", examDate: "", branchId: "" });
-  React.useEffect(() => { if (!open) setForm({ code: "", openDate: "", examDate: "", branchId: "" }); }, [open]);
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr]   = React.useState(null);
+  React.useEffect(() => {
+    if (!open) setForm({ code: "", openDate: "", examDate: "", branchId: "" });
+    if (open) { setBusy(false); setErr(null); }
+  }, [open]);
+  const submit = async () => {
+    try {
+      setBusy(true); setErr(null);
+      await (onSave && onSave(form));
+      onClose();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <Modal open={open} onClose={onClose} width={520}
            title="Tạo lớp mới"
-           primaryLabel="Tạo lớp"
-           primaryAction={() => { onSave && onSave(form); onClose(); }}
-           primaryDisabled={!form.code || !form.branchId}>
+           primaryLabel={busy ? "Đang tạo…" : "Tạo lớp"}
+           primaryAction={submit}
+           primaryDisabled={busy || !form.code || !form.branchId}
+           footerStart={err ? (
+             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>
+               Lỗi: {err}
+             </span>
+           ) : null}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Input label="Mã lớp" value={form.code} onChange={v => setForm({ ...form, code: v })} placeholder="MÔ TÔ 06/2026"/>
         <Select label="Chi nhánh" value={form.branchId} onChange={v => setForm({ ...form, branchId: v })}

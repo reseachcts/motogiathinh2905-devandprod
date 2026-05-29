@@ -337,9 +337,15 @@ function ClassDetail({ classId, onBack, onOpenStudent, isAdmin }) {
 
       <ClassEditModal open={editOpen} onClose={() => setEditOpen(false)} cls={cls}
                       currentStatus={status}
-                      onSaveStatus={(s) => {
-                        setStatus(s);
-                        window.MGT_DATA.api.updateClass(cls.id, { statusOverride: s })
+                      onSaveStatus={({ status: newStatus, openDate, examDate }) => {
+                        setStatus(newStatus);
+                        const patch = { statusOverride: newStatus };
+                        // Only forward date fields when they actually changed
+                        // so an admin who only toggles the status doesn't
+                        // accidentally rewrite the wall-clock dates.
+                        if (openDate && openDate !== cls.openDate) patch.openDate = openDate;
+                        if (examDate && examDate !== cls.examDate) patch.examDate = examDate;
+                        window.MGT_DATA.api.updateClass(cls.id, patch)
                           .catch(e => alert("Lỗi: " + e.message));
                       }}/>
 
@@ -410,7 +416,14 @@ function ClassEditModal({ open, onClose, cls, currentStatus, onSaveStatus }) {
   return (
     <Modal open={open} onClose={onClose}
            title={`Sửa lớp ${cls.code}`}
-           primaryAction={() => { onSaveStatus(draft.status); onClose(); }}
+           primaryAction={() => {
+             onSaveStatus({
+               status: draft.status,
+               openDate: draft.openDate,
+               examDate: draft.examDate,
+             });
+             onClose();
+           }}
            primaryLabel="Lưu thay đổi"
            primaryIcon="check"
            width={520}>
