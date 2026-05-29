@@ -39,7 +39,9 @@ test('buildDesired produces auto-* notifications from real seed', () => {
   for (const [id, row] of desired) {
     assert.ok(id.startsWith('auto-payment-') || id.startsWith('auto-profile-'),
       'id should be auto-payment-* or auto-profile-*, got ' + id);
-    assert.ok(['payment', 'profile'].includes(row.type));
+    // 'doc' is the frontend-compatible alias for profile-incomplete rows
+    // (see notifications.js Rule 3 comment).
+    assert.ok(['payment', 'doc'].includes(row.type), 'unexpected type: ' + row.type);
     assert.ok(['info', 'warn', 'danger'].includes(row.severity));
     assert.ok(row.studentId);
   }
@@ -56,7 +58,7 @@ test('recompute is idempotent — second run has no changes', () => {
 
 test('PATCH profileComplete=true removes the auto-profile row', () => {
   const desired = buildDesired();
-  const sample = [...desired.values()].find(n => n.type === 'profile');
+  const sample = [...desired.values()].find(n => n.type === 'doc');
   assert.ok(sample, 'expected at least one profile-incomplete student');
   const sid = sample.studentId;
   // Flip the student.

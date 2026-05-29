@@ -14,6 +14,58 @@
 import { db, nowDdMmYyyyHHMMSS, logActivity } from './db.js';
 
 // ---------------------------------------------------------------------------
+// Schema self-patch — broaden notifications.type CHECK to include 'doc'.
+//
+// The frozen frontend (webapp/screen-notifs.jsx) counts `type === "doc"` for
+// its "Hồ sơ thiếu" stat, but the original schema only allowed
+// ('payment','profile','system'), so the profile-incomplete rule emitted
+// rows that the UI never saw. We:
+//   1. Migrate any existing auto-profile-* rows to type='doc'.
+//   2. Relax the CHECK so new INSERTs with 'doc' succeed.
+//
+// SQLite can't ALTER a CHECK in place, so we rebuild the table when the old
+// constraint is detected. Idempotent — re-runs are no-ops once 'doc' is in
+// the CHECK. Lives here (not in db.js / migrations) so the contract that
+// "notifications.js owns the type vocabulary" stays in one file.
+// ---------------------------------------------------------------------------
+(function ensureDocType() {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notifications'").get();
+  if (!row || !row.sql) return;
+  if (/CHECK\s*\(\s*type\s+IN\s*\([^)]*'doc'[^)]*\)\s*\)/i.test(row.sql)) return; // already broadened
+  db.exec('BEGIN');
+  try {
+    db.exec('ALTER TABLE notifications RENAME TO notifications_old');
+    db.exec(`
+      CREATE TABLE notifications (
+        id         TEXT PRIMARY KEY,
+        type       TEXT NOT NULL CHECK (type IN ('payment','profile','doc','system')),
+        severity   TEXT NOT NULL CHECK (severity IN ('info','warn','danger')),
+        title      TEXT NOT NULL,
+        message    TEXT,
+        studentId  TEXT,
+        read       INTEGER NOT NULL DEFAULT 0,
+        createdAt  TEXT NOT NULL
+      )
+    `);
+    db.exec(`
+      INSERT INTO notifications (id, type, severity, title, message, studentId, read, createdAt)
+      SELECT id,
+             CASE WHEN id LIKE 'auto-%' AND type = 'profile' THEN 'doc' ELSE type END,
+             severity, title, message, studentId, read, createdAt
+        FROM notifications_old
+    `);
+    db.exec('DROP TABLE notifications_old');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read)');
+    db.exec('COMMIT');
+    console.log("[notifications] schema patched: type CHECK now allows 'doc'");
+  } catch (e) {
+    try { db.exec('ROLLBACK'); } catch {}
+    console.error('[notifications] schema patch failed:', e);
+    throw e;
+  }
+})();
+
+// ---------------------------------------------------------------------------
 // Date / status derivation (mirrors webapp/data-loader.js so server-side
 // recompute agrees with what the UI shows).
 // ---------------------------------------------------------------------------
@@ -71,11 +123,14 @@ export function buildDesired() {
       });
     }
 
-    // Rule 3: profile incomplete
+    // Rule 3: profile incomplete. type='doc' (not 'profile') because the
+    // frozen frontend (webapp/screen-notifs.jsx) filters its "Hồ sơ thiếu"
+    // stat on type === 'doc'. The CHECK constraint is broadened in the
+    // ensureDocType() self-migration at module load.
     if (!s.profileComplete) {
       const id = `auto-profile-${s.id}`;
       desired.set(id, {
-        id, type: 'profile', severity: 'warn',
+        id, type: 'doc', severity: 'warn',
         title: 'Hồ sơ chưa đầy đủ',
         message: `${s.name} (${s.maHV}) — thiếu tài liệu / thông tin cá nhân.`,
         studentId: s.id, read: 0, createdAt: now,
@@ -87,8 +142,20 @@ export function buildDesired() {
 
 // ---------------------------------------------------------------------------
 // Apply the desired set against the DB. Returns counts for logging.
+//
+// Concurrency: node:sqlite's DatabaseSync doesn't expose a better-sqlite3
+// style db.transaction() wrapper, so we serialize callers ourselves. Two
+// simultaneous recomputes would both try to BEGIN and the second would throw
+// "cannot start a transaction within a transaction". An in-process boolean
+// flag is enough since DatabaseSync calls are all synchronous — any caller
+// that finds the flag set queues a "needs another pass" bit and skips the
+// expensive work (the in-flight call already covers the latest state once
+// the row reads happen after the flag is set).
 // ---------------------------------------------------------------------------
-export function recompute() {
+let _running = false;
+let _rerunQueued = false;
+
+function _recomputeUnlocked() {
   const desired = buildDesired();
   const desiredIds = new Set(desired.keys());
 
@@ -97,15 +164,10 @@ export function recompute() {
 
   // 1. DELETE stale: auto-rows no longer in the desired set.
   const stale = existingAuto.filter(n => !desiredIds.has(n.id));
-  if (stale.length) {
-    const del = db.prepare('DELETE FROM notifications WHERE id = ?');
-    db.prepare('BEGIN').run();
-    try { for (const n of stale) del.run(n.id); db.prepare('COMMIT').run(); }
-    catch (e) { db.prepare('ROLLBACK').run(); throw e; }
-  }
 
   // 2. UPSERT desired. If row already present, only update mutable fields
   //    (don't reset `read` — user may have already dismissed).
+  const del = db.prepare('DELETE FROM notifications WHERE id = ?');
   const ins = db.prepare(`
     INSERT INTO notifications (id, type, severity, title, message, studentId, read, createdAt)
     VALUES (@id, @type, @severity, @title, @message, @studentId, @read, @createdAt)
@@ -116,9 +178,14 @@ export function recompute() {
            studentId = @studentId
      WHERE id = @id
   `);
+
   let added = 0, updated = 0;
-  db.prepare('BEGIN').run();
+  // Single transaction wraps both DELETE-stale and UPSERT-desired so
+  // observers never see a half-applied state.
+  db.exec('BEGIN');
+  let committed = false;
   try {
+    for (const n of stale) del.run(n.id);
     for (const [id, row] of desired) {
       const ex = existingById.get(id);
       if (!ex) { ins.run(row); added++; }
@@ -127,10 +194,36 @@ export function recompute() {
         upd.run(row); updated++;
       }
     }
-    db.prepare('COMMIT').run();
-  } catch (e) { db.prepare('ROLLBACK').run(); throw e; }
+    db.exec('COMMIT');
+    committed = true;
+  } finally {
+    if (!committed) { try { db.exec('ROLLBACK'); } catch {} }
+  }
 
   return { desired: desired.size, added, updated, deleted: stale.length };
+}
+
+export function recompute() {
+  if (_running) {
+    // Another recompute is mid-flight on this process. Note that a follow-up
+    // pass is wanted and return a no-op result; the active call will pick up
+    // the latest DB state (or we'll catch it on the next tick).
+    _rerunQueued = true;
+    return { desired: 0, added: 0, updated: 0, deleted: 0, skipped: true };
+  }
+  _running = true;
+  try {
+    let result = _recomputeUnlocked();
+    // Drain any queued reruns so callers that arrived during the active pass
+    // still see their changes reflected before we return control.
+    while (_rerunQueued) {
+      _rerunQueued = false;
+      result = _recomputeUnlocked();
+    }
+    return result;
+  } finally {
+    _running = false;
+  }
 }
 
 // ---------------------------------------------------------------------------
