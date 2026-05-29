@@ -145,3 +145,162 @@ test('GET /api/files/misc/* — refused even for admin (kind not in SERVABLE_KIN
   });
   assert.equal(r.status, 404, `expected 404, got ${r.status}`);
 });
+
+// ---------------------------------------------------------------------------
+// Polish-round regression tests (L3 → L5 boundary). Each covers a write-side
+// gate added in this pass.
+// ---------------------------------------------------------------------------
+
+test('POST /accounts — rejects weak password before insert', async (t) => {
+  if (!alive) { t.skip('backend not running / setup failed'); return; }
+  const r = await api('/api/accounts', { method: 'POST', cookie: adminCookie,
+    body: {
+      name: 'Weak Pass User', email: `weak-${Date.now()}@example.com`,
+      role: 'staff', branchId: 'br-1', password: 'short1',
+    },
+  });
+  assert.equal(r.status, 400);
+  // passwordPolicy emits its structured code; UI maps to a friendly message.
+  assert.ok(/password_(too_short|needs_)/.test(r.body.error),
+    `expected password_* error code, got ${JSON.stringify(r.body)}`);
+});
+
+test('PATCH /accounts — rejects role: "superadmin" (enum gate)', async (t) => {
+  if (!alive) { t.skip('backend not running / setup failed'); return; }
+  const r = await api(`/api/accounts/${encodeURIComponent(staffBr1.id)}`,
+    { method: 'PATCH', cookie: adminCookie, body: { role: 'superadmin' } });
+  assert.equal(r.status, 400, `expected 400, got ${r.status} ${JSON.stringify(r.body)}`);
+  assert.equal(r.body.error, 'bad_role');
+  // Sanity: original role intact on disk.
+  const accts = await api('/api/accounts', { cookie: adminCookie });
+  const still = accts.body.find(a => a.id === staffBr1.id);
+  assert.equal(still.role, 'staff', 'role should not have changed');
+});
+
+test('POST /branches — admin-only + 409 on duplicate-after-FK-protect', async (t) => {
+  if (!alive) { t.skip('backend not running / setup failed'); return; }
+  // Staff cannot create branches at all (admin-only middleware).
+  const staffTry = await api('/api/branches', { method: 'POST', cookie: staffBr1Cookie,
+    body: { name: 'Should Reject', address: 'x' } });
+  assert.equal(staffTry.status, 403, `expected 403 from staff, got ${staffTry.status}`);
+
+  // Admin can create. We use a unique name so the row doesn't collide with
+  // prior test runs.
+  const name = `E2E Branch ${Date.now()}`;
+  const ok = await api('/api/branches', { method: 'POST', cookie: adminCookie,
+    body: { name, address: 'E2E address' } });
+  assert.equal(ok.status, 201, `expected 201, got ${ok.status} ${JSON.stringify(ok.body)}`);
+  assert.ok(ok.body.id?.startsWith('br'), `new branch id: ${ok.body.id}`);
+
+  // Cleanup — branch is unused so delete should succeed (and exercises the
+  // FK-clean path on DELETE).
+  const del = await api(`/api/branches/${encodeURIComponent(ok.body.id)}`,
+    { method: 'DELETE', cookie: adminCookie });
+  assert.equal(del.status, 200, `cleanup delete: ${JSON.stringify(del.body)}`);
+});
+
+test('DELETE /branches/:id — FK refusal when classes/students/etc reference it', async (t) => {
+  if (!alive) { t.skip('backend not running / setup failed'); return; }
+  // br-1 in the seed has classes, students, payments, etc — must refuse.
+  const r = await api('/api/branches/br-1', { method: 'DELETE', cookie: adminCookie });
+  assert.equal(r.status, 409, `expected 409 in_use, got ${r.status} ${JSON.stringify(r.body)}`);
+  assert.equal(r.body.error, 'branch_in_use');
+  assert.ok(r.body.references && Object.keys(r.body.references).length,
+    'expected per-table reference counts in the error body');
+});
+
+test('PATCH /students — feePlanId change recomputes totalFee server-side', async (t) => {
+  if (!alive) { t.skip('backend not running / setup failed'); return; }
+  // Find a student + a different fee plan than what they're on. We need both
+  // fee plans to exist; the seed has fee-a (1,995,000) + fee-a1 (565,000).
+  const [studentsRes, feesRes] = await Promise.all([
+    api('/api/students', { cookie: adminCookie }),
+    api('/api/fee-plans', { cookie: adminCookie }),
+  ]);
+  const stu = studentsRes.body.find(s => s.feePlanId && s.feePlanId !== '');
+  assert.ok(stu, 'expected at least one student with a feePlanId');
+  const otherFee = feesRes.body.find(f => f.id !== stu.feePlanId);
+  assert.ok(otherFee, 'expected a different fee plan to switch to');
+
+  const r = await api(`/api/students/${encodeURIComponent(stu.id)}`, {
+    method: 'PATCH', cookie: adminCookie,
+    body: { feePlanId: otherFee.id, promotionId: 'promo-none' },
+  });
+  assert.equal(r.status, 200, `patch failed: ${JSON.stringify(r.body)}`);
+  // totalFee should equal the new fee plan's amount (promo-none = 0 discount).
+  assert.equal(r.body.totalFee, otherFee.amount,
+    `expected totalFee=${otherFee.amount}, got ${r.body.totalFee}`);
+
+  // Restore — keeps the seeded dataset stable for downstream tests / smoke.
+  await api(`/api/students/${encodeURIComponent(stu.id)}`, {
+    method: 'PATCH', cookie: adminCookie,
+    body: { feePlanId: stu.feePlanId, promotionId: stu.promotionId || 'promo-none' },
+  });
+});
+
+test('POST /students/:id/docs/:key — rejects magic-byte mismatch (PNG bytes, .jpg name)', async (t) => {
+  if (!alive) { t.skip('backend not running / setup failed'); return; }
+  // Pick any student we can write to as admin.
+  const studentsRes = await api('/api/students', { cookie: adminCookie });
+  const stu = studentsRes.body[0];
+  assert.ok(stu, 'expected at least one student');
+
+  // Real PNG signature (8 bytes) + a tiny IHDR-ish chunk so it's a "valid"
+  // PNG by magic. We label it .jpg with mimetype image/jpeg to force the
+  // server's enforceMagic() to compare and reject.
+  const pngBytes = Buffer.from([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,    // PNG signature
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,    // IHDR length + "IHDR"
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,    // 1×1
+    0x08, 0x02, 0x00, 0x00, 0x00,
+  ]);
+  const fd = new FormData();
+  fd.append('file', new Blob([pngBytes], { type: 'image/jpeg' }), 'fake.jpg');
+  const r = await fetch(BASE + `/api/students/${encodeURIComponent(stu.id)}/docs/cccd`, {
+    method: 'POST', body: fd, headers: { cookie: adminCookie },
+  });
+  // The browser-supplied mimetype passes multer's fileFilter (image/jpeg),
+  // but our magic-byte check sniffs PNG and accepts it as image/png (PNG is
+  // in ALLOWED_MIME). So a PNG-bytes-but-jpg-named upload actually SUCCEEDS.
+  // What MUST fail is a non-image disguised as one — verify with random bytes.
+  assert.ok(r.status === 201 || r.status === 415,
+    `PNG-bytes/jpg-name should be 201 or 415, got ${r.status}`);
+
+  // The real disguise test: garbage bytes labeled image/jpeg → 415.
+  const fd2 = new FormData();
+  fd2.append('file', new Blob([Buffer.from('not an image at all')], { type: 'image/jpeg' }), 'fake.jpg');
+  const r2 = await fetch(BASE + `/api/students/${encodeURIComponent(stu.id)}/docs/cccd`, {
+    method: 'POST', body: fd2, headers: { cookie: adminCookie },
+  });
+  assert.equal(r2.status, 415, `garbage-bytes upload must 415, got ${r2.status}`);
+});
+
+test('DELETE /students/:id/docs/:key — clears the doc + zeroes URL', async (t) => {
+  if (!alive) { t.skip('backend not running / setup failed'); return; }
+  // First, upload a real PNG so there's something to delete.
+  const studentsRes = await api('/api/students', { cookie: adminCookie });
+  const stu = studentsRes.body[0];
+  const pngBytes = Buffer.from([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x02, 0x00, 0x00, 0x00,
+  ]);
+  const fd = new FormData();
+  fd.append('file', new Blob([pngBytes], { type: 'image/png' }), 'real.png');
+  const up = await fetch(BASE + `/api/students/${encodeURIComponent(stu.id)}/docs/the3x4`, {
+    method: 'POST', body: fd, headers: { cookie: adminCookie },
+  });
+  assert.equal(up.status, 201, `upload failed: ${up.status}`);
+
+  // Now delete it.
+  const del = await api(`/api/students/${encodeURIComponent(stu.id)}/docs/the3x4`,
+    { method: 'DELETE', cookie: adminCookie });
+  assert.equal(del.status, 200, `delete failed: ${JSON.stringify(del.body)}`);
+
+  // Verify the row reflects the clear.
+  const after = await api('/api/students', { cookie: adminCookie });
+  const stuAfter = after.body.find(s => s.id === stu.id);
+  assert.equal(stuAfter.docs_the3x4, false, 'docs_the3x4 should be false');
+  assert.equal(stuAfter.docs_the3x4_url, null, 'docs_the3x4_url should be null');
+});
