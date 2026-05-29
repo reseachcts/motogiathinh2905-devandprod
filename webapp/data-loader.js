@@ -80,20 +80,48 @@
   };
   // Strip non-digits — canonical store form for phone/CCCD/digit-only fields.
   window.digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
-  // VN mobile phone — render `0xx xxx xxxx` (10) or `0xxx xxx xxxx` (11) groups.
-  // Input may contain spaces/dots/hyphens; they're stripped before grouping.
+
+  // VN mobile phone — canonical 10 digits, rendered `xxx xxx xxxx`.
+  // Partial-build formatting so the mask appears WHILE the user is typing:
+  //   "09" → "09" ; "0901" → "090 1" ; "0901234" → "090 123 4" ; etc.
   window.fmtPhone = (s) => {
-    const d = window.digitsOnly(s);
-    if (d.length === 10) return `${d.slice(0,3)} ${d.slice(3,6)} ${d.slice(6)}`;
-    if (d.length === 11) return `${d.slice(0,4)} ${d.slice(4,7)} ${d.slice(7)}`;
-    if (d.length === 9)  return `${d.slice(0,3)} ${d.slice(3,6)} ${d.slice(6)}`;
-    return d;
+    const d = window.digitsOnly(s).slice(0, 10);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return d.slice(0, 3) + ' ' + d.slice(3);
+    return d.slice(0, 3) + ' ' + d.slice(3, 6) + ' ' + d.slice(6);
   };
-  // VN CCCD — render 12-digit ID as `xxx xxx xxx xxx` groups of 3.
+
+  // VN CCCD — canonical 12 digits, rendered `xxx xxx xxx xxx`. Partial-build
+  // formatting like fmtPhone so users see the spaces appear as they type.
   window.fmtCCCD = (s) => {
+    const d = window.digitsOnly(s).slice(0, 12);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return d.slice(0, 3) + ' ' + d.slice(3);
+    if (d.length <= 9) return d.slice(0, 3) + ' ' + d.slice(3, 6) + ' ' + d.slice(6);
+    return d.slice(0, 3) + ' ' + d.slice(3, 6) + ' ' + d.slice(6, 9) + ' ' + d.slice(9);
+  };
+
+  // Money — thousands-separator with commas. Used for live-format inside
+  // the input box AND for display in lists/details (alongside fmtVND which
+  // adds the đ suffix). Stored value is always bare integer digits.
+  window.fmtMoneyInput = (s) => {
     const d = window.digitsOnly(s);
-    if (d.length === 12) return `${d.slice(0,3)} ${d.slice(3,6)} ${d.slice(6,9)} ${d.slice(9)}`;
-    return d;
+    if (!d) return '';
+    return d.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
+  // Date — build `dd/mm/yyyy` from raw digits as the user types.
+  //   "1"        → "1"
+  //   "12"       → "12"
+  //   "1208"     → "12/08"
+  //   "12082002" → "12/08/2002"
+  // The stored value IS the formatted string (matches existing dd/mm/yyyy
+  // column convention everywhere).
+  window.fmtDateInput = (s) => {
+    const d = window.digitsOnly(s).slice(0, 8);
+    if (d.length <= 2) return d;
+    if (d.length <= 4) return d.slice(0, 2) + '/' + d.slice(2);
+    return d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4);
   };
 
   // Login overlay — vanilla DOM, only shown if /api/me returns 401.

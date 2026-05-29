@@ -4,10 +4,11 @@
 //
 // Used by routes/writes.js; aim is friendly UI errors + locked spec rules.
 
-// Vietnamese phone — canonical store form is digits-only (9–11 digits).
-// The accept regex tolerates spaces / dots / hyphens during transition;
-// new writes from the frontend Input atom (digits=true) arrive bare.
-const PHONE_RE  = /^[\s.\-]*(?:\d[\s.\-]*){9,11}$/;
+// Vietnamese phone — canonical store form is digits-only, exactly 10
+// digits. Frontend Input strips separators while typing, so writes
+// arrive bare; the regex tolerates legacy whitespace from old rows but
+// the digit count must equal 10.
+const PHONE_RE  = /^[\s.\-]*(?:\d[\s.\-]*){10}$/;
 // CCCD — canonical store form is exactly 12 digits, no separators.
 const CCCD_RE   = /^\d{12}$/;
 const DDMMYYYY  = /^(\d{2})\/(\d{2})\/(\d{4})$/;

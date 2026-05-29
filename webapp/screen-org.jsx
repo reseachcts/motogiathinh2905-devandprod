@@ -816,9 +816,14 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
               : <Input  label={f.label} value={draft[f.id]}
                         onChange={(v) => set(f.id, v)} placeholder={f.placeholder}
                         type={f.type === "password" ? "password" : "text"}
-                        digits={f.type === "phone" || f.type === "cccd" || f.type === "money" || f.type === "int"}
-                        maxDigits={f.type === "phone" ? 11 : f.type === "cccd" ? 12 : f.type === "money" ? 12 : undefined}
-                        format={f.type === "phone" ? window.fmtPhone : f.type === "cccd" ? window.fmtCCCD : undefined}
+                        digits={["phone","cccd","money","int","date"].includes(f.type)}
+                        maxDigits={f.type === "phone" ? 10 : f.type === "cccd" ? 12 : f.type === "date" ? 8 : f.type === "money" ? 12 : undefined}
+                        format={f.type === "phone" ? window.fmtPhone
+                              : f.type === "cccd"  ? window.fmtCCCD
+                              : f.type === "money" ? window.fmtMoneyInput
+                              : f.type === "date"  ? window.fmtDateInput
+                              : undefined}
+                        storeFormatted={f.type === "date"}
                         mono={f.type === "money" || f.type === "int"}/>;
             return (
               <div key={f.id} style={{ gridColumn: useGrid && span === 2 ? "span 2" : "auto" }}>
@@ -999,9 +1004,14 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
               : <Input  label={f.label} value={draft[f.id]}
                         onChange={(v) => set(f.id, v)} placeholder={f.placeholder}
                         type={f.type === "password" ? "password" : "text"}
-                        digits={f.type === "phone" || f.type === "cccd" || f.type === "money" || f.type === "int"}
-                        maxDigits={f.type === "phone" ? 11 : f.type === "cccd" ? 12 : f.type === "money" ? 12 : undefined}
-                        format={f.type === "phone" ? window.fmtPhone : f.type === "cccd" ? window.fmtCCCD : undefined}
+                        digits={["phone","cccd","money","int","date"].includes(f.type)}
+                        maxDigits={f.type === "phone" ? 10 : f.type === "cccd" ? 12 : f.type === "date" ? 8 : f.type === "money" ? 12 : undefined}
+                        format={f.type === "phone" ? window.fmtPhone
+                              : f.type === "cccd"  ? window.fmtCCCD
+                              : f.type === "money" ? window.fmtMoneyInput
+                              : f.type === "date"  ? window.fmtDateInput
+                              : undefined}
+                        storeFormatted={f.type === "date"}
                         mono={f.type === "money" || f.type === "int"}/>;
             return (
               <div key={f.id} style={{ gridColumn: useGrid && span === 2 ? "span 2" : "auto" }}>

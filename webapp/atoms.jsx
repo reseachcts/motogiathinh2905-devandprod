@@ -188,21 +188,49 @@ function Avatar({ name, size = 32, glow = false }) {
 // (RecordCreatorModal threads this through via field metadata).
 // --------------------------------------------------------------------
 function Input({ label, value, onChange, placeholder, mono = false, prefix, type = "text",
-                 digits = false, maxDigits, format }) {
-  // digits=true  → strip non-digits on every keystroke (max N if maxDigits set).
-  //                Stored value is digits-only; rendered with optional format()
-  //                (e.g. window.fmtPhone) while NOT focused — focus shows raw
-  //                digits so the cursor doesn't fight a moving mask.
-  // format       → display-only mask fn (digits-only str → "090 555 0001").
+                 digits = false, maxDigits, format, storeFormatted = false }) {
+  // digits=true     → strip non-digits on every keystroke (cap at maxDigits).
+  // format          → live mask fn (e.g. fmtPhone, fmtMoneyInput, fmtDateInput).
+  //                   Applied to the visible input value AS THE USER TYPES.
+  // storeFormatted  → onChange emits the formatted display value (use for
+  //                   dates where storage form IS the formatted string).
+  //                   Default: onChange emits the bare digit-stripped value.
+  // Cursor preservation: we track caret position by *digit count to the left*
+  // of the caret, then restore that digit-count after re-format. This keeps
+  // the caret intuitively placed even when masks add/remove separators.
   const [focused, setFocused] = React.useState(false);
+  const inputRef = React.useRef(null);
+  const caretRef = React.useRef(null);
   const rawValue = String(value ?? "");
-  const display  = (!focused && digits && format) ? format(rawValue) : rawValue;
-  const handle = (raw) => {
+  const display  = format ? format(rawValue) : rawValue;
+  // After every render where a caret target is queued, restore selection.
+  React.useEffect(() => {
+    if (!inputRef.current || caretRef.current == null) return;
+    const want = caretRef.current; caretRef.current = null;
+    const cur = inputRef.current.value;
+    // Walk `cur` and find the offset where `want` digits have been counted.
+    let digitsSeen = 0, i = 0;
+    while (i < cur.length && digitsSeen < want) {
+      if (/\d/.test(cur[i])) digitsSeen++;
+      i++;
+    }
+    try { inputRef.current.setSelectionRange(i, i); } catch {}
+  });
+  const handle = (e) => {
     if (!onChange) return;
+    const raw = e.target.value;
+    // Count digits before the caret in the user-typed string. We'll restore
+    // the caret after format() to the position with that many digits.
+    if (format && digits) {
+      const caret = e.target.selectionStart ?? raw.length;
+      let d = 0;
+      for (let i = 0; i < caret; i++) if (/\d/.test(raw[i])) d++;
+      caretRef.current = d;
+    }
     if (!digits) return onChange(raw);
     let d = raw.replace(/\D+/g, "");
     if (maxDigits) d = d.slice(0, maxDigits);
-    onChange(d);
+    onChange(storeFormatted && format ? format(d) : d);
   };
   const usingMono = mono || digits;  // digit fields always render in tabular-nums
   return (
@@ -224,7 +252,7 @@ function Input({ label, value, onChange, placeholder, mono = false, prefix, type
         transition: "border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out)",
       }}>
         {prefix && <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg-3)" }}>{prefix}</span>}
-        <input value={display} onChange={e => handle(e.target.value)} placeholder={placeholder}
+        <input ref={inputRef} value={display} onChange={handle} placeholder={placeholder}
                type={type}
                inputMode={digits ? "numeric" : undefined}
                autoComplete={type === "password" ? "new-password" : undefined}

@@ -94,7 +94,11 @@ function digitsOnly(s) { return String(s || '').replace(/\D+/g, ''); }
 function castRow(row, spec) {
   for (const k of spec.intCols) row[k] = row[k] === '' || row[k] == null ? 0 : parseInt(row[k], 10);
   for (const k of spec.boolCols) row[k] = row[k] === 'true' ? 1 : 0;
-  if ('phone' in row && row.phone) row.phone = digitsOnly(row.phone);
+  if ('phone' in row && row.phone) {
+    let p = digitsOnly(row.phone);
+    if (p.length === 9) p = p + '0';   // VN spec is exactly 10
+    row.phone = p.slice(0, 10);
+  }
   if ('idNumber' in row && row.idNumber) row.idNumber = digitsOnly(row.idNumber).slice(0, 12);
   if (spec.extraCols) Object.assign(row, spec.extraCols);
   return row;

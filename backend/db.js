@@ -24,7 +24,7 @@ db.exec('PRAGMA busy_timeout = 5000');
 // _migrations table and skip what's already done.
 db.exec("CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at TEXT)");
 const applied = new Set(db.prepare('SELECT id FROM _migrations').all().map(r => r.id));
-const MIGRATIONS = ['001_init.sql', '002_uploads.sql', '003_notif_types.sql', '004_normalize_phone_cccd.sql'];
+const MIGRATIONS = ['001_init.sql', '002_uploads.sql', '003_notif_types.sql', '004_normalize_phone_cccd.sql', '005_phone_pad_10.sql'];
 for (const m of MIGRATIONS) {
   if (applied.has(m)) continue;
   const sql = readFileSync(resolve(HERE, 'migrations', m), 'utf-8');

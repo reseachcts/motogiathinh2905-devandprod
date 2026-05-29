@@ -127,7 +127,8 @@ function AddStudentModal({ open, onClose, onSave }) {
               <div style={{ gridColumn: "span 2" }}>
                 <Input label="Họ và tên"      value={form.name}        onChange={v => setForm({ ...form, name: v })}        placeholder="Nguyễn Văn A"/>
               </div>
-              <Input label="Ngày sinh"        value={form.dob}         onChange={v => setForm({ ...form, dob: v })}         placeholder="dd/mm/yyyy" mono/>
+              <Input label="Ngày sinh"        value={form.dob}         onChange={v => setForm({ ...form, dob: v })}         placeholder="dd/mm/yyyy"
+                     digits maxDigits={8} format={window.fmtDateInput} storeFormatted/>
               <Input label="Giới tính"        value={form.gender}      onChange={v => setForm({ ...form, gender: v })}      placeholder="Nam / Nữ"/>
               <div style={{ gridColumn: "span 2" }}>
                 <Input label="Quê quán"       value={form.queQuan}     onChange={v => setForm({ ...form, queQuan: v })}     placeholder="Bến Tre"/>
@@ -135,7 +136,8 @@ function AddStudentModal({ open, onClose, onSave }) {
               <div style={{ gridColumn: "span 2" }}>
                 <Input label="Nơi thường trú" value={form.address}     onChange={v => setForm({ ...form, address: v })}     placeholder="Số nhà, đường, phường, quận"/>
               </div>
-              <Input label="Ngày cấp"         value={form.ngayCapCCCD} onChange={v => setForm({ ...form, ngayCapCCCD: v })} placeholder="dd/mm/yyyy" mono/>
+              <Input label="Ngày cấp"         value={form.ngayCapCCCD} onChange={v => setForm({ ...form, ngayCapCCCD: v })} placeholder="dd/mm/yyyy"
+                     digits maxDigits={8} format={window.fmtDateInput} storeFormatted/>
               <Input label="Nơi cấp"          value={form.noiCapCCCD}  onChange={v => setForm({ ...form, noiCapCCCD: v })}  placeholder="Cục CS QLHC về TTXH"/>
             </div>
           </div>
@@ -145,7 +147,7 @@ function AddStudentModal({ open, onClose, onSave }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div style={{ gridColumn: "span 2" }}>
                 <Input label="SĐT" value={form.phone} onChange={v => setForm({ ...form, phone: v })} placeholder="090 123 4567"
-                       digits maxDigits={11} format={window.fmtPhone}/>
+                       digits maxDigits={10} format={window.fmtPhone}/>
               </div>
               <Select label="Lớp" value={form.classId} onChange={v => setForm({ ...form, classId: v })}
                       placeholder={openClasses.length === 0 ? "Chưa có lớp đang mở" : "Chọn lớp đang mở"}
@@ -304,7 +306,8 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
         )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Input label="Số tiền" value={form.amount} onChange={v => setForm({ ...form, amount: v })} placeholder="0" mono prefix="₫"/>
+          <Input label="Số tiền" value={form.amount} onChange={v => setForm({ ...form, amount: v })} placeholder="0" prefix="₫"
+                 digits maxDigits={12} format={window.fmtMoneyInput}/>
           <Select label="Hình thức" value={form.method} onChange={v => setForm({ ...form, method: v })}
                   placeholder="Chọn hình thức"
                   options={[{ value: "Tiền mặt", label: "Tiền mặt" }, { value: "Chuyển khoản", label: "Chuyển khoản" }]}/>
@@ -511,8 +514,10 @@ function AddClassModal({ open, onClose, onSave }) {
                 placeholder="Chọn chi nhánh"
                 options={D.branches.map(b => ({ value: b.id, label: b.name }))}/>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Input label="Ngày mở"  value={form.openDate} onChange={v => setForm({ ...form, openDate: v })} placeholder="01/06/2026" mono/>
-          <Input label="Ngày thi" value={form.examDate} onChange={v => setForm({ ...form, examDate: v })} placeholder="30/06/2026" mono/>
+          <Input label="Ngày mở"  value={form.openDate} onChange={v => setForm({ ...form, openDate: v })} placeholder="dd/mm/yyyy"
+                 digits maxDigits={8} format={window.fmtDateInput} storeFormatted/>
+          <Input label="Ngày thi" value={form.examDate} onChange={v => setForm({ ...form, examDate: v })} placeholder="dd/mm/yyyy"
+                 digits maxDigits={8} format={window.fmtDateInput} storeFormatted/>
         </div>
       </div>
     </Modal>
