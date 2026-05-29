@@ -133,6 +133,43 @@ router.post('/students/:id/docs/:key', upload.single('file'), (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// DELETE /api/students/:id/docs/:key — clear an uploaded student doc.
+// Admin OR same-branch staff. Removes the file from disk + zeroes
+// docs_<key>_url / docs_<key> in the DB. Idempotent — missing file or
+// already-cleared row both return 200 so the UI's optimistic clear stays
+// consistent with the backend.
+// ---------------------------------------------------------------------------
+router.delete('/students/:id/docs/:key', (req, res) => {
+  const { id, key } = req.params;
+  if (!DOC_KEYS.includes(key)) return res.status(400).json({ error: 'invalid_doc_key' });
+
+  const student = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
+  if (!student) return res.status(404).json({ error: 'not_found' });
+  if (req.user.role !== 'admin' && student.branchId !== req.user.branchId) {
+    return res.status(403).json({ error: 'wrong_branch' });
+  }
+
+  // Translate the stored URL ("/api/files/students/<id>/<key>-<ts>.jpg")
+  // back to a disk path before deleting. Defensive: only delete inside
+  // UPLOAD_ROOT, and only if the path resolves under the student's own
+  // upload dir (no traversal via crafted URL).
+  const url = student[`docs_${key}_url`];
+  if (url && typeof url === 'string') {
+    const rel = url.replace(/^\/api\/files\//, '').replace(/\\/g, '/');
+    const abs = resolve(UPLOAD_ROOT, rel);
+    const studentDir = resolve(UPLOAD_ROOT, 'students', id);
+    if (abs.startsWith(studentDir) && existsSync(abs)) {
+      try { unlinkSync(abs); } catch (e) { console.warn('[uploads] unlink failed:', e?.message || e); }
+    }
+  }
+
+  db.prepare(`UPDATE students SET docs_${key} = 0, docs_${key}_url = NULL WHERE id = ?`).run(id);
+  logActivity(req.user.id, 'student.doc_clear', `${student.maHV} ${key}`);
+  recomputeAfterWrite(req.user.id, `student ${student.maHV} doc ${key}`);
+  res.json({ ok: true, key });
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/payments/:id/bien-lai
 // ---------------------------------------------------------------------------
 router.post('/payments/:id/bien-lai', upload.single('file'), (req, res) => {

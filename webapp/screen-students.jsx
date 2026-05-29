@@ -431,10 +431,19 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
                          setDocs(prev => ({ ...prev, [k]: true }));
                          if (file) {
                            D.api.uploadStudentDoc(s.id, k, file)
-                             .catch(err => alert("Lỗi tải tài liệu: " + err.message));
+                             .catch(err => window.MGT_TOAST && window.MGT_TOAST("Lỗi tải tài liệu: " + err.message));
                          }
                        }}
-                       onClear={(k) => setDocs({ ...docs, [k]: false })}/>
+                       onClear={(k) => {
+                         // Optimistic flip + backend DELETE. On failure restore
+                         // the local flag and surface the error via toast so the
+                         // UI doesn't claim the file is gone while it persists.
+                         setDocs(prev => ({ ...prev, [k]: false }));
+                         D.api.deleteStudentDoc(s.id, k).catch(err => {
+                           setDocs(prev => ({ ...prev, [k]: true }));
+                           window.MGT_TOAST && window.MGT_TOAST("Lỗi xóa tài liệu: " + err.message);
+                         });
+                       }}/>
             ))}
           </div>
           <div style={{ padding: "10px 12px", borderRadius: 10, background: "color-mix(in oklab, var(--neon-cyan) 8%, transparent)", border: "1px solid color-mix(in oklab, var(--neon-cyan) 30%, transparent)", display: "flex", gap: 8, alignItems: "flex-start" }}>

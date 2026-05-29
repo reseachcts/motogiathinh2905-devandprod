@@ -387,6 +387,17 @@
           if (s) { s.docs[key] = true; s['docs_' + key] = true; s['docs_' + key + '_url'] = out.url; }
           this._bump(); return out;
         },
+        async deleteStudentDoc(studentId, key) {
+          await api('/students/' + encodeURIComponent(studentId) + '/docs/' + encodeURIComponent(key), { method: 'DELETE' });
+          const s = studentsById.get(studentId);
+          if (s) {
+            s.docs[key] = false;
+            s['docs_' + key] = false;
+            s['docs_' + key + '_url'] = null;
+          }
+          this._bump();
+          return { studentId, key };
+        },
         async uploadBienLai(paymentId, file) {
           const out = await this._upload('/payments/' + encodeURIComponent(paymentId) + '/bien-lai', file);
           const p = payments.find(p => p.id === paymentId);
