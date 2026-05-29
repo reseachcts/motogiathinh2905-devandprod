@@ -676,10 +676,11 @@ function StudentRentalsCard({ student }) {
           <div style={{ display: "flex", flexDirection: "column" }}>
             {/* Header row — column widths copied from the payment grid so
                 the two tables line up visually. Cols by position:
-                  1 Thời điểm  2 Mã  3 Xe  4 Lượt  5 Số tiền  6 Hình thức  7 Biên lai
-                The lime "Số tiền" sits in the 5th column (same width slot
-                as the payment card's "Còn nợ"); col-3 hosts the vehicle
-                so a scanner reads "what was rented · how many · how much". */}
+                  1 Thời điểm  2 Mã thuê  3 Số tiền  4 Lượt  5 Xe  6 Hình thức  7 Biên lai
+                Số tiền sits in col 3 (lime, right-aligned) to match the
+                payment card's Số tiền slot exactly. Lượt takes col 4
+                (mirrors the payment Đã thu right-aligned numeric slot),
+                Xe fills col 5 as left-aligned text. */}
             <div style={{
               display: "grid", gridTemplateColumns: "130px 90px 1.1fr 1.1fr 1.1fr 100px 60px",
               padding: "10px 12px", gap: 12, borderBottom: "1px solid var(--ink-4)",
@@ -687,9 +688,9 @@ function StudentRentalsCard({ student }) {
             }}>
               <span>Thời điểm</span>
               <span>Mã thuê</span>
-              <span>Xe</span>
-              <span style={{ textAlign: "right" }}>Lượt</span>
               <span style={{ textAlign: "right" }}>Số tiền</span>
+              <span style={{ textAlign: "right" }}>Lượt</span>
+              <span>Xe</span>
               <span>Hình thức</span>
               <span style={{ textAlign: "center" }}>Biên lai</span>
             </div>
@@ -710,13 +711,13 @@ function StudentRentalsCard({ student }) {
                   {/* Mã thuê */}
                   <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-1)", fontWeight: 600, letterSpacing: "0.04em",
                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.id}</span>
+                  {/* Số tiền — lime, same column slot as the payment row's Số tiền */}
+                  <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--neon-lime)", fontWeight: 600 }}>+{window.fmtVND(r.amount)}</span>
+                  {/* Lượt */}
+                  <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--fg-1)", fontWeight: 600 }}>{r.rentalRounds || 0}</span>
                   {/* Xe */}
                   <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-1)",
                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v ? v.name : (r.vehicleId || "—")}</span>
-                  {/* Lượt */}
-                  <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--fg-1)", fontWeight: 600 }}>{r.rentalRounds || 0}</span>
-                  {/* Số tiền — lime, same colour treatment as the payment row's Số tiền */}
-                  <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--neon-lime)", fontWeight: 600 }}>+{window.fmtVND(r.amount)}</span>
                   {/* Hình thức */}
                   <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-2)" }}>{r.method}</span>
                   {/* Biên lai */}
