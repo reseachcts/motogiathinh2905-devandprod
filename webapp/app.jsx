@@ -103,8 +103,15 @@ function AppRoot() {
   const openClass   = (id) => { setTab("classes"); setDetail({ type: "class", id }); };
 
   // Back-button handler. Honours the optional `from` marker on the
-  // current detail object — including the vehicle-card case which jumps
-  // back to Tổ chức → Phương tiện with the selected vehicle restored.
+  // current detail object and ALSO switches the top-level tab so the
+  // sidebar nav lights up the screen actually rendered.
+  //
+  // Forward path that triggered this: Tổ chức → branch card → class
+  // detail → student detail. Back path the user wants:
+  //   Học viên detail → class detail (tab=classes) → class list page.
+  // Without the tab switch below, the back-restored class detail would
+  // render under tab=students with the wrong sidebar highlight.
+  const TAB_BY_DETAIL = { student: "students", class: "classes", payment: "payments" };
   const goBack = () => {
     const f = detail?.from;
     if (f?.type === "vehicle") {
@@ -114,7 +121,11 @@ function AppRoot() {
       setDetail(null);
       return;
     }
-    if (f) { setDetail(f); return; }
+    if (f && TAB_BY_DETAIL[f.type]) {
+      setTab(TAB_BY_DETAIL[f.type]);
+      setDetail({ type: f.type, id: f.id });
+      return;
+    }
     setDetail(null);
   };
 
