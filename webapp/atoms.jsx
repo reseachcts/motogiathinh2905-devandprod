@@ -622,7 +622,11 @@ function Select({ label, value, onChange, options, placeholder = "Chọn…", no
           color: value ? "var(--fg-1)" : "var(--fg-4)",
           fontFamily: "var(--font-ui)", fontSize: 14, cursor: "pointer", outline: "none",
         }}>
-          <option value="" disabled>{placeholder}</option>
+          {/* Disabled "Chọn…" only when nothing is selected — once the
+              user picks a value (or the form is seeded with one), the
+              placeholder line disappears from the dropdown so it can't
+              be mistaken for an acceptable value. */}
+          {!value && <option value="" disabled>{placeholder}</option>}
           {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <Icon name="arrow-down" size={14}

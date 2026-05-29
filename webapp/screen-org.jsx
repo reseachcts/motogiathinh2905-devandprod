@@ -261,10 +261,10 @@ function AccountsTab() {
   const [editingId, setEditingId] = React.useState(null);
   const [pwId, setPwId] = React.useState(null);
   const isAdmin = D.currentUser?.role === "admin";
-  const branchOpts = [
-    { id: "", label: "— Chọn chi nhánh —" },
-    ...D.branches.map(b => ({ id: b.id, label: b.name })),
-  ];
+  // No placeholder entry — "" is not an accepted value server-side, and
+  // EditRecordModal/RecordCreatorModal seed selects from options[0].id so
+  // the first real branch is the default.
+  const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
   const accountCreateFields = [
     { id: "name",     label: "Họ tên",        type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
     { id: "phone",    label: "Số điện thoại", type: "phone",  placeholder: "090 123 4567" },
@@ -468,10 +468,10 @@ function TeachersTab() {
   const [open, setOpen] = React.useState(false);
   const [editingId, setEditingId] = React.useState(null);
   const isAdmin = D.currentUser?.role === "admin";
-  const branchOpts = [
-    { id: "", label: "— Chọn chi nhánh —" },
-    ...D.branches.map(b => ({ id: b.id, label: b.name })),
-  ];
+  // No placeholder entry — "" is not an accepted value server-side, and
+  // EditRecordModal/RecordCreatorModal seed selects from options[0].id so
+  // the first real branch is the default.
+  const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
   const teacherFields = [
     { id: "name",     label: "Họ tên",        type: "text",   placeholder: "Trần Văn B" },
     { id: "phone",    label: "Số điện thoại", type: "phone",  placeholder: "09…" },
@@ -540,10 +540,10 @@ function VehiclesTab() {
   const [open, setOpen] = React.useState(false);
   const [editingId, setEditingId] = React.useState(null);
   const isAdmin = D.currentUser?.role === "admin";
-  const branchOpts = [
-    { id: "", label: "— Chọn chi nhánh —" },
-    ...D.branches.map(b => ({ id: b.id, label: b.name })),
-  ];
+  // No placeholder entry — "" is not an accepted value server-side, and
+  // EditRecordModal/RecordCreatorModal seed selects from options[0].id so
+  // the first real branch is the default.
+  const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
   const vehicleFields = [
     { id: "name",     label: "Tên xe",   type: "text",   placeholder: "Honda Wave Alpha" },
     { id: "licence",  label: "Bằng",     type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
