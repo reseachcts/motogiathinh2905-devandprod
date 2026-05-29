@@ -372,6 +372,84 @@ async function run() {
     } catch { recordFail('11: Xóa đã chọn (backend delete did not persist)', await snapshotFailure(page, consoleErrors)); }
   });
 
+  // 13. AddStudentModal — when there are no open classes, the modal must
+  // surface "Không có lớp đang mở" in the footer AND disable "Lưu học viên"
+  // so the user understands why submit isn't possible. Mutate the local
+  // MGT_DATA.classes snapshot (read-only flip — not persisted) to simulate
+  // the empty-class state; restore after.
+  await safeRun(page, '13: AddStudent hint when no open class', async () => {
+    await gotoTab(page, 'Học viên');
+    const saved = await page.evaluate(() => {
+      const D = window.MGT_DATA;
+      const snapshot = D.classes.map(c => ({ id: c.id, status: c.status }));
+      D.classes.forEach(c => { c.status = 'đã kết thúc'; });
+      return snapshot;
+    });
+    try {
+      await page.locator('button:has-text("Thêm học viên")').first().click({ force: true });
+      await waitForModalOpen(page);
+      const seen = await page.evaluate(() => {
+        const portals = Array.from(document.body.children).filter(el =>
+          el.tagName === 'DIV' && /position:\s*fixed/i.test(el.getAttribute('style') || ''));
+        const modal = portals[portals.length - 1];
+        if (!modal) return { ok: false, why: 'no modal' };
+        const text = (modal.innerText || '');
+        const hintShown = /Không có lớp đang mở/.test(text);
+        const luuBtn = Array.from(modal.querySelectorAll('button')).find(b => /Lưu học viên/.test(b.textContent || ''));
+        const disabled = !!(luuBtn && luuBtn.disabled);
+        return { ok: hintShown && disabled, hintShown, disabled };
+      });
+      if (seen.ok) recordPass('13: AddStudent hint when no open class', 'hint + disabled');
+      else recordFail('13: AddStudent hint when no open class', `hintShown=${seen.hintShown} disabled=${seen.disabled}`);
+    } finally {
+      await page.evaluate((snapshot) => {
+        const D = window.MGT_DATA;
+        const byId = new Map(snapshot.map(s => [s.id, s.status]));
+        D.classes.forEach(c => { if (byId.has(c.id)) c.status = byId.get(c.id); });
+      }, saved);
+    }
+  });
+
+  // 14. RecordCreatorModal — when the backend rejects (duplicate email),
+  // the modal must stay open and render the error inline instead of
+  // closing immediately. Submit a Tạo tài khoản form twice with the same
+  // email; second submit should fail and the modal should still be open.
+  await safeRun(page, '14: RecordCreatorModal keeps open on failure', async () => {
+    await gotoTab(page, 'Tổ chức');
+    await clickOrgTab(page, 'Tài khoản');
+    const dupEmail = `e2e-dup+${SALT}@motogiathinh.vn`;
+    // First successful create
+    await page.locator('button:has-text("Tạo tài khoản")').first().click({ force: true });
+    await waitForModalOpen(page);
+    await fillByPlaceholder(page, 'Nguyễn Văn A',        `E2E Dup ${SALT}`);
+    await fillByPlaceholder(page, '090 123 4567',        '0933' + Math.floor(Math.random() * 1e6));
+    await fillByPlaceholder(page, 'you@motogiathinh.vn', dupEmail);
+    await selectByLabel(page,     'Chi nhánh',           '.+');
+    await clickPrimary(page, 'Tạo mới');
+    await page.waitForFunction((e) => !!window.MGT_DATA.accounts.find(a => a.email === e), dupEmail, { timeout: 6000 });
+    await dismissAnyModal(page);
+    // Second create with the same email — should fail
+    await page.locator('button:has-text("Tạo tài khoản")').first().click({ force: true });
+    await waitForModalOpen(page);
+    await fillByPlaceholder(page, 'Nguyễn Văn A',        `E2E Dup2 ${SALT}`);
+    await fillByPlaceholder(page, '090 123 4567',        '0944' + Math.floor(Math.random() * 1e6));
+    await fillByPlaceholder(page, 'you@motogiathinh.vn', dupEmail);
+    await selectByLabel(page,     'Chi nhánh',           '.+');
+    await clickPrimary(page, 'Tạo mới');
+    // Give the failed request a moment to land
+    await page.waitForTimeout(800);
+    const modalStillOpen = await page.evaluate(() => {
+      const portals = Array.from(document.body.children).filter(el =>
+        el.tagName === 'DIV' && /position:\s*fixed/i.test(el.getAttribute('style') || ''));
+      const modal = portals[portals.length - 1];
+      if (!modal) return { open: false };
+      const text = modal.innerText || '';
+      return { open: true, hasErr: /Lỗi:/.test(text) };
+    });
+    if (modalStillOpen.open && modalStillOpen.hasErr) recordPass('14: RecordCreatorModal keeps open on failure', 'inline error shown');
+    else recordFail('14: RecordCreatorModal keeps open on failure', `open=${modalStillOpen.open} hasErr=${modalStillOpen.hasErr}`);
+  });
+
   // 12. Sidebar user pill → logout modal → Đăng xuất → login form returns
   await safeRun(page, '12: Đăng xuất', async () => {
     await page.locator('aside button').last().click({ force: true });
