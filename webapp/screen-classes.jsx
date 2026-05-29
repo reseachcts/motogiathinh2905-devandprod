@@ -410,11 +410,14 @@ function ClassEditModal({ open, onClose, cls, currentStatus, onSaveStatus }) {
   });
   const [busy, setBusy] = React.useState(false);
   const [err, setErr]   = React.useState(null);
+  // Synchronous double-submit guard — React state updates are async so a
+  // burst of .click()s can race past the `busy` flag before re-render.
+  const busyRef = React.useRef(false);
   // Reset draft whenever the modal reopens for a different class.
   React.useEffect(() => {
     if (open) {
       setDraft({ status: currentStatus, openDate: cls.openDate, examDate: cls.examDate });
-      setBusy(false); setErr(null);
+      setBusy(false); setErr(null); busyRef.current = false;
     }
   }, [open, cls.id, currentStatus]);  // eslint-disable-line
 
@@ -423,6 +426,8 @@ function ClassEditModal({ open, onClose, cls, currentStatus, onSaveStatus }) {
   // Await onSaveStatus; only close on success so the user sees the error
   // inline if the API rejects.
   const submit = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
       setBusy(true); setErr(null);
       await onSaveStatus({
@@ -434,6 +439,7 @@ function ClassEditModal({ open, onClose, cls, currentStatus, onSaveStatus }) {
     } catch (e) {
       setErr(e?.message || String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };

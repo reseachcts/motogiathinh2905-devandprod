@@ -753,11 +753,19 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
   const [draft, setDraft] = React.useState(buildSeed);
   const [busy, setBusy]   = React.useState(false);
   const [err, setErr]     = React.useState(null);
-  React.useEffect(() => { if (open) { setDraft(buildSeed()); setBusy(false); setErr(null); } }, [open, initialValues]);  // eslint-disable-line
+  // Synchronous double-submit guard — React state updates are async so a
+  // burst of clicks (e2e fires .click() 3× in a row) can slip past the
+  // `busy` flag before the re-render disables the button. The ref check
+  // is synchronous and wins that race; the React state still drives the
+  // visual disabled/label.
+  const busyRef = React.useRef(false);
+  React.useEffect(() => { if (open) { setDraft(buildSeed()); setBusy(false); setErr(null); busyRef.current = false; } }, [open, initialValues]);  // eslint-disable-line
   const set = (id, v) => setDraft(prev => ({ ...prev, [id]: v }));
   // Await onSave; only close on success so failures stay visible inline
   // instead of vanishing with the dialog.
   const submit = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
       setBusy(true); setErr(null);
       await onSave?.(draft);
@@ -765,6 +773,7 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
     } catch (e) {
       setErr(e?.message || String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -830,8 +839,12 @@ function PasswordResetModal({ open, onClose, account, onSubmit }) {
   const [pw, setPw]     = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [err, setErr]   = React.useState(null);
-  React.useEffect(() => { if (open) { setPw(""); setBusy(false); setErr(null); } }, [open]);
+  // Synchronous double-submit guard — see RecordCreatorModal for rationale.
+  const busyRef = React.useRef(false);
+  React.useEffect(() => { if (open) { setPw(""); setBusy(false); setErr(null); busyRef.current = false; } }, [open]);
   const submit = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
       setBusy(true); setErr(null);
       await onSubmit?.(pw);
@@ -839,6 +852,7 @@ function PasswordResetModal({ open, onClose, account, onSubmit }) {
     } catch (e) {
       setErr(e?.message || String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -915,12 +929,16 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
   const [draft, setDraft] = React.useState(buildSeed);
   const [busy, setBusy]   = React.useState(false);
   const [err, setErr]     = React.useState(null);
-  React.useEffect(() => { if (open) { setDraft(buildSeed()); setBusy(false); setErr(null); } }, [open]);  // eslint-disable-line
+  // Synchronous double-submit guard — see EditRecordModal for rationale.
+  const busyRef = React.useRef(false);
+  React.useEffect(() => { if (open) { setDraft(buildSeed()); setBusy(false); setErr(null); busyRef.current = false; } }, [open]);  // eslint-disable-line
 
   const set = (id, v) => setDraft(prev => ({ ...prev, [id]: v }));
   // Await the onCreate promise; only close on success so failure alerts
   // surface inline rather than after the dialog has already vanished.
   const submit = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
       setBusy(true); setErr(null);
       await onCreate?.(draft);
@@ -928,6 +946,7 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
     } catch (e) {
       setErr(e?.message || String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };

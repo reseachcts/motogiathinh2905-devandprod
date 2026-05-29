@@ -226,6 +226,10 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
   const [bienLaiFile, setBienLaiFile] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
   const [err, setErr]   = React.useState(null);
+  // Synchronous double-submit guard — React's `busy` state updates
+  // asynchronously, so a burst of .click()s can race past it. The ref
+  // check is synchronous and blocks duplicate POSTs.
+  const busyRef = React.useRef(false);
 
   React.useEffect(() => {
     if (open) {
@@ -234,7 +238,7 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
         amount: defaultAmount != null ? String(defaultAmount) : "",
         method: "", bienLaiId: "",
       });
-      setBusy(false); setErr(null);
+      setBusy(false); setErr(null); busyRef.current = false;
     }
     if (!open) { setBienLaiPhoto(false); setBienLaiFile(null); }
   }, [open, defaultStudentId, defaultAmount]);
@@ -248,6 +252,8 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
     : "—";
 
   const submit = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
       setBusy(true); setErr(null);
       await (onSave && onSave({ ...form, amount, bienLaiPhoto, bienLaiFile }));
@@ -255,6 +261,7 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
     } catch (e) {
       setErr(e?.message || String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -454,11 +461,15 @@ function AddClassModal({ open, onClose, onSave }) {
   const [form, setForm] = React.useState({ code: "", openDate: "", examDate: "", branchId: "" });
   const [busy, setBusy] = React.useState(false);
   const [err, setErr]   = React.useState(null);
+  // Synchronous double-submit guard — see AddPaymentModal for rationale.
+  const busyRef = React.useRef(false);
   React.useEffect(() => {
     if (!open) setForm({ code: "", openDate: "", examDate: "", branchId: "" });
-    if (open) { setBusy(false); setErr(null); }
+    if (open) { setBusy(false); setErr(null); busyRef.current = false; }
   }, [open]);
   const submit = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
       setBusy(true); setErr(null);
       await (onSave && onSave(form));
@@ -466,6 +477,7 @@ function AddClassModal({ open, onClose, onSave }) {
     } catch (e) {
       setErr(e?.message || String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
