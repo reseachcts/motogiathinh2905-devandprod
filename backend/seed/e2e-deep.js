@@ -14,8 +14,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const BASE     = process.env.SMOKE_BASE          || 'http://127.0.0.1:3001';
-const EMAIL    = process.env.SEED_ADMIN_EMAIL    || 'thinh@motogiathinh.vn';
-const PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'changeme';
+const EMAIL    = process.env.SEED_ADMIN_EMAIL    || 'admin@motogiathinh.centersai';
+const PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'admin';
 const SALT     = Math.random().toString(36).slice(2, 7);
 const SHOTS    = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'snapshots');
 const TMPDIR   = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'tmp-l5');

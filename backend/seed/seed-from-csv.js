@@ -148,8 +148,8 @@ function seedAdminIfMissing() {
     return;
   }
 
-  const email = process.env.SEED_ADMIN_EMAIL || 'admin@motogiathinh.local';
-  const password = process.env.SEED_ADMIN_PASSWORD || 'changeme';
+  const email = process.env.SEED_ADMIN_EMAIL || 'admin@motogiathinh.centersai';
+  const password = process.env.SEED_ADMIN_PASSWORD || 'admin';
 
   // Prefer an existing admin row (from accounts.csv) and just set its password.
   let admin = db.prepare("SELECT * FROM accounts WHERE role = 'admin' LIMIT 1").get();
@@ -170,8 +170,8 @@ function seedAdminIfMissing() {
     ).run(id, 'Admin', 'admin', null, null, email, hash, nowDdMmYyyyHHMMSS());
     console.log(`  ✓ created default admin (id=${id}, email=${email})`);
   }
-  if (password === 'changeme') {
-    console.log('  ⚠ default password is "changeme" — change immediately after first login');
+  if (password === 'admin' || password === 'changeme') {
+    console.log(`  ⚠ default password is "${password}" — change immediately after first login`);
   }
 }
 

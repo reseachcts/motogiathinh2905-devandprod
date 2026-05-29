@@ -10,8 +10,8 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 
 const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:3001';
-const ADMIN_EMAIL = process.env.SMOKE_ADMIN_EMAIL || 'thinh@motogiathinh.vn';
-const ADMIN_PW    = process.env.SMOKE_ADMIN_PW    || 'changeme';
+const ADMIN_EMAIL = process.env.SMOKE_ADMIN_EMAIL || 'admin@motogiathinh.centersai';
+const ADMIN_PW    = process.env.SMOKE_ADMIN_PW    || 'admin';
 
 async function api(path, opts = {}) {
   const res = await fetch(BASE + path, {

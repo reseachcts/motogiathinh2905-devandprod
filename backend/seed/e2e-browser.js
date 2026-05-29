@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:3001';
 const EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin@motogiathinh.local';
-const PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'changeme';
+const PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'admin';
 const SNAPSHOT = process.argv.includes('--snapshot');
 
 const HERE = dirname(fileURLToPath(import.meta.url));

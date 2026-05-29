@@ -29,7 +29,7 @@ cd backend
 npm install
 node seed/seed-from-csv.js
 PORT=3001 node server.js
-# → http://127.0.0.1:3001  (login: admin@motogiathinh.local / changeme)
+# → http://127.0.0.1:3001  (login: admin@motogiathinh.centersai / admin)
 ```
 
 Full deployment instructions in [DEPLOY.md](./DEPLOY.md).

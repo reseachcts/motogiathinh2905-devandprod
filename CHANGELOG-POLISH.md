@@ -81,7 +81,7 @@ Core backend behaviour landed in these letters:
 | c009bc4 | fix: enforce feePlanId in AddStudent + click-to-view DocSlot + multi-file spec |
 | a813299 | test(security): live-server checks for notification branch scope + adjacent fixes |
 | 20cadae | K4: MoreMenu row actions + branches CRUD + generic _crud helper |
-| 84c288f | fix(test): smoke-test uses actual CSV admin email (thinh@motogiathinh.vn) |
+| 84c288f | fix(test): smoke-test uses actual CSV admin email (admin@motogiathinh.centersai) |
 
 K1 caught a batch of high-severity gaps:
 
@@ -176,7 +176,7 @@ Three real bugs the multi-agent L5 review caught:
 - `FloatingFilterPanel` now mirrors `Modal`'s Escape-to-dismiss
   pattern — all 4 list screens.
 - `e2e-write-flows.js` default `EMAIL` was the wrong account; switched
-  to the CSV-seeded `thinh@motogiathinh.vn`. Tests 5 & 14 also needed
+  to the CSV-seeded `admin@motogiathinh.centersai`. Tests 5 & 14 also needed
   the new mandatory password field.
 - Test 4 was flaky because many seed classes share the code
   `MÔ TÔ 06/2026`; `find()` returned a different id than the grid

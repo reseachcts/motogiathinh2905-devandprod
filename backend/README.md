@@ -10,7 +10,7 @@ cd backend
 npm install
 node seed/seed-from-csv.js          # one-time: import CSV fixtures
 PORT=3001 node server.js
-# open http://127.0.0.1:3001/  → login: admin@motogiathinh.local / changeme
+# open http://127.0.0.1:3001/  → login: admin@motogiathinh.centersai / admin
 ```
 
 ## Layout
@@ -44,8 +44,8 @@ backend/
 | `JWT_SECRET` | dev-only | **Required in production.** Generate with `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
 | `JWT_COOKIE` | `mgt_session` | Cookie name |
 | `JWT_DAYS` | 14 | Session lifetime |
-| `SEED_ADMIN_EMAIL` | `admin@motogiathinh.local` | Default admin email |
-| `SEED_ADMIN_PASSWORD` | `changeme` | **Change immediately** after first login |
+| `SEED_ADMIN_EMAIL` | `admin@motogiathinh.centersai` | Default admin email |
+| `SEED_ADMIN_PASSWORD` | `admin` | **Change immediately** after first login |
 | `CORS_ORIGINS` | (empty) | Comma-separated; leave empty when API + webapp share an origin |
 | `UPLOAD_DIR` | `./data/uploads` | Where multer writes uploaded files (student docs + biên lai). Must be writable by the service user. |
 | `MIN_PASSWORD_LENGTH` | 10 | Min length for `POST /api/auth/password`. Lower bound is 8. |
