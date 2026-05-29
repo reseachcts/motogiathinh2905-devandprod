@@ -337,16 +337,18 @@ function ClassDetail({ classId, onBack, onOpenStudent, isAdmin }) {
 
       <ClassEditModal open={editOpen} onClose={() => setEditOpen(false)} cls={cls}
                       currentStatus={status}
-                      onSaveStatus={({ status: newStatus, openDate, examDate }) => {
-                        setStatus(newStatus);
+                      onSaveStatus={async ({ status: newStatus, openDate, examDate }) => {
                         const patch = { statusOverride: newStatus };
                         // Only forward date fields when they actually changed
                         // so an admin who only toggles the status doesn't
                         // accidentally rewrite the wall-clock dates.
                         if (openDate && openDate !== cls.openDate) patch.openDate = openDate;
                         if (examDate && examDate !== cls.examDate) patch.examDate = examDate;
-                        window.MGT_DATA.api.updateClass(cls.id, patch)
-                          .catch(e => alert("Lỗi: " + e.message));
+                        // Let rejections propagate to ClassEditModal so it can
+                        // render the error inline + stay open. Only flip local
+                        // status state AFTER the server confirms.
+                        await window.MGT_DATA.api.updateClass(cls.id, patch);
+                        setStatus(newStatus);
                       }}/>
 
       <GlassCard padding={0}>
@@ -406,26 +408,48 @@ function ClassEditModal({ open, onClose, cls, currentStatus, onSaveStatus }) {
     openDate: cls.openDate,
     examDate: cls.examDate,
   });
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr]   = React.useState(null);
   // Reset draft whenever the modal reopens for a different class.
   React.useEffect(() => {
-    if (open) setDraft({ status: currentStatus, openDate: cls.openDate, examDate: cls.examDate });
+    if (open) {
+      setDraft({ status: currentStatus, openDate: cls.openDate, examDate: cls.examDate });
+      setBusy(false); setErr(null);
+    }
   }, [open, cls.id, currentStatus]);  // eslint-disable-line
 
   const branch = window.MGT_DATA.getBranch(cls.branchId);
 
+  // Await onSaveStatus; only close on success so the user sees the error
+  // inline if the API rejects.
+  const submit = async () => {
+    try {
+      setBusy(true); setErr(null);
+      await onSaveStatus({
+        status: draft.status,
+        openDate: draft.openDate,
+        examDate: draft.examDate,
+      });
+      onClose();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Modal open={open} onClose={onClose}
            title={`Sửa lớp ${cls.code}`}
-           primaryAction={() => {
-             onSaveStatus({
-               status: draft.status,
-               openDate: draft.openDate,
-               examDate: draft.examDate,
-             });
-             onClose();
-           }}
-           primaryLabel="Lưu thay đổi"
+           primaryAction={submit}
+           primaryLabel={busy ? "Đang lưu…" : "Lưu thay đổi"}
            primaryIcon="check"
+           primaryDisabled={busy}
+           footerStart={err ? (
+             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>
+               Lỗi: {err}
+             </span>
+           ) : null}
            width={520}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <FormField label="Trạng thái lớp">
