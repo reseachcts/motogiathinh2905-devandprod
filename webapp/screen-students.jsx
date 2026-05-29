@@ -690,7 +690,7 @@ function StudentRentalsCard({ student }) {
               <span>Mã thuê</span>
               <span style={{ textAlign: "right" }}>Số tiền</span>
               <span style={{ textAlign: "right" }}>Lượt</span>
-              <span>Xe</span>
+              <span style={{ textAlign: "left" }}>Xe</span>
               <span>Hình thức</span>
               <span style={{ textAlign: "center" }}>Biên lai</span>
             </div>
@@ -715,8 +715,8 @@ function StudentRentalsCard({ student }) {
                   <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--neon-lime)", fontWeight: 600 }}>+{window.fmtVND(r.amount)}</span>
                   {/* Lượt */}
                   <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--fg-1)", fontWeight: 600 }}>{r.rentalRounds || 0}</span>
-                  {/* Xe */}
-                  <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-1)",
+                  {/* Xe — explicit left align so it lines up with the Xe header */}
+                  <span style={{ textAlign: "left", fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-1)",
                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v ? v.name : (r.vehicleId || "—")}</span>
                   {/* Hình thức */}
                   <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-2)" }}>{r.method}</span>
