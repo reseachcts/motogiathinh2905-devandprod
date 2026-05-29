@@ -182,8 +182,12 @@ function Avatar({ name, size = 32, glow = false }) {
 
 // --------------------------------------------------------------------
 // Input
+//
+// `type` is forwarded straight to the underlying <input> — defaults to
+// "text". Callers wanting a masked password field pass type="password"
+// (RecordCreatorModal threads this through via field metadata).
 // --------------------------------------------------------------------
-function Input({ label, value, onChange, placeholder, mono = false, prefix }) {
+function Input({ label, value, onChange, placeholder, mono = false, prefix, type = "text" }) {
   const [focused, setFocused] = React.useState(false);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -205,6 +209,8 @@ function Input({ label, value, onChange, placeholder, mono = false, prefix }) {
       }}>
         {prefix && <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg-3)" }}>{prefix}</span>}
         <input value={value || ""} onChange={e => onChange && onChange(e.target.value)} placeholder={placeholder}
+               type={type}
+               autoComplete={type === "password" ? "new-password" : undefined}
                onFocus={() => setFocused(true)}
                onBlur={() => setFocused(false)}
                style={{

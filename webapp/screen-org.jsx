@@ -278,7 +278,7 @@ function AccountsTab() {
     { id: "email",    label: "Email",         type: "text",   placeholder: "you@motogiathinh.vn" },
     { id: "role",     label: "Vai trò",       type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }] },
     { id: "branchId", label: "Chi nhánh",     type: "select", options: branchOpts },
-    { id: "password", label: "Mật khẩu tạm thời", type: "text", placeholder: "≥10 ký tự, có chữ + số", fullWidth: true },
+    { id: "password", label: "Mật khẩu tạm thời", type: "password", placeholder: "≥10 ký tự, có chữ + số", fullWidth: true },
   ];
   // PATCH doesn't accept `password` — keep the edit form without it
   // (use Đặt lại mật khẩu instead).
@@ -302,7 +302,7 @@ function AccountsTab() {
         onSave={(d) => window.MGT_DATA.api.updateAccount(editingId, d)}/>
       <PasswordResetModal open={!!pwAccount} onClose={() => setPwId(null)}
         account={pwAccount}
-        onSubmit={(pw) => window.MGT_DATA.api.resetPassword(pwId, pw).catch(e => reportWriteError(e, "Lỗi đặt lại mật khẩu"))}/>
+        onSubmit={(pw) => window.MGT_DATA.api.resetPassword(pwId, pw)}/>
       <div style={{
         display: "grid", gridTemplateColumns: "1.6fr 110px 1.4fr 1fr 140px 100px 40px",
         padding: "12px 22px", gap: 12, borderBottom: "1px solid var(--ink-4)",
@@ -805,7 +805,8 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
                                        onChange={(v) => set(f.id, v)}
                                        color={f.color || "cyan"}/>
               : <Input  label={f.label} value={draft[f.id]}
-                        onChange={(v) => set(f.id, v)} placeholder={f.placeholder}/>;
+                        onChange={(v) => set(f.id, v)} placeholder={f.placeholder}
+                        type={f.type === "password" ? "password" : "text"}/>;
             return (
               <div key={f.id} style={{ gridColumn: useGrid && span === 2 ? "span 2" : "auto" }}>
                 {node}
@@ -821,19 +822,42 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
 // --------------------------------------------------------------------
 // PasswordResetModal — admin-only prompt for resetting an account's
 // password. Single password field; sends POST /accounts/:id/reset-password.
+// Uses the same busy/err close-after-async pattern as RecordCreatorModal /
+// EditRecordModal so a backend rejection (weak password, lockout) stays
+// visible inline rather than vanishing with the dialog.
 // --------------------------------------------------------------------
 function PasswordResetModal({ open, onClose, account, onSubmit }) {
-  const [pw, setPw] = React.useState("");
-  React.useEffect(() => { if (open) setPw(""); }, [open]);
+  const [pw, setPw]     = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr]   = React.useState(null);
+  React.useEffect(() => { if (open) { setPw(""); setBusy(false); setErr(null); } }, [open]);
+  const submit = async () => {
+    try {
+      setBusy(true); setErr(null);
+      await onSubmit?.(pw);
+      onClose();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <Modal open={open} onClose={onClose}
            title="Đặt lại mật khẩu"
            subtitle={account ? `Cho ${account.name} · ${account.email}` : ""}
-           primaryAction={() => { onSubmit && onSubmit(pw); onClose(); }}
-           primaryLabel="Đặt lại" primaryIcon="check" width={420}
-           primaryDisabled={(pw || "").length < 10}>
+           primaryAction={submit}
+           primaryLabel={busy ? "Đang đặt lại…" : "Đặt lại"}
+           primaryIcon="check" width={420}
+           primaryDisabled={busy || (pw || "").length < 10}
+           footerStart={err ? (
+             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>
+               Lỗi: {err}
+             </span>
+           ) : null}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <Input label="Mật khẩu mới (≥ 10 ký tự)" value={pw} onChange={setPw} placeholder="••••••••••"/>
+        <Input label="Mật khẩu mới (≥ 10 ký tự)" value={pw} onChange={setPw}
+               type="password" placeholder="••••••••••"/>
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
           Người dùng sẽ phải đăng nhập lại bằng mật khẩu này.
         </span>
@@ -944,7 +968,8 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
                                        onChange={(v) => set(f.id, v)}
                                        color={f.color || "cyan"}/>
               : <Input  label={f.label} value={draft[f.id]}
-                        onChange={(v) => set(f.id, v)} placeholder={f.placeholder}/>;
+                        onChange={(v) => set(f.id, v)} placeholder={f.placeholder}
+                        type={f.type === "password" ? "password" : "text"}/>;
             return (
               <div key={f.id} style={{ gridColumn: useGrid && span === 2 ? "span 2" : "auto" }}>
                 {node}
