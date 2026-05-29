@@ -29,6 +29,45 @@
     return new Date(y, m - 1, d, hh, mm, ss).getTime();
   }
 
+  // Lightweight transient toast — vanilla DOM, no React dep. Used for
+  // "Tính năng đang phát triển" placeholders, soft-failure notices,
+  // etc. Stacks bottom-right; auto-dismisses after `ms` (default 2.6s).
+  window.MGT_TOAST = (msg, opts = {}) => {
+    if (!msg) return;
+    let host = document.getElementById('mgt-toast-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'mgt-toast-host';
+      Object.assign(host.style, {
+        position: 'fixed', right: '20px', bottom: '20px', zIndex: 100000,
+        display: 'flex', flexDirection: 'column', gap: '8px',
+        pointerEvents: 'none',
+      });
+      document.body.appendChild(host);
+    }
+    const el = document.createElement('div');
+    el.textContent = String(msg);
+    Object.assign(el.style, {
+      pointerEvents: 'auto',
+      fontFamily: 'var(--font-ui, system-ui, sans-serif)', fontSize: '13px', fontWeight: '500',
+      color: 'var(--fg-1, #fff)',
+      background: 'var(--glass-3, rgba(20,22,28,0.92))',
+      border: '1px solid var(--glass-stroke-strong, rgba(255,255,255,0.16))',
+      borderRadius: '12px', padding: '10px 14px',
+      boxShadow: '0 12px 30px rgba(0,0,0,0.38)',
+      backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+      maxWidth: '320px', opacity: '0', transform: 'translateY(6px)',
+      transition: 'opacity 180ms ease-out, transform 180ms ease-out',
+    });
+    host.appendChild(el);
+    requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
+    const ms = opts.ms || 2600;
+    setTimeout(() => {
+      el.style.opacity = '0'; el.style.transform = 'translateY(6px)';
+      setTimeout(() => { el.remove(); if (!host.children.length) host.remove(); }, 220);
+    }, ms);
+  };
+
   window.fmtVND = (n) => {
     const abs = Math.abs(Math.round(n));
     return (n < 0 ? '−' : '') + abs.toLocaleString('en-US') + 'đ';
