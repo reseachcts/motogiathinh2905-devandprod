@@ -63,9 +63,12 @@ const assert = (cond, msg) => { if (!cond) { console.error('  ✗', msg); proces
   assert(newClass.id && newClass.id.startsWith('cls-'), `new class id=${newClass.id}`);
 
   console.log('6. write: create student');
+  // Per-run unique 12-digit idNumber so re-running the smoke test doesn't
+  // 409 on the UNIQUE(students.idNumber) constraint.
+  const idNumber = '9' + Date.now().toString().slice(-11);
   const newStudent = await api('/api/students', { method: 'POST', body: {
     form: {
-      name: 'Smoke Test Student', gender: 'Nam', dob: '01/01/2000', idNumber: '999999999999',
+      name: 'Smoke Test Student', gender: 'Nam', dob: '01/01/2000', idNumber,
       address: '123 Test St', phone: '0900000000', queQuan: 'Test', ngayCapCCCD: '01/01/2020',
       noiCapCCCD: 'Test', classId: newClass.id, licence: 'A', feePlanId: 'fee-a',
       promotionId: 'promo-none', responsibleStaffId: 'u-admin',
