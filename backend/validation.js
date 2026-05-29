@@ -18,6 +18,7 @@ const LOCKED_CLASS_STATUS = new Set(['đang mở', 'đang diễn ra', 'đã kế
 const LOCKED_LICENCE      = new Set(['A', 'A1']);
 const LOCKED_METHOD       = new Set(['Tiền mặt', 'Chuyển khoản']);
 const LOCKED_ROLE         = new Set(['admin', 'staff']);
+const LOCKED_PAYMENT_KIND = new Set(['tuition', 'rental']);
 
 function err(field, code, message) { return { field, code, message }; }
 
@@ -100,6 +101,12 @@ export const validators = {
     return LOCKED_ROLE.has(v)
       ? null
       : err('role', 'bad_role', 'Vai trò phải là admin hoặc staff.');
+  },
+  paymentKind(v) {
+    if (v == null) return null;
+    return LOCKED_PAYMENT_KIND.has(v)
+      ? null
+      : err('kind', 'bad_kind', 'Loại thanh toán phải là tuition hoặc rental.');
   },
 };
 

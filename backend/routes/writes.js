@@ -183,38 +183,68 @@ router.patch('/students/:id', (req, res) => {
 // ---------------------------------------------------------------------------
 
 router.post('/payments', (req, res) => {
-  const { studentId, amount, method, bienLaiId, bienLaiPhoto, staffId } = req.body || {};
+  const { studentId, amount, method, bienLaiId, bienLaiPhoto, staffId,
+          kind, vehicleId, rentalRounds } = req.body || {};
   if (!studentId || !method) return bad(res, 400, 'missing_required_fields');
-  // Compensating-entry support per BACKEND.md §8.5: allow negative amounts
-  // (refund/correction), reject zero/non-integer.
-  const amtErr = V.amount(amount, { allowNegative: true });
-  if (amtErr) return badV(res, amtErr);
   const methodErr = V.method(method);
   if (methodErr) return badV(res, methodErr);
+
+  // Kind defaults to 'tuition'. Rentals are a separate ledger — same
+  // `payments` table, but excluded from branch revenue / student balance.
+  const k = kind || 'tuition';
+  const kindErr = V.paymentKind(k);
+  if (kindErr) return badV(res, kindErr);
 
   const student = db.prepare('SELECT * FROM students WHERE id = ?').get(studentId);
   if (!student) return bad(res, 400, 'invalid_studentId');
   if (req.user.role !== 'admin' && student.branchId !== req.user.branchId) {
     return bad(res, 403, 'wrong_branch');
   }
-  const amt = parseInt(amount, 10);
 
-  const id = genId('PMT');
+  // -- Rental branch ----------------------------------------------------
+  // Server is the source of truth for the amount: it = vehicle.price ×
+  // rentalRounds. The client never picks the number; we want audit logs
+  // to reflect a price the operator can't quietly change.
+  let amt, vehicleRow = null, rounds = null;
+  if (k === 'rental') {
+    if (!vehicleId) return bad(res, 400, 'rental_requires_vehicleId');
+    rounds = parseInt(rentalRounds, 10);
+    if (!Number.isFinite(rounds) || rounds < 1) return bad(res, 400, 'rental_requires_positive_rounds');
+    vehicleRow = db.prepare('SELECT * FROM vehicles WHERE id = ?').get(vehicleId);
+    if (!vehicleRow) return bad(res, 400, 'invalid_vehicleId');
+    if (req.user.role !== 'admin' && vehicleRow.branchId && vehicleRow.branchId !== req.user.branchId) {
+      return bad(res, 403, 'wrong_branch');
+    }
+    if (!vehicleRow.price || vehicleRow.price <= 0) return bad(res, 400, 'vehicle_price_unset');
+    amt = vehicleRow.price * rounds;
+  } else {
+    // -- Tuition branch (legacy default) --------------------------------
+    const amtErr = V.amount(amount, { allowNegative: true });
+    if (amtErr) return badV(res, amtErr);
+    amt = parseInt(amount, 10);
+  }
+
+  const id = genId(k === 'rental' ? 'RNT' : 'PMT');
   const blId = bienLaiId || nextBienLaiId();
   const createdAt = nowDdMmYyyyHHMMSS();
 
   try {
     db.prepare(`
-      INSERT INTO payments (id, studentId, branchId, staffId, amount, method, bienLaiId, bienLaiPhoto, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO payments (id, studentId, branchId, staffId, amount, method, bienLaiId, bienLaiPhoto, createdAt,
+                            kind, vehicleId, rentalRounds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, studentId, student.branchId, staffId || req.user.id, amt, method, blId,
-      bienLaiPhoto ? 1 : 0, createdAt);
+      bienLaiPhoto ? 1 : 0, createdAt, k, vehicleId || null, rounds);
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) return bad(res, 409, 'duplicate_bienLaiId');
     throw e;
   }
 
-  logActivity(req.user.id, 'payment.create', `${blId} (${amt}đ for ${student.maHV})`);
+  const auditAction = k === 'rental' ? 'rental.create' : 'payment.create';
+  const auditTarget = k === 'rental'
+    ? `${blId} (${amt}đ · ${vehicleRow.name} × ${rounds} for ${student.maHV})`
+    : `${blId} (${amt}đ for ${student.maHV})`;
+  logActivity(req.user.id, auditAction, auditTarget);
   recomputeAfterWrite(req.user.id, `payment ${blId}`);
   const row = db.prepare('SELECT * FROM payments WHERE id = ?').get(id);
   res.status(201).json(coerceBools('payments', row));
@@ -378,7 +408,7 @@ router.post('/teachers', requireAdmin, makeAdminCreator('teachers', 't',
   }));
 
 router.post('/vehicles', requireAdmin, makeAdminCreator('vehicles', 'v',
-  ['name', 'licence', 'plate', 'year', 'branchId', 'status'], { required: ['name'] }));
+  ['name', 'licence', 'plate', 'year', 'branchId', 'status', 'price'], { required: ['name'] }));
 
 // Branch-scope guard for notifications: system-wide rows (no studentId) are
 // editable by anyone; per-student rows are limited to the student's branch.
@@ -428,7 +458,7 @@ const PATCHABLE = {
   fee_plans:  ['name', 'licence', 'amount'],
   promotions: ['name', 'appliesTo', 'discount'],
   teachers:   ['name', 'phone', 'yearsExp', 'branchId', 'active'],
-  vehicles:   ['name', 'licence', 'plate', 'year', 'branchId', 'status'],
+  vehicles:   ['name', 'licence', 'plate', 'year', 'branchId', 'status', 'price'],
   branches:   ['name', 'address', 'manager_id'],
 };
 

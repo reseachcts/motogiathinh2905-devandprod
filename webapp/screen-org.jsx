@@ -197,14 +197,32 @@ function BranchExpanded({ branchId, onClose, onOpenClass }) {
     const [d, m, y] = s.split("/").map(Number);
     return new Date(y, m - 1, d).getTime();
   };
-  const sortedClasses = branchClasses.slice().sort((a, c) => dateMs(c.openDate) - dateMs(a.openDate));
-
-  // Compute total revenue per class
-  const classWithRevenue = sortedClasses.map(cls => {
+  // Compute revenue + student count per class first, then sort across
+  // whichever key the user picked (sort menu replaces the old Đóng button).
+  const enriched = branchClasses.map(cls => {
     const studentsInClass = D.studentsInClass(cls.id);
     const studentIds = new Set(studentsInClass.map(s => s.id));
     const revenue = D.payments.filter(p => studentIds.has(p.studentId)).reduce((acc, p) => acc + p.amount, 0);
-    return { cls, count: studentsInClass.length, revenue };
+    return { cls, count: studentsInClass.length, revenue,
+             _openMs: dateMs(cls.openDate), _examMs: dateMs(cls.examDate) };
+  });
+  const sortOpts = [
+    { id: "open:desc",  label: "Ngày mở: Mới → Cũ" },
+    { id: "open:asc",   label: "Ngày mở: Cũ → Mới" },
+    { id: "exam:desc",  label: "Ngày thi: Mới → Cũ" },
+    { id: "exam:asc",   label: "Ngày thi: Cũ → Mới" },
+    { id: "count:desc", label: "Sĩ số ↓" },
+    { id: "count:asc",  label: "Sĩ số ↑" },
+    { id: "rev:desc",   label: "Doanh thu ↓" },
+    { id: "rev:asc",    label: "Doanh thu ↑" },
+  ];
+  const [sortKey, setSortKey] = React.useState("open:desc");
+  const [skField, skDir] = sortKey.split(":");
+  const skMap = { open: "_openMs", exam: "_examMs", count: "count", rev: "revenue" };
+  const skProp = skMap[skField];
+  const classWithRevenue = enriched.slice().sort((a, c) => {
+    const av = a[skProp] || 0, cv = c[skProp] || 0;
+    return skDir === "asc" ? av - cv : cv - av;
   });
 
   return (
@@ -228,7 +246,7 @@ function BranchExpanded({ branchId, onClose, onOpenClass }) {
               <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{b.name}</h3>
               <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-3)" }}>{b.address} · Quản lý: {D.getStaff(b.manager_id)?.name || "—"}</span>
             </div>
-            <Button variant="ghost" size="sm" icon="x" onClick={onClose}>Đóng</Button>
+            <SortMenu value={sortKey} onChange={setSortKey} options={sortOpts}/>
           </div>
 
           {/* Staff cards */}
@@ -571,80 +589,393 @@ function TeachersTab() {
 
 function VehiclesTab() {
   const D = window.MGT_DATA;
-  const [open, setOpen] = React.useState(false);
-  const [editingId, setEditingId] = React.useState(null);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [rentOpen,   setRentOpen]   = React.useState(false);
+  const [editingId,  setEditingId]  = React.useState(null);
+  const [selectedId, setSelectedId] = React.useState(null);
   const isAdmin = D.currentUser?.role === "admin";
-  // No placeholder entry — "" is not an accepted value server-side, and
-  // EditRecordModal/RecordCreatorModal seed selects from options[0].id so
-  // the first real branch is the default.
   const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
   const vehicleFields = [
-    { id: "name",     label: "Tên xe",   type: "text",   placeholder: "Honda Wave Alpha" },
-    { id: "licence",  label: "Bằng",     type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
-    { id: "plate",    label: "Biển số",  type: "text",   placeholder: "59-K1 123.45" },
-    { id: "year",     label: "Năm sản xuất", type: "int",  placeholder: "2024" },
-    { id: "branchId", label: "Chi nhánh", type: "select", options: branchOpts },
+    { id: "name",     label: "Tên xe",       type: "text",   placeholder: "Honda Wave Alpha", fullWidth: true },
+    { id: "licence",  label: "Bằng",         type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
+    { id: "branchId", label: "Chi nhánh",    type: "select", options: branchOpts },
+    { id: "plate",    label: "Biển số",      type: "text",   placeholder: "59-K1 123.45" },
+    { id: "year",     label: "Năm sản xuất", type: "int",    placeholder: "2024" },
+    { id: "price",    label: "Giá thuê (đ/lượt)", type: "money", placeholder: "20,000", fullWidth: true },
   ];
   const editing = editingId ? D.vehicles.find(x => x.id === editingId) : null;
+  const toggle  = (id) => setSelectedId(s => s === id ? null : id);
   return (
-    <GlassCard padding={0}>
-      <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)", display: "flex", alignItems: "center" }}>
-        <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>{D.vehicles.length} phương tiện</span>
-        <Button variant="primary" size="sm" icon="plus" onClick={() => setOpen(true)}>Thêm phương tiện</Button>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>
+          {D.vehicles.length} phương tiện · {D.rentals.length} lượt thuê đã ghi
+        </span>
+        {/* Admin sees both buttons; staff only sees "Ghi nhận lượt thuê".
+            Per spec: "Thêm phương tiện" sits LEFT of "Ghi nhận lượt thuê". */}
+        {isAdmin && <Button variant="secondary" size="sm" icon="plus" onClick={() => setCreateOpen(true)}>Thêm phương tiện</Button>}
+        <Button variant="primary" size="sm" icon="card" onClick={() => setRentOpen(true)}>Ghi nhận lượt thuê</Button>
       </div>
-      <RecordCreatorModal open={open} onClose={() => setOpen(false)}
+
+      <RecordCreatorModal open={createOpen} onClose={() => setCreateOpen(false)}
         title="Thêm phương tiện"
-        onCreate={(d) => window.MGT_DATA.api.createVehicle(d)}
+        onCreate={(d) => window.MGT_DATA.api.createVehicle(d).catch(e => reportWriteError(e, "Lỗi tạo phương tiện"))}
         fields={vehicleFields}/>
       <EditRecordModal open={!!editing} onClose={() => setEditingId(null)}
         title="Sửa phương tiện" subtitle={editing?.name}
         initialValues={editing || {}} fields={vehicleFields}
         onSave={(d) => window.MGT_DATA.api.updateVehicle(editingId, d)}/>
-      <div style={{
-        display: "grid", gridTemplateColumns: "1.4fr 80px 160px 100px 1fr 120px 40px",
-        padding: "12px 22px", gap: 12, borderBottom: "1px solid var(--ink-4)",
-        fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)",
-      }}>
-        <span>Tên xe</span><span>Bằng</span><span>Biển số</span><span>Năm</span><span>Chi nhánh</span><span>Trạng thái</span><span></span>
-      </div>
-      {D.vehicles.map((v, i) => {
-        const b = D.getBranch(v.branchId);
-        return (
-          <div key={v.id} style={{
-            display: "grid", gridTemplateColumns: "1.4fr 80px 160px 100px 1fr 120px 40px",
-            padding: "14px 22px", gap: 12, alignItems: "center",
-            borderBottom: i < D.vehicles.length - 1 ? "1px solid var(--ink-4)" : "none",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: 8,
-                background: "color-mix(in oklab, var(--neon-cyan) 14%, transparent)",
-                border: "1px solid color-mix(in oklab, var(--neon-cyan) 30%, transparent)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <Icon name="bike" size={16} color="var(--neon-cyan)" style={{ filter: "drop-shadow(0 0 4px var(--neon-cyan-glow))" }}/>
+      <RentVehicleModal open={rentOpen} onClose={() => setRentOpen(false)}
+        defaultVehicleId={selectedId || D.vehicles[0]?.id}/>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+        {D.vehicles.map(v => {
+          const b = D.getBranch(v.branchId);
+          const isSelected = selectedId === v.id;
+          const rentals = D.rentalsForVehicle(v.id);
+          const tone = "var(--neon-cyan)";
+          return (
+            <GlassCard key={v.id} padding={22}
+                       onClick={() => toggle(v.id)}
+                       style={{
+                         cursor: "pointer",
+                         transition: "all 220ms var(--ease-out)",
+                         borderColor: isSelected ? tone : "var(--glass-stroke)",
+                         boxShadow: isSelected
+                           ? `0 0 0 1px ${tone}, 0 0 28px color-mix(in oklab, ${tone} 42%, transparent), var(--shadow-2)`
+                           : `0 0 18px color-mix(in oklab, ${tone} 14%, transparent), var(--shadow-2)`,
+                         background: `linear-gradient(135deg, color-mix(in oklab, ${tone} 9%, transparent), transparent 70%), var(--glass-2)`,
+                         transform: isSelected ? "translateY(-2px)" : "none",
+                       }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: `linear-gradient(135deg, ${tone}, color-mix(in oklab, ${tone} 55%, var(--ink-0)))`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: `0 0 16px color-mix(in oklab, ${tone} 52%, transparent)`,
+                  }}>
+                    <Icon name="bike" size={20} color="var(--ink-0)"/>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em",
+                                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.name}</h3>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{v.plate || "—"} · {v.year || "—"}</span>
+                  </div>
+                </div>
+
+                <Divider/>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                  <MicroStat label="Bằng" value={v.licence || "—"}/>
+                  <MicroStat label="Giá"  value={v.price ? window.fmtVND(v.price) : "—"} mono color="var(--neon-lime)"/>
+                  <MicroStat label="Lượt thuê" value={rentals.length} mono/>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 4 }}>
+                  <span style={{ flex: 1, fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-3)" }}>{b ? b.name : "—"}</span>
+                  {isAdmin && (
+                    <span onClick={(e) => { e.stopPropagation(); setEditingId(v.id); }}
+                          style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase",
+                                   color: "var(--fg-3)", cursor: "pointer", padding: "4px 8px", borderRadius: 8,
+                                   border: "1px solid var(--glass-stroke)" }}>Sửa</span>
+                  )}
+                </div>
               </div>
-              <span style={{ fontFamily: "var(--font-ui)", fontSize: 14, fontWeight: 600, color: "var(--fg-1)" }}>{v.name}</span>
+            </GlassCard>
+          );
+        })}
+      </div>
+
+      {selectedId && <VehicleExpanded vehicleId={selectedId}/>}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------
+// VehicleExpanded — appears under the vehicle grid when a card is open.
+// Pattern follows BranchExpanded: a single roll-down panel with detail
+// metadata + a table of rental payments for the selected vehicle. The
+// top-right hosts a Sort menu (no Đóng button — re-click the same card
+// to collapse) per user spec.
+// --------------------------------------------------------------------
+function VehicleExpanded({ vehicleId }) {
+  const D = window.MGT_DATA;
+  const v = D.getVehicle(vehicleId);
+  const b = D.getBranch(v?.branchId);
+  const rentals = D.rentalsForVehicle(vehicleId);
+  const tone = "var(--neon-cyan)";
+  const sortOpts = [
+    { id: "createdAtMs:desc", label: "Mới → Cũ" },
+    { id: "createdAtMs:asc",  label: "Cũ → Mới" },
+    { id: "amount:desc",      label: "Số tiền ↓" },
+    { id: "amount:asc",       label: "Số tiền ↑" },
+    { id: "rentalRounds:desc",label: "Số lượt ↓" },
+    { id: "rentalRounds:asc", label: "Số lượt ↑" },
+  ];
+  const [sortKey, setSortKey] = React.useState("createdAtMs:desc");
+  const [field, dir] = sortKey.split(":");
+  const sorted = [...rentals].sort((a, c) => {
+    const av = a[field] || 0, cv = c[field] || 0;
+    return dir === "asc" ? av - cv : cv - av;
+  });
+  const totalAmount = rentals.reduce((s, r) => s + r.amount, 0);
+  const totalRounds = rentals.reduce((s, r) => s + (r.rentalRounds || 0), 0);
+  if (!v) return null;
+  return (
+    <div key={vehicleId} style={{ animation: "mgt-roll-down 280ms var(--ease-out)" }}>
+      <style>{`@keyframes mgt-roll-down { from { opacity: 0; transform: translateY(-8px) scaleY(0.96); transform-origin: top; max-height: 0; } to { opacity: 1; transform: translateY(0) scaleY(1); max-height: 2000px; } }`}</style>
+      <GlassCard padding={26}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 8, height: 28, borderRadius: 2, background: tone,
+                          boxShadow: `0 0 12px color-mix(in oklab, ${tone} 60%, transparent)` }}/>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{v.name}</h3>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-3)" }}>
+                {v.licence || "—"} · {v.plate || "—"} · {v.year || "—"} · {b ? b.name : "—"} · Giá {v.price ? window.fmtVND(v.price) : "chưa đặt"}
+              </span>
             </div>
-            <Chip>{v.licence}</Chip>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-1)", fontVariantNumeric: "tabular-nums" }}>{v.plate}</span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-2)", fontVariantNumeric: "tabular-nums" }}>{v.year}</span>
-            <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-2)" }}>{b ? b.name : "—"}</span>
-            <span style={{
-              fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700,
-              padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap",
-              background: "color-mix(in oklab, var(--neon-lime) 14%, transparent)",
-              color: "var(--neon-lime)",
-              border: "1px solid color-mix(in oklab, var(--neon-lime) 36%, transparent)",
-              display: "inline-block", textAlign: "center",
-            }}>HOẠT ĐỘNG</span>
-            <MoreMenu items={[
-              { label: "Sửa", onClick: () => setEditingId(v.id), hidden: !isAdmin },
-            ]}/>
+            <SortMenu value={sortKey} onChange={setSortKey} options={sortOpts}/>
           </div>
-        );
-      })}
-    </GlassCard>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <MicroStat label="Số lượt thuê" value={rentals.length} mono/>
+            <MicroStat label="Tổng số lượt"  value={totalRounds} mono/>
+            <MicroStat label="Tổng thu"       value={window.fmtVND(totalAmount)} mono color="var(--neon-lime)"/>
+          </div>
+
+          <div>
+            <div style={{
+              display: "grid", gridTemplateColumns: "150px 1fr 80px 120px 1fr",
+              padding: "10px 14px", gap: 12, borderBottom: "1px solid var(--ink-4)",
+              fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)",
+            }}>
+              <span>Thời điểm</span><span>Học viên</span><span style={{ textAlign: "right" }}>Lượt</span>
+              <span style={{ textAlign: "right" }}>Số tiền</span><span>Nhân viên</span>
+            </div>
+            <div style={{ maxHeight: 320, overflowY: "auto" }}>
+              {sorted.length === 0 && (
+                <div style={{ padding: "20px 14px", color: "var(--fg-4)", fontFamily: "var(--font-ui)", fontSize: 13, fontStyle: "italic", textAlign: "center" }}>
+                  Chưa có lượt thuê nào cho xe này.
+                </div>
+              )}
+              {sorted.map((r, i) => {
+                const stu = D.getStudent(r.studentId);
+                const staff = D.getStaff(r.staffId);
+                return (
+                  <div key={r.id} style={{
+                    display: "grid", gridTemplateColumns: "150px 1fr 80px 120px 1fr",
+                    padding: "12px 14px", gap: 12, alignItems: "center",
+                    borderBottom: i < sorted.length - 1 ? "1px solid var(--ink-4)" : "none",
+                  }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-2)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt}</span>
+                    <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-1)" }}>{stu?.name || r.studentId}</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--fg-1)", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{r.rentalRounds || 0}</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--neon-lime)", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{window.fmtVND(r.amount)}</span>
+                    <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-3)" }}>{staff?.name || "—"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------
+// SortMenu — small dropdown atom used in expanded detail cards. Single-
+// select cycle through (field, dir) options.
+// --------------------------------------------------------------------
+function SortMenu({ value, onChange, options }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const current = options.find(o => o.id === value) || options[0];
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        padding: "7px 12px", borderRadius: 10,
+        background: "var(--glass-2)", border: "1px solid var(--glass-stroke)",
+        color: "var(--fg-1)", fontFamily: "var(--font-ui)", fontWeight: 600, fontSize: 12,
+        cursor: "pointer",
+      }}>
+        <Icon name="filter" size={13}/>
+        <span>Sắp xếp: {current.label}</span>
+        <Icon name="arrow-down" size={11} style={{ transition: "transform 160ms var(--ease-out)", transform: open ? "rotate(180deg)" : "none" }}/>
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", right: 0, top: "100%", marginTop: 6, zIndex: 50,
+          minWidth: 180, padding: 4, borderRadius: 12,
+          background: "var(--glass-3)", backdropFilter: "var(--glass-blur)",
+          border: "1px solid var(--glass-stroke-strong)", boxShadow: "var(--shadow-3)",
+        }}>
+          {options.map(o => (
+            <div key={o.id} onClick={() => { onChange(o.id); setOpen(false); }}
+                 style={{
+                   padding: "8px 12px", borderRadius: 8, cursor: "pointer",
+                   fontFamily: "var(--font-ui)", fontSize: 13,
+                   color: o.id === value ? "var(--neon-cyan)" : "var(--fg-1)",
+                   background: o.id === value ? "color-mix(in oklab, var(--neon-cyan) 12%, transparent)" : "transparent",
+                 }}
+                 onMouseEnter={(e) => { if (o.id !== value) e.currentTarget.style.background = "var(--glass-2)"; }}
+                 onMouseLeave={(e) => { if (o.id !== value) e.currentTarget.style.background = "transparent"; }}>
+              {o.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------
+// RentVehicleModal — "Ghi nhận lượt thuê" entry point. Picks a vehicle,
+// a student (search across name / maHV / phone), and a round count.
+// Amount is locked to vehicle.price × rounds — server validates the same
+// (cashier can't override). Submits via createRental.
+// --------------------------------------------------------------------
+function RentVehicleModal({ open, onClose, defaultVehicleId }) {
+  const D = window.MGT_DATA;
+  const [vehicleId, setVehicleId] = React.useState(defaultVehicleId || D.vehicles[0]?.id || "");
+  const [studentQ,  setStudentQ]  = React.useState("");
+  const [studentId, setStudentId] = React.useState("");
+  const [rounds,    setRounds]    = React.useState("1");
+  const [method,    setMethod]    = React.useState("Tiền mặt");
+  const [busy, setBusy] = React.useState(false);
+  const [err,  setErr]  = React.useState(null);
+  const busyRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!open) return;
+    setVehicleId(defaultVehicleId || D.vehicles[0]?.id || "");
+    setStudentQ(""); setStudentId(""); setRounds("1");
+    setMethod("Tiền mặt"); setBusy(false); setErr(null); busyRef.current = false;
+  }, [open, defaultVehicleId]);  // eslint-disable-line
+
+  const veh = D.getVehicle(vehicleId);
+  const r = parseInt(rounds, 10) || 0;
+  const total = veh && veh.price > 0 && r > 0 ? veh.price * r : 0;
+  // Student search — prefix-match by name / maHV / phone, cap at 8 matches.
+  const matches = React.useMemo(() => {
+    const q = studentQ.trim().toLowerCase();
+    if (!q || studentId) return [];
+    return D.students.filter(s =>
+      (s.name || "").toLowerCase().includes(q)
+      || (s.maHV || "").toLowerCase().includes(q)
+      || (s.phone || "").includes(q)
+    ).slice(0, 8);
+  }, [studentQ, studentId]);
+  const chosenStudent = studentId ? D.getStudent(studentId) : null;
+
+  const canSubmit = !busy && veh && veh.price > 0 && r >= 1 && studentId;
+  const submit = async () => {
+    if (busyRef.current || !canSubmit) return;
+    busyRef.current = true;
+    try {
+      setBusy(true); setErr(null);
+      await D.api.createRental({ studentId, vehicleId, rounds: r, method });
+      onClose();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      busyRef.current = false; setBusy(false);
+    }
+  };
+
+  const vehicleOpts = D.vehicles.map(v => ({ value: v.id, label: `${v.name} · ${v.plate || "—"}${v.price ? ` · ${window.fmtVND(v.price)}/lượt` : " · chưa đặt giá"}` }));
+  return (
+    <Modal open={open} onClose={onClose} width={560}
+           title="Ghi nhận lượt thuê xe"
+           subtitle="Pay-on-the-spot · không tính vào doanh thu chính"
+           primaryAction={submit}
+           primaryLabel={busy ? "Đang ghi…" : "Ghi nhận"}
+           primaryIcon="check"
+           primaryDisabled={!canSubmit}
+           footerStart={err ? (
+             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>Lỗi: {err}</span>
+           ) : null}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <Select label="Phương tiện" value={vehicleId} onChange={setVehicleId} options={vehicleOpts}/>
+        {/* Student picker — controlled-search input. Once a match is
+            picked the chip replaces the input until "Đổi" clicked. */}
+        <div>
+          <label style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)", display: "block", marginBottom: 6 }}>Học viên</label>
+          {chosenStudent ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                          background: "var(--ink-2)", border: "1px solid var(--glass-stroke)", borderRadius: 10 }}>
+              <Avatar name={chosenStudent.name} size={28}/>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>{chosenStudent.name}</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)" }}>{chosenStudent.maHV} · {chosenStudent.phone || "—"}</div>
+              </div>
+              <button type="button" onClick={() => { setStudentId(""); setStudentQ(""); }}
+                      style={{ background: "transparent", border: "1px solid var(--glass-stroke)", color: "var(--fg-3)",
+                               padding: "4px 10px", borderRadius: 8, cursor: "pointer",
+                               fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>Đổi</button>
+            </div>
+          ) : (
+            <div style={{ position: "relative" }}>
+              <Input value={studentQ} onChange={setStudentQ} placeholder="Tìm theo tên / mã HV / SĐT…"/>
+              {matches.length > 0 && (
+                <div style={{ position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 30,
+                              padding: 4, borderRadius: 10,
+                              background: "var(--glass-3)", border: "1px solid var(--glass-stroke-strong)", boxShadow: "var(--shadow-2)",
+                              maxHeight: 240, overflowY: "auto" }}>
+                  {matches.map(s => (
+                    <div key={s.id} onClick={() => { setStudentId(s.id); setStudentQ(s.name); }}
+                         style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
+                                  borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-ui)", fontSize: 13 }}
+                         onMouseEnter={(e) => e.currentTarget.style.background = "var(--glass-2)"}
+                         onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                      <Avatar name={s.name} size={24}/>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: "var(--fg-1)", fontWeight: 600 }}>{s.name}</div>
+                        <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)" }}>{s.maHV} · {s.phone || "—"}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Input label="Số lượt" value={rounds} onChange={setRounds} digits maxDigits={3} mono placeholder="1"/>
+          <Select label="Hình thức" value={method} onChange={setMethod}
+                  options={[{ value: "Tiền mặt", label: "Tiền mặt" }, { value: "Chuyển khoản", label: "Chuyển khoản" }]}/>
+        </div>
+
+        {/* Live total — read-only, server computes the same. */}
+        <div style={{
+          padding: "12px 14px", borderRadius: 12,
+          background: "color-mix(in oklab, var(--neon-lime) 10%, transparent)",
+          border: "1px solid color-mix(in oklab, var(--neon-lime) 28%, transparent)",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>
+            {veh && veh.price > 0 ? `${r || 0} lượt × ${window.fmtVND(veh.price)}` : "Chưa đủ thông tin"}
+          </span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 22, fontWeight: 700, color: "var(--neon-lime)", fontVariantNumeric: "tabular-nums" }}>
+            {window.fmtVND(total)}
+          </span>
+        </div>
+        {veh && (!veh.price || veh.price <= 0) && (
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-amber)" }}>
+            ⚠ Phương tiện này chưa đặt giá thuê. Admin cần đặt giá trước khi cho thuê.
+          </span>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -656,7 +987,7 @@ function VehiclesTab() {
 function classifyAction(action) {
   const [domain, ...rest] = String(action || "").split(".");
   const verb = rest.join(".");
-  const moneyDomains = ["payment", "payments"];
+  const moneyDomains = ["payment", "payments", "rental", "rentals"];
   if (moneyDomains.includes(domain)) return { cat: "money", severity: "money", verbLabel: verb || "" };
   if (verb === "delete") return { cat: "delete", severity: "danger", verbLabel: "Xóa" };
   if (verb === "update" || verb === "patch" || verb === "edit") return { cat: "edit", severity: "warn", verbLabel: "Sửa" };

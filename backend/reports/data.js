@@ -40,6 +40,10 @@ function parseInputDate(s) {
 // ---------------------------------------------------------------------------
 // Derived student fields. Recomputes paid/balance/paymentStatus from the
 // ledger so the report agrees with what the live UI shows.
+//
+// Rental payments (kind='rental') are EXCLUDED from the sum — rentals
+// don't reduce a student's tuition balance; they're a pay-on-the-spot
+// service tracked separately. Matches webapp/data-loader.js behaviour.
 // ---------------------------------------------------------------------------
 function studentsWithDerived(branchIdScope) {
   const where = branchIdScope ? 'WHERE branchId = ?' : '';
@@ -47,8 +51,10 @@ function studentsWithDerived(branchIdScope) {
   const rows = db.prepare(`
     SELECT s.*, COALESCE(p.paid, 0) AS paid
     FROM students s
-    LEFT JOIN (SELECT studentId, SUM(amount) AS paid FROM payments GROUP BY studentId) p
-      ON p.studentId = s.id
+    LEFT JOIN (
+      SELECT studentId, SUM(amount) AS paid
+      FROM payments WHERE kind = 'tuition' GROUP BY studentId
+    ) p ON p.studentId = s.id
     ${where}
     ORDER BY s.createdAt DESC
   `).all(...args);
@@ -72,7 +78,7 @@ export function branchSummary(period) {
       return t >= period.sinceMs && t <= period.untilMs;
     });
     const periodPays = db.prepare(`
-      SELECT * FROM payments WHERE branchId = ?
+      SELECT * FROM payments WHERE branchId = ? AND kind = 'tuition'
     `).all(b.id).filter(p => {
       const t = parseDT(p.createdAt);
       return t >= period.sinceMs && t <= period.untilMs;
@@ -83,7 +89,7 @@ export function branchSummary(period) {
       students:  allStudents.length,
       newStudents: newInPeriod.length,
       revenuePeriod: periodPays.reduce((a, p) => a + p.amount, 0),
-      revenueAll:    db.prepare('SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE branchId = ?').get(b.id).s,
+      revenueAll:    db.prepare("SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE branchId = ? AND kind = 'tuition'").get(b.id).s,
       committed:     allStudents.reduce((a, s) => a + (s.totalFee || 0), 0),
       outstanding:   allStudents.reduce((a, s) => a + Math.max(0, s.balance || 0), 0),
       paidFull: allStudents.filter(s => s.paymentStatus === '100%').length,
@@ -97,6 +103,9 @@ export function branchSummary(period) {
 // 2. Thanh toán trong kỳ — every payment in the period with joined lookups.
 // ---------------------------------------------------------------------------
 export function paymentsInPeriod(period) {
+  // Tuition only — the Thanh toán list mirrors the live UI which hides
+  // rentals from the regular payments page (rentals live under the
+  // dedicated "Cho thuê xe" section below).
   const all = db.prepare(`
     SELECT p.*, s.name AS studentName, s.maHV AS studentMaHV,
            b.name AS branchName, a.name AS staffName, c.code AS classCode
@@ -105,6 +114,29 @@ export function paymentsInPeriod(period) {
     LEFT JOIN branches b ON b.id = p.branchId
     LEFT JOIN accounts a ON a.id = p.staffId
     LEFT JOIN classes  c ON c.id = s.classId
+    WHERE p.kind = 'tuition'
+    ORDER BY p.createdAt DESC
+  `).all();
+  return all.filter(p => {
+    const t = parseDT(p.createdAt);
+    return t >= period.sinceMs && t <= period.untilMs;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 7. Cho thuê xe trong kỳ — vehicle rentals (separate from revenue).
+// ---------------------------------------------------------------------------
+export function rentalsInPeriod(period) {
+  const all = db.prepare(`
+    SELECT p.*, s.name AS studentName, s.maHV AS studentMaHV,
+           b.name AS branchName, a.name AS staffName,
+           v.name AS vehicleName, v.plate AS vehiclePlate, v.licence AS vehicleLicence
+    FROM payments p
+    LEFT JOIN students s ON s.id = p.studentId
+    LEFT JOIN branches b ON b.id = p.branchId
+    LEFT JOIN accounts a ON a.id = p.staffId
+    LEFT JOIN vehicles v ON v.id = p.vehicleId
+    WHERE p.kind = 'rental'
     ORDER BY p.createdAt DESC
   `).all();
   return all.filter(p => {
@@ -175,7 +207,7 @@ export function auditLogInPeriod(period) {
     // Per user spec: "no warnings upon creation" — audit table covers
     // edits + deletes + money operations only.
     if (/\.(update|delete|reset_password|doc_clear|upload)$/i.test(l.action)) return true;
-    if (/^(payment|payments)\./.test(l.action)) return true;
+    if (/^(payment|payments|rental|rentals)\./.test(l.action)) return true;
     return false;
   });
 }
@@ -194,6 +226,7 @@ export function buildReportData(opts = {}) {
     newStudentsInPeriod: newStudentsInPeriod(period),
     activeClasses:       activeClasses(),
     outstandingStudents: outstandingStudents(),
+    rentalsInPeriod:     rentalsInPeriod(period),
     auditLog:            auditLogInPeriod(period),
   };
 }

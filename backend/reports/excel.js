@@ -193,6 +193,36 @@ function sheetOutstanding(wb, data) {
   ws.views = [{ state: 'frozen', ySplit: 4 }];
 }
 
+function sheetRentals(wb, data) {
+  const ws = wb.addWorksheet('Cho thuê xe');
+  const total = data.rentalsInPeriod.reduce((a, p) => a + p.amount, 0);
+  addBanner(ws, 'Cho thuê xe trong kỳ',
+    `${data.rentalsInPeriod.length} lượt thuê · Tổng thu: ${total.toLocaleString('en-US')}đ · Không tính vào doanh thu chính`);
+  const cols = [
+    { header: 'Thời điểm',  width: 18 },
+    { header: 'Xe',         width: 22 },
+    { header: 'Biển số',    width: 16 },
+    { header: 'Bằng',       width: 8  },
+    { header: 'Học viên',   width: 22 },
+    { header: 'Mã HV',      width: 10 },
+    { header: 'Số lượt',    width: 10, numFmt: INT_FMT },
+    { header: 'Số tiền',    width: 16, numFmt: MONEY_FMT },
+    { header: 'Hình thức',  width: 14 },
+    { header: 'Nhân viên',  width: 18 },
+    { header: 'Chi nhánh',  width: 16 },
+  ];
+  setColumnWidths(ws, cols);
+  addHeaderRow(ws, cols);
+  for (const p of data.rentalsInPeriod) {
+    ws.addRow([p.createdAt, p.vehicleName || '', p.vehiclePlate || '', p.vehicleLicence || '',
+               p.studentName || '', p.studentMaHV || '', p.rentalRounds || 0, p.amount,
+               p.method, p.staffName || '', p.branchName || '']);
+  }
+  applyDataFormats(ws, cols, 5);
+  fillTotalRow(ws, cols, ['', '', '', '', '', '', 'Tổng', total, '', '', '']);
+  ws.views = [{ state: 'frozen', ySplit: 4 }];
+}
+
 function sheetAudit(wb, data) {
   const ws = wb.addWorksheet('Nhật ký');
   addBanner(ws, 'Nhật ký Sửa / Xóa / Thanh toán trong kỳ', `${data.auditLog.length} mục — chỉ ghi nhận thay đổi & giao dịch tài chính`);
@@ -221,6 +251,7 @@ export async function buildExcel(data) {
   sheetNewStudents(wb, data);
   sheetActiveClasses(wb, data);
   sheetOutstanding(wb, data);
+  sheetRentals(wb, data);
   sheetAudit(wb, data);
   return wb.xlsx.writeBuffer();
 }

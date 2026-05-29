@@ -230,7 +230,17 @@
       ...s, createdAtMs: parseDT(s.createdAt),
       docs: { cccd: !!s.docs_cccd, gksk: !!s.docs_gksk, donDeNghi: !!s.docs_donDeNghi, the3x4: !!s.docs_the3x4 },
     }));
-    const payments = paymentsRaw.map(p => ({ ...p, createdAtMs: parseDT(p.createdAt) }));
+    // Split the wire payload by kind. Existing rows that pre-date the
+    // schema migration come back as kind=undefined → coerce to 'tuition'
+    // so legacy behaviour is preserved.
+    // `payments` (tuition) is what feeds the Thanh toán list, dashboard
+    // revenue, branch performance and the student paid/balance derive.
+    // `rentals` is the parallel ledger surfaced on Phương tiện cards and
+    // in the formal report's "Cho thuê xe" section. Rentals never count
+    // toward revenue or student outstanding balance.
+    const allPaymentsRaw = paymentsRaw.map(p => ({ ...p, kind: p.kind || 'tuition', createdAtMs: parseDT(p.createdAt) }));
+    const payments = allPaymentsRaw.filter(p => p.kind === 'tuition');
+    const rentals  = allPaymentsRaw.filter(p => p.kind === 'rental');
 
     const branchesById   = new Map(branches.map(b => [b.id, b]));
     const accountsById   = new Map(accounts.map(a => [a.id, a]));
@@ -238,10 +248,13 @@
     const studentsById   = new Map(students.map(s => [s.id, s]));
     const feePlansById   = new Map(feePlans.map(f => [f.id, f]));
     const promotionsById = new Map(promotions.map(p => [p.id, p]));
+    const vehiclesById   = new Map(vehicles.map(v => [v.id, v]));
 
     const paymentsByStudentId = new Map(), paymentsByBranchId = new Map();
+    const rentalsByStudentId  = new Map(), rentalsByVehicleId  = new Map();
     const pushTo = (map, key, val) => { const l = map.get(key); if (l) l.push(val); else map.set(key, [val]); };
     for (const p of payments) { pushTo(paymentsByStudentId, p.studentId, p); pushTo(paymentsByBranchId, p.branchId, p); }
+    for (const r of rentals)  { pushTo(rentalsByStudentId,  r.studentId, r); if (r.vehicleId) pushTo(rentalsByVehicleId, r.vehicleId, r); }
     const studentsByClassId = new Map(), studentsByBranchId = new Map();
     for (const s of students) { pushTo(studentsByClassId, s.classId, s); pushTo(studentsByBranchId, s.branchId, s); }
 
@@ -304,10 +317,17 @@
       return s;
     }
     function patchPaymentIn(raw) {
-      const p = { ...raw, createdAtMs: parseDT(raw.createdAt) };
-      payments.push(p);
-      pushTo(paymentsByStudentId, p.studentId, p); pushTo(paymentsByBranchId, p.branchId, p);
-      const s = studentsById.get(p.studentId); if (s) recomputeDerived(s);
+      const p = { ...raw, kind: raw.kind || 'tuition', createdAtMs: parseDT(raw.createdAt) };
+      if (p.kind === 'rental') {
+        rentals.push(p);
+        pushTo(rentalsByStudentId, p.studentId, p);
+        if (p.vehicleId) pushTo(rentalsByVehicleId, p.vehicleId, p);
+      } else {
+        payments.push(p);
+        pushTo(paymentsByStudentId, p.studentId, p);
+        pushTo(paymentsByBranchId,  p.branchId,  p);
+        const s = studentsById.get(p.studentId); if (s) recomputeDerived(s);
+      }
       return p;
     }
     function patchClassIn(raw) {
@@ -321,9 +341,10 @@
 
     const MGT_DATA = {
       branches, accounts, feePlans, promotions, teachers, vehicles,
-      classes, students, payments, notifications, activityLog,
-      _byId: { branchesById, accountsById, classesById, studentsById, feePlansById, promotionsById },
-      _indexes: { paymentsByStudentId, studentsByClassId, studentsByBranchId, paymentsByBranchId },
+      classes, students, payments, rentals, notifications, activityLog,
+      _byId: { branchesById, accountsById, classesById, studentsById, feePlansById, promotionsById, vehiclesById },
+      _indexes: { paymentsByStudentId, studentsByClassId, studentsByBranchId, paymentsByBranchId,
+                  rentalsByStudentId, rentalsByVehicleId },
 
       currentUserId: me.id,
       get currentUser() { return accountsById.get(this.currentUserId) || me; },
@@ -334,7 +355,10 @@
       getStudent:   (id) => studentsById.get(id),
       getFeePlan:   (id) => feePlansById.get(id),
       getPromotion: (id) => promotionsById.get(id),
+      getVehicle:   (id) => vehiclesById.get(id),
       paymentsForStudent: (id) => paymentsByStudentId.get(id) || [],
+      rentalsForStudent:  (id) => rentalsByStudentId.get(id)  || [],
+      rentalsForVehicle:  (id) => rentalsByVehicleId.get(id)  || [],
       studentsInClass:    (id) => studentsByClassId.get(id) || [],
 
       TODAY: TODAY_STR, NOW, _NOW: NOW,
@@ -430,6 +454,15 @@
         },
         async createStudent(payload) { const r = patchStudentIn(await api('/students', { method: 'POST', body: payload })); this._bump(); return r; },
         async createPayment(payload) { const r = patchPaymentIn(await api('/payments', { method: 'POST', body: payload })); this._bump(); return r; },
+        async createRental(payload) {
+          // Convenience wrapper. Server computes amount = vehicle.price ×
+          // rentalRounds; we just pass kind=rental + the ids.
+          const body = { kind: 'rental', studentId: payload.studentId, vehicleId: payload.vehicleId,
+                         rentalRounds: parseInt(payload.rounds || payload.rentalRounds, 10) || 0,
+                         method: payload.method || 'Tiền mặt' };
+          const r = patchPaymentIn(await api('/payments', { method: 'POST', body }));
+          this._bump(); return r;
+        },
         async createClass(payload)   { const r = patchClassIn(  await api('/classes',  { method: 'POST', body: payload })); this._bump(); return r; },
         createAccount(p)     { return this._crud('create', '/accounts',  accounts,   accountsById,   { body: p }); },
         updateAccount(id, p) { return this._crud('update', '/accounts',  accounts,   accountsById,   { id, body: p }); },
@@ -440,8 +473,8 @@
         updatePromotion(id, p) { return this._crud('update', '/promotions', promotions, promotionsById, { id, body: 'discount' in p ? { ...p, discount: parseInt(p.discount, 10) || 0 } : p, normalize: _normPromo }); },
         createTeacher(p)     { return this._crud('create', '/teachers',  teachers,   null,           { body: { ...p, yearsExp: parseInt(p.yearsExp, 10) || 0 } }); },
         updateTeacher(id, p) { return this._crud('update', '/teachers',  teachers,   null,           { id, body: p }); },
-        createVehicle(p)     { return this._crud('create', '/vehicles',  vehicles,   null,           { body: { ...p, year: parseInt(p.year, 10) || null } }); },
-        updateVehicle(id, p) { return this._crud('update', '/vehicles',  vehicles,   null,           { id, body: p }); },
+        createVehicle(p)     { return this._crud('create', '/vehicles',  vehicles,   vehiclesById,   { body: { ...p, year: parseInt(p.year, 10) || null, price: parseInt(p.price, 10) || 0 } }); },
+        updateVehicle(id, p) { return this._crud('update', '/vehicles',  vehicles,   vehiclesById,   { id, body: 'price' in p ? { ...p, price: parseInt(p.price, 10) || 0 } : p }); },
         createBranch(p)      { return this._crud('create', '/branches',  branches,   branchesById,   { body: p }); },
         updateBranch(id, p)  { return this._crud('update', '/branches',  branches,   branchesById,   { id, body: p }); },
         deleteBranch(id)     { return this._crud('delete', '/branches',  branches,   branchesById,   { id }); },

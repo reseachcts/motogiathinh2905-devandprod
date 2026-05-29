@@ -160,9 +160,41 @@ function tableOutstanding(data) {
   `);
 }
 
+function tableRentals(data) {
+  const rows = data.rentalsInPeriod;
+  const total = rows.reduce((a, p) => a + p.amount, 0);
+  return section('6. Cho thuê xe trong kỳ',
+    `${rows.length} lượt thuê · Tổng thu: ${fmtVND(total)} · Không tính vào doanh thu chính`, `
+    <table class="dense">
+      <thead><tr>
+        <th>Thời điểm</th><th>Xe</th><th>Biển số</th><th>Bằng</th>
+        <th>Học viên</th><th>Mã HV</th>
+        <th class="num">Số lượt</th><th class="num">Số tiền</th>
+        <th>Hình thức</th><th>Nhân viên</th>
+      </tr></thead>
+      <tbody>
+        ${rows.length === 0 ? '<tr><td colspan="10" class="empty">Không có lượt thuê xe trong kỳ.</td></tr>' :
+          rows.map(p => `<tr>
+            <td class="small">${esc(p.createdAt)}</td>
+            <td>${esc(p.vehicleName || '')}</td>
+            <td class="mono small">${esc(p.vehiclePlate || '')}</td>
+            <td class="small">${esc(p.vehicleLicence || '')}</td>
+            <td>${esc(p.studentName || '')}</td>
+            <td class="mono small">${esc(p.studentMaHV || '')}</td>
+            <td class="num">${fmtInt(p.rentalRounds)}</td>
+            <td class="num">${fmtVND(p.amount)}</td>
+            <td class="small">${esc(p.method)}</td>
+            <td class="small">${esc(p.staffName || '')}</td>
+          </tr>`).join('')}
+      </tbody>
+      <tfoot><tr><td colspan="6">Tổng</td><td></td><td class="num">${fmtVND(total)}</td><td colspan="2"></td></tr></tfoot>
+    </table>
+  `);
+}
+
 function tableAudit(data) {
   const rows = data.auditLog;
-  return section('6. Nhật ký Sửa / Xóa / Thanh toán', `${rows.length} mục — không bao gồm thao tác tạo mới`, `
+  return section('7. Nhật ký Sửa / Xóa / Thanh toán', `${rows.length} mục — không bao gồm thao tác tạo mới`, `
     <table class="dense">
       <thead><tr><th>Thời điểm</th><th>Người dùng</th><th>Vai trò</th><th>Hành động</th><th>Đối tượng</th></tr></thead>
       <tbody>
@@ -239,6 +271,7 @@ ${tablePayments(data)}
 ${tableNewStudents(data)}
 ${tableActiveClasses(data)}
 ${tableOutstanding(data)}
+${tableRentals(data)}
 ${tableAudit(data)}
 
 <footer class="signoff">
