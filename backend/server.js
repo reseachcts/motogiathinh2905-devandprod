@@ -48,7 +48,11 @@ app.use(cookieParser());
 // Request logging: one structured line per request to stdout. Skip noise
 // (static-asset GETs). originalUrl is captured up front because routing
 // middleware mutates req.path/url as it dispatches.
-const LOG_SKIP = /\.(?:js|jsx|css|svg|otf|woff2?|png|jpg|jpeg|gif|ico)(?:\?|$)/i;
+//
+// LOG_SKIP is anchored to NON-/api paths only so that successful student-PII
+// downloads under /api/files/* are still audited. The audit trail is the only
+// way to spot a staff account exfiltrating CCCD scans, so we never elide it.
+const LOG_SKIP = /^\/(?!api\/)[^?]*\.(?:js|jsx|css|svg|otf|woff2?|png|jpg|jpeg|gif|ico)(?:\?|$)/i;
 app.use((req, res, next) => {
   const t0 = process.hrtime.bigint();
   const url = req.originalUrl;

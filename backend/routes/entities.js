@@ -38,6 +38,17 @@ function dump(table, mapRow) {
         LEFT JOIN students s ON s.id = n.studentId
         WHERE n.studentId IS NULL OR s.branchId = ?
       `).all(req.user.branchId);
+    } else if (table === 'activity_log' && req.user.role !== 'admin') {
+      // Staff see only their own branch's actions. The activity row carries
+      // userId (the actor), so we resolve actor → accounts.branchId and
+      // include rows where the actor was in the caller's branch OR where
+      // the actor is the caller themselves (covers system rows too).
+      rows = db.prepare(`
+        SELECT a.* FROM activity_log a
+        LEFT JOIN accounts u ON u.id = a.userId
+        WHERE u.branchId = ? OR a.userId = ?
+        ORDER BY a.at DESC
+      `).all(req.user.branchId, req.user.id);
     } else {
       rows = db.prepare(`SELECT * FROM ${table}`).all();
     }

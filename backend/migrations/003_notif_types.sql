@@ -8,6 +8,12 @@
 -- can use 'doc' (which the frontend already understands).
 --
 -- SQLite can't ALTER a CHECK constraint in place — we rebuild the table.
+-- Idempotent: if the live schema already lists 'doc' (because a previous
+-- run of notifications.js's now-retired IIFE applied the same patch), we
+-- still rewrite any legacy auto-profile-* rows to 'doc' so the frontend's
+-- "Hồ sơ thiếu" stat picks them up. The rebuild itself is harmless either
+-- way because the migration only runs once (tracked in _migrations).
+--
 -- Steps:
 --   1. Rename old notifications → notifications_old (preserves rows).
 --   2. Recreate notifications with the broadened CHECK.
@@ -15,6 +21,9 @@
 --      frontend's existing filter starts counting them. Hand-created
 --      notifications keep whatever type they had.
 --   4. Drop the old table + recreate the index.
+--   5. Apply the legacy auto-profile-* → 'doc' rewrite explicitly as a
+--      belt-and-braces UPDATE — covers DBs where the IIFE already broadened
+--      the CHECK but predated the rewrite step.
 
 PRAGMA foreign_keys = OFF;
 
@@ -41,5 +50,11 @@ FROM notifications_old;
 DROP TABLE notifications_old;
 
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+
+-- Belt-and-braces: if any auto-profile-* row still claims type='profile' in
+-- the rebuilt table (shouldn't happen given the SELECT above, but harmless
+-- to run), flip it to 'doc' so the UI's "Hồ sơ thiếu" filter sees it.
+UPDATE notifications SET type = 'doc'
+  WHERE id LIKE 'auto-profile-%' AND type != 'doc';
 
 PRAGMA foreign_keys = ON;

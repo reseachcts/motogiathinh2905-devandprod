@@ -124,6 +124,30 @@ export function clearLoginFailures(email) {
   _failures.delete(_key(email));
 }
 
+// Periodic cleanup so abandoned attempt records don't accumulate forever in
+// a long-running process. Drops entries whose attempts window is empty AND
+// whose lockout has expired — both implicit "no longer relevant" signals.
+// Runs every 60s, unref'd so it doesn't keep the event loop alive at
+// shutdown. Tests don't need this so we only start it under non-test envs
+// (NODE_ENV !== 'test') to keep `node --test` deterministic.
+function _evictStaleFailures() {
+  const now = _now();
+  for (const [k, rec] of _failures) {
+    const liveAttempts = rec.attempts.filter(t => now - t < WINDOW_MS);
+    const stillLocked = rec.lockUntil && rec.lockUntil > now;
+    if (!liveAttempts.length && !stillLocked) {
+      _failures.delete(k);
+    } else if (liveAttempts.length !== rec.attempts.length) {
+      rec.attempts = liveAttempts;     // trim in place
+    }
+  }
+}
+if (process.env.NODE_ENV !== 'test') {
+  setInterval(_evictStaleFailures, 60_000).unref();
+}
+// Exported only for tests; the live interval handles production cleanup.
+export const _evictStaleFailuresForTest = _evictStaleFailures;
+
 const touchActive = db.prepare('UPDATE accounts SET lastActive = ? WHERE id = ?');
 export function bumpLastActive(accountId) {
   touchActive.run(nowDdMmYyyyHHMMSS(), accountId);

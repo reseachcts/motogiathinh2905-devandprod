@@ -456,7 +456,9 @@ function DocLightbox({ url, label, onClose }) {
                       display: "flex", alignItems: "center", justifyContent: "center",
                       background: "var(--bg-0)" }}>
           {isPdf
-            ? <iframe src={url} title={label} style={{ width: "80vw", height: "80vh", border: "none" }}/>
+            ? <iframe src={url} title={label}
+                      sandbox="allow-same-origin"
+                      style={{ width: "80vw", height: "80vh", border: "none" }}/>
             : <img src={url} alt={label} style={{ maxWidth: "88vw", maxHeight: "82vh", objectFit: "contain" }}/>}
         </div>
       </div>

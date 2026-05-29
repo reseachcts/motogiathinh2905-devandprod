@@ -13,57 +13,12 @@
 
 import { db, nowDdMmYyyyHHMMSS, logActivity } from './db.js';
 
-// ---------------------------------------------------------------------------
-// Schema self-patch — broaden notifications.type CHECK to include 'doc'.
-//
-// The frozen frontend (webapp/screen-notifs.jsx) counts `type === "doc"` for
-// its "Hồ sơ thiếu" stat, but the original schema only allowed
-// ('payment','profile','system'), so the profile-incomplete rule emitted
-// rows that the UI never saw. We:
-//   1. Migrate any existing auto-profile-* rows to type='doc'.
-//   2. Relax the CHECK so new INSERTs with 'doc' succeed.
-//
-// SQLite can't ALTER a CHECK in place, so we rebuild the table when the old
-// constraint is detected. Idempotent — re-runs are no-ops once 'doc' is in
-// the CHECK. Lives here (not in db.js / migrations) so the contract that
-// "notifications.js owns the type vocabulary" stays in one file.
-// ---------------------------------------------------------------------------
-(function ensureDocType() {
-  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notifications'").get();
-  if (!row || !row.sql) return;
-  if (/CHECK\s*\(\s*type\s+IN\s*\([^)]*'doc'[^)]*\)\s*\)/i.test(row.sql)) return; // already broadened
-  db.exec('BEGIN');
-  try {
-    db.exec('ALTER TABLE notifications RENAME TO notifications_old');
-    db.exec(`
-      CREATE TABLE notifications (
-        id         TEXT PRIMARY KEY,
-        type       TEXT NOT NULL CHECK (type IN ('payment','profile','doc','system')),
-        severity   TEXT NOT NULL CHECK (severity IN ('info','warn','danger')),
-        title      TEXT NOT NULL,
-        message    TEXT,
-        studentId  TEXT,
-        read       INTEGER NOT NULL DEFAULT 0,
-        createdAt  TEXT NOT NULL
-      )
-    `);
-    db.exec(`
-      INSERT INTO notifications (id, type, severity, title, message, studentId, read, createdAt)
-      SELECT id,
-             CASE WHEN id LIKE 'auto-%' AND type = 'profile' THEN 'doc' ELSE type END,
-             severity, title, message, studentId, read, createdAt
-        FROM notifications_old
-    `);
-    db.exec('DROP TABLE notifications_old');
-    db.exec('CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read)');
-    db.exec('COMMIT');
-    console.log("[notifications] schema patched: type CHECK now allows 'doc'");
-  } catch (e) {
-    try { db.exec('ROLLBACK'); } catch {}
-    console.error('[notifications] schema patch failed:', e);
-    throw e;
-  }
-})();
+// Schema note: the notifications.type CHECK includes 'doc' because the frozen
+// frontend (webapp/screen-notifs.jsx) counts type === 'doc' for its
+// "Hồ sơ thiếu" stat. Originally enforced via an IIFE here that rebuilt the
+// table when needed; now owned by migrations/003_notif_types.sql (applied by
+// db.js's MIGRATIONS array) so a single source of truth handles fresh installs
+// and already-seeded DBs the same way. See 003 for the migration rationale.
 
 // ---------------------------------------------------------------------------
 // Date / status derivation (mirrors webapp/data-loader.js so server-side
