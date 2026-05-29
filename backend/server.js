@@ -88,11 +88,15 @@ app.use('/api', writeRoutes);    // POST/PATCH
 app.use('/api', uploadRoutes);   // multipart uploads + GET /api/files/*
 
 // Catch unhandled API errors as JSON (not HTML). Includes a short request
-// id so server-side log and client error correlate.
+// id so server-side log and client error correlate. In production, the raw
+// error.message is suppressed because SQLite errors leak table / column
+// names ("SQLITE_CONSTRAINT: students.idNumber"). Dev keeps it for debugging.
 app.use('/api', (err, req, res, _next) => {
   const rid = 'r-' + Math.random().toString(36).slice(2, 8);
   console.error(`[api error] rid=${rid} ${req.method} ${req.path}`, err);
-  res.status(500).json({ error: 'internal_error', requestId: rid, message: String(err.message || err) });
+  const body = { error: 'internal_error', requestId: rid };
+  if (NODE_ENV !== 'production') body.message = String(err.message || err);
+  res.status(500).json(body);
 });
 
 // Static webapp — serve the same folder GitHub Pages serves.
