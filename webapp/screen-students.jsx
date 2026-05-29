@@ -459,6 +459,22 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
 }
 
 function StudentPaymentsTab({ student, payments, initialPaymentId, onAddPayment }) {
+  // Wrapper render below assembles two stacked cards: the original
+  // payment ledger card + the new vehicle-rental card. We keep the
+  // payments logic in the inner Card component so this outer fn stays
+  // declarative.
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <StudentPaymentsCard student={student} payments={payments}
+                            initialPaymentId={initialPaymentId}
+                            onAddPayment={onAddPayment}/>
+      <StudentRentalsCard student={student}/>
+    </div>
+  );
+}
+
+// Original payment ledger card. Untouched aside from the wrapper rename.
+function StudentPaymentsCard({ student, payments, initialPaymentId, onAddPayment }) {
   // Sort ascending so cumulative snapshots reflect ledger order; display
   // newest-first for readability.
   const sortedAsc = React.useMemo(
@@ -610,69 +626,98 @@ function StudentPaymentsTab({ student, payments, initialPaymentId, onAddPayment 
           </div>
         )}
 
-        {/* Rentals — pay-on-the-spot, informational only. Does NOT count
-            toward the student's tuition balance. Operators record rentals
-            from the Phương tiện page; this section just exposes them on
-            the student's profile for cross-reference. */}
-        <StudentRentalsSection studentId={student.id}/>
       </div>
     </GlassCard>
   );
 }
 
 // --------------------------------------------------------------------
-// StudentRentalsSection — small "Thuê xe" list under the main payments.
-// Hidden entirely when the student has zero rentals so it doesn't add
-// noise to the common case.
+// StudentRentalsCard — separate GlassCard rendered BELOW the payment
+// card, sharing its visual idiom (2 SummaryStats on top, "Lịch sử thuê"
+// row with a "Ghi nhận lượt thuê" button, then a row list per rental).
+// Rentals stay informational here — no balance / outstanding logic, no
+// cumulative columns. The action button reuses the same RentVehicleModal
+// used on the Phương tiện page, with the student pre-locked.
 // --------------------------------------------------------------------
-function StudentRentalsSection({ studentId }) {
+function StudentRentalsCard({ student }) {
   const D = window.MGT_DATA;
-  const rentals = D.rentalsForStudent(studentId);
-  if (rentals.length === 0) return null;
-  const sorted = [...rentals].sort((a, b) => b.createdAtMs - a.createdAtMs);
-  const total = rentals.reduce((s, r) => s + r.amount, 0);
+  const RentVehicleModal = window.RentVehicleModal;
+  const [rentOpen, setRentOpen] = React.useState(false);
+  const rentals = D.rentalsForStudent(student.id);
+  const sorted = React.useMemo(
+    () => [...rentals].sort((a, b) => b.createdAtMs - a.createdAtMs),
+    [rentals]
+  );
+  const totalAmount = rentals.reduce((s, r) => s + r.amount, 0);
   const totalRounds = rentals.reduce((s, r) => s + (r.rentalRounds || 0), 0);
   return (
-    <>
-      <Divider/>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <h3 style={{ margin: 0, flex: 1, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>Thuê xe</h3>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            {rentals.length} lượt · {totalRounds} lượt thuê · {window.fmtVND(total)}
-          </span>
+    <GlassCard padding={24}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        {/* Stat tiles — match the SummaryStat treatment used by the payment card. */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <SummaryStat label="Lượt thi"      value={totalRounds}/>
+          <SummaryStat label="Tổng phí thuê" value={window.fmtVND(totalAmount)} color="var(--neon-lime)"/>
         </div>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-4)" }}>
-          Pay-on-the-spot — không tính vào học phí / công nợ.
-        </span>
-        <div style={{
-          display: "grid", gridTemplateColumns: "150px 1fr 80px 130px 1fr",
-          padding: "10px 12px", gap: 12, borderBottom: "1px solid var(--ink-4)",
-          fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)",
-        }}>
-          <span>Thời điểm</span><span>Xe</span>
-          <span style={{ textAlign: "right" }}>Lượt</span>
-          <span style={{ textAlign: "right" }}>Số tiền</span><span>Nhân viên</span>
+
+        <Divider/>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h3 style={{ margin: 0, flex: 1, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>Lịch sử thuê</h3>
+          <Button variant="primary" size="sm" icon="plus" onClick={() => setRentOpen(true)}>Ghi nhận lượt thuê</Button>
         </div>
-        {sorted.map((r, i) => {
-          const v = D.getVehicle(r.vehicleId);
-          const staff = D.getStaff(r.staffId);
-          return (
-            <div key={r.id} style={{
-              display: "grid", gridTemplateColumns: "150px 1fr 80px 130px 1fr",
-              padding: "10px 12px", gap: 12, alignItems: "center",
-              borderBottom: i < sorted.length - 1 ? "1px solid var(--ink-4)" : "none",
+
+        {sorted.length === 0 ? (
+          <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--fg-3)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
+            Học viên chưa có lịch sử thuê.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {/* Header row — column widths chosen to echo the payment row
+                grid below (date / mã / target / qty / amount / method). */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "130px 140px 1fr 80px 1.1fr 100px",
+              padding: "10px 12px", gap: 12, borderBottom: "1px solid var(--ink-4)",
+              fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)",
             }}>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-2)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt}</span>
-              <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-1)" }}>{v ? `${v.name} · ${v.plate || "—"}` : r.vehicleId || "—"}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--fg-1)", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{r.rentalRounds || 0}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--neon-lime)", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{window.fmtVND(r.amount)}</span>
-              <span style={{ fontFamily: "var(--font-ui)", fontSize: 11, color: "var(--fg-3)" }}>{staff?.name || "—"}</span>
+              <span>Thời điểm</span>
+              <span>Mã thuê</span>
+              <span>Xe</span>
+              <span style={{ textAlign: "right" }}>Lượt</span>
+              <span style={{ textAlign: "right" }}>Số tiền</span>
+              <span>Hình thức</span>
             </div>
-          );
-        })}
+            {sorted.map((r, i) => {
+              const v = D.getVehicle(r.vehicleId);
+              const isLast = i === sorted.length - 1;
+              return (
+                <div key={r.id} style={{
+                  display: "grid", gridTemplateColumns: "130px 140px 1fr 80px 1.1fr 100px",
+                  padding: "14px 12px", gap: 12, alignItems: "center",
+                  borderBottom: isLast ? "none" : "1px solid var(--ink-4)",
+                }}>
+                  <div style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 2 }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--fg-1)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt.split(" ").slice(0, 2).join(" ")}</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt.split(" ")[2] || ""}</span>
+                  </div>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-1)", fontWeight: 600, letterSpacing: "0.04em",
+                                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.id}</span>
+                  <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-1)",
+                                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v ? v.name : (r.vehicleId || "—")}</span>
+                  <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--fg-1)", fontWeight: 600 }}>{r.rentalRounds || 0}</span>
+                  <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--neon-lime)", fontWeight: 600 }}>+{window.fmtVND(r.amount)}</span>
+                  <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-2)" }}>{r.method}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </>
+
+      {RentVehicleModal && (
+        <RentVehicleModal open={rentOpen} onClose={() => setRentOpen(false)}
+                          defaultStudentId={student.id}/>
+      )}
+    </GlassCard>
   );
 }
 

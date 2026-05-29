@@ -957,11 +957,15 @@ function SortMenu({ sortField, sortDir, onSortField, onSortDir, options }) {
 // Amount is locked to vehicle.price × rounds — server validates the same
 // (cashier can't override). Submits via createRental.
 // --------------------------------------------------------------------
-function RentVehicleModal({ open, onClose, defaultVehicleId }) {
+function RentVehicleModal({ open, onClose, defaultVehicleId, defaultStudentId }) {
+  // When the modal is opened from a student profile, `defaultStudentId`
+  // pre-fills + locks the picker (no search / no "Đổi" affordance).
+  // When opened from the Phương tiện page it stays freely searchable.
   const D = window.MGT_DATA;
+  const studentLocked = !!defaultStudentId;
   const [vehicleId, setVehicleId] = React.useState(defaultVehicleId || D.vehicles[0]?.id || "");
   const [studentQ,  setStudentQ]  = React.useState("");
-  const [studentId, setStudentId] = React.useState("");
+  const [studentId, setStudentId] = React.useState(defaultStudentId || "");
   const [rounds,    setRounds]    = React.useState("1");
   const [method,    setMethod]    = React.useState("Tiền mặt");
   const [busy, setBusy] = React.useState(false);
@@ -970,9 +974,9 @@ function RentVehicleModal({ open, onClose, defaultVehicleId }) {
   React.useEffect(() => {
     if (!open) return;
     setVehicleId(defaultVehicleId || D.vehicles[0]?.id || "");
-    setStudentQ(""); setStudentId(""); setRounds("1");
+    setStudentQ(""); setStudentId(defaultStudentId || ""); setRounds("1");
     setMethod("Tiền mặt"); setBusy(false); setErr(null); busyRef.current = false;
-  }, [open, defaultVehicleId]);  // eslint-disable-line
+  }, [open, defaultVehicleId, defaultStudentId]);  // eslint-disable-line
 
   const veh = D.getVehicle(vehicleId);
   const r = parseInt(rounds, 10) || 0;
@@ -1030,10 +1034,12 @@ function RentVehicleModal({ open, onClose, defaultVehicleId }) {
                 <div style={{ fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>{chosenStudent.name}</div>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)" }}>{chosenStudent.maHV} · {chosenStudent.phone || "—"}</div>
               </div>
-              <button type="button" onClick={() => { setStudentId(""); setStudentQ(""); }}
-                      style={{ background: "transparent", border: "1px solid var(--glass-stroke)", color: "var(--fg-3)",
-                               padding: "4px 10px", borderRadius: 8, cursor: "pointer",
-                               fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>Đổi</button>
+              {!studentLocked && (
+                <button type="button" onClick={() => { setStudentId(""); setStudentQ(""); }}
+                        style={{ background: "transparent", border: "1px solid var(--glass-stroke)", color: "var(--fg-3)",
+                                 padding: "4px 10px", borderRadius: 8, cursor: "pointer",
+                                 fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>Đổi</button>
+              )}
             </div>
           ) : (
             <div style={{ position: "relative" }}>
@@ -1458,7 +1464,7 @@ function reportWriteError(e, fallback = "Lỗi") {
 Object.assign(window, {
   OrganizationScreen, BranchesTab, AccountsTab, FeesTab, PromosTab,
   TeachersTab, VehiclesTab, ActivityTab, RecordCreatorModal,
-  MoreMenu, EditRecordModal, PasswordResetModal,
+  MoreMenu, EditRecordModal, PasswordResetModal, RentVehicleModal,
 });
 
 // --------------------------------------------------------------------
