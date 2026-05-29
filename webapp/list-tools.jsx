@@ -431,6 +431,16 @@ function FloatingFilterPanel({ open, onClose, onClear, children, defaultPos = { 
     wasOpenRef.current = open;
   }, [open, defaultPos]);
 
+  // Esc-to-dismiss: mirrors the Modal pattern in shell.jsx so the floating
+  // advanced-filter panel doesn't trap users with no keyboard escape.
+  // Attached at document level, gated on `open`.
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); onClose && onClose(); } };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   const panelRef = React.useRef(null);
 
   const onPointerDown = (e) => {
