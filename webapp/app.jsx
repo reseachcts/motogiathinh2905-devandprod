@@ -68,10 +68,16 @@ function AppRoot() {
     return () => window.removeEventListener("mgt:datachanged", fn);
   }, []);
 
+  // Print mode (?print=dashboard) — sidebar hidden, all sections rendered
+  // expanded, used by the headless-chromium PDF route. Detected once at
+  // mount from window.location.search.
+  const printMode = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("print") === "dashboard";
+
   // route: { tab: "students"|"payments"|..., detail: null | { type, id } }
   const [tab, setTab]       = React.useState("dashboard");
   const [detail, setDetail] = React.useState(null);
-  const [navCollapsed, setNavCollapsed] = React.useState(false);
+  const [navCollapsed, setNavCollapsed] = React.useState(!!printMode);
 
   // modals
   const [addStudent, setAddStudent] = React.useState(false);
@@ -109,11 +115,11 @@ function AppRoot() {
       display: "flex", gap: navCollapsed ? 0 : 14, alignItems: "flex-start",
       transition: "padding-left 320ms var(--ease-out), gap 320ms var(--ease-out)",
     }}>
-      <SidebarEdgeToggle collapsed={navCollapsed} onToggle={() => setNavCollapsed(v => !v)}/>
-      <Sidebar active={tab} onNav={goTab}
+      {!printMode && <SidebarEdgeToggle collapsed={navCollapsed} onToggle={() => setNavCollapsed(v => !v)}/>}
+      {!printMode && <Sidebar active={tab} onNav={goTab}
                onQuickAdd={() => setAddStudent(true)}
                unreadCount={unread}
-               collapsed={navCollapsed}/>
+               collapsed={navCollapsed}/>}
 
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         {/* Detail back link sits ABOVE the title row */}
@@ -137,7 +143,7 @@ function AppRoot() {
           title={detail ? detailTitle.title : meta.title}
           right={
             !detail && tab === "dashboard"
-              ? <Button variant="ghost" size="sm" icon="download" onClick={() => window.MGT_TOAST && window.MGT_TOAST("Tính năng đang phát triển")}>Báo cáo</Button>
+              ? <Button variant="ghost" size="sm" icon="download" onClick={() => D.api.downloadDashboardPdf()}>Báo cáo</Button>
               : !detail && tab === "students"
               ? <Button variant="primary" icon="plus" onClick={() => setAddStudent(true)}>Thêm học viên</Button>
               : !detail && tab === "payments"

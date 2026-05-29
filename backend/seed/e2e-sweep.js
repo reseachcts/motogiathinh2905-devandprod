@@ -428,7 +428,7 @@ async function run() {
       { id: 'Khuyến mãi', proof: 'khuyến mãi' },
       { id: 'Giáo viên',  proof: 'giáo viên' },
       { id: 'Phương tiện',proof: 'phương tiện' },
-      { id: 'Lịch sử',    proof: 'Nhật ký hoạt động' },
+      { id: 'Lịch sử',    proof: 'Nhật ký' },
     ];
     for (const t of tabs) {
       await gotoTab(page, 'Tổ chức');
@@ -462,7 +462,7 @@ async function run() {
     crashed || aside === 0
       ? FAIL('ActivityTab CRASHES React tree (whole app unmounts)',
              `err="${newErr.slice(0,2).join(' | ').slice(0,200)}" aside=${aside}`)
-      : /Nhật ký hoạt động/i.test(await page.evaluate(() => document.body.innerText))
+      : /Nhật ký/i.test(await page.evaluate(() => document.body.innerText))
         ? PASS('ActivityTab renders') : FAIL('ActivityTab no title');
   });
 
@@ -617,16 +617,19 @@ async function run() {
     gone ? PASS('toast auto-dismisses') : WARN('toast lingered past 3s');
   });
 
-  // ============ 30. BÁO CÁO triggers MGT_TOAST ============
-  await safe(page, 'baocao-toast', async () => {
+  // ============ 30. BÁO CÁO triggers PDF download (was a toast placeholder pre-O1) ============
+  await safe(page, 'baocao-pdf-toast', async () => {
     await gotoTab(page, 'Tổng quan');
     const btn = page.locator('header button:has-text("Báo cáo")').first();
     if (!(await btn.count())) { FAIL('Báo cáo button missing'); return; }
     await btn.click({ force: true });
-    await page.waitForTimeout(180);
-    const seen = await page.evaluate(() => /Tính năng đang phát triển/.test(document.body.innerText));
-    seen ? PASS('Báo cáo onClick fires toast') : FAIL('Báo cáo did not show toast');
-    await page.waitForTimeout(2800);
+    // The "Đang tạo báo cáo PDF…" toast should appear within ~200ms.
+    await page.waitForTimeout(400);
+    const seen = await page.evaluate(() => /Đang tạo báo cáo PDF/.test(document.body.innerText));
+    seen ? PASS('Báo cáo onClick triggers PDF generation toast') : FAIL('Báo cáo did not show PDF toast');
+    // Don't wait for the full PDF render to finish (it takes 5–20s).
+    // The endpoint smoke is covered elsewhere; this test only checks
+    // the click path fires the user-visible "Đang tạo…" state.
   });
 
   // ============ 31. ActivityTab survives null log.userId (P0 regression) ============
@@ -635,7 +638,7 @@ async function run() {
     const before = consoleErrors.length;
     await page.locator('main button:has-text("Lịch sử")').first().click({ force: true });
     // 215+ rows in the log — give it room to commit + render.
-    await page.waitForFunction(() => /Nhật ký hoạt động/i.test(document.body.innerText), null, { timeout: 5000 }).catch(() => {});
+    await page.waitForFunction(() => /Nhật ký/i.test(document.body.innerText), null, { timeout: 5000 }).catch(() => {});
     const aside = await page.locator('aside button').count();
     const crashed = consoleErrors.slice(before).some(e => /Cannot read properties of undefined.*name/i.test(e));
     if (crashed || aside === 0) { FAIL('ActivityTab crashed', `crashed=${crashed} aside=${aside}`); return; }
@@ -645,7 +648,7 @@ async function run() {
       const D = window.MGT_DATA;
       const nullRows = D.activityLog.filter(l => !l.userId).length;
       const txt = document.body.innerText || '';
-      return { nullRows, hasHeTheng: /Hệ thống/i.test(txt), hasNhatKy: /Nhật ký hoạt động/i.test(txt) };
+      return { nullRows, hasHeTheng: /Hệ thống/i.test(txt), hasNhatKy: /Nhật ký/i.test(txt) };
     });
     r.hasNhatKy ? PASS('ActivityTab renders nhật ký', `null-userId rows=${r.nullRows}`)
                 : FAIL('ActivityTab title missing');

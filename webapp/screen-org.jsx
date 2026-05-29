@@ -110,17 +110,10 @@ function BranchesTab({ onOpenClass }) {
                     <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{b.name}</h3>
                     <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-3)" }}>{b.address}</span>
                   </div>
-                  {isAdmin && (
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <MoreMenu items={[
-                        { label: "Sửa", onClick: () => setEditingId(b.id) },
-                        { label: "Xóa", danger: true, onClick: () => {
-                            if (!window.confirm(`Xóa chi nhánh "${b.name}"?`)) return;
-                            window.MGT_DATA.api.deleteBranch(b.id).catch(e => reportWriteError(e, "Lỗi xóa chi nhánh"));
-                          }},
-                      ]}/>
-                    </div>
-                  )}
+                  {/* Per spec: branches do not expose Sửa/Xóa actions.
+                      Creation stays available via the "Thêm chi nhánh"
+                      button above for setup, but lifecycle changes happen
+                      via Lịch sử audit + DB ops, not user UI. */}
                 </div>
 
                 <Divider/>
@@ -621,30 +614,105 @@ function VehiclesTab() {
   );
 }
 
+// classifyAction — derive (category, severity, tone) from an action string
+// such as "student.create" / "payment.create" / "branches.update" /
+// "auth.login_fail". Categories drive filter chips; severities drive the
+// per-row tone (info=cyan for system, warn=amber for edits, danger=pink
+// for deletes, money=lime for anything payment-related).
+function classifyAction(action) {
+  const [domain, ...rest] = String(action || "").split(".");
+  const verb = rest.join(".");
+  const moneyDomains = ["payment", "payments"];
+  if (moneyDomains.includes(domain)) return { cat: "money", severity: "money", verbLabel: verb || "" };
+  if (verb === "delete") return { cat: "delete", severity: "danger", verbLabel: "Xóa" };
+  if (verb === "update" || verb === "patch" || verb === "edit") return { cat: "edit", severity: "warn", verbLabel: "Sửa" };
+  if (/auth\./.test(action) || domain === "auth" || /system|notifications\./.test(action)) return { cat: "system", severity: "system", verbLabel: verb || "" };
+  if (verb === "create") return { cat: "create", severity: "info", verbLabel: "Tạo mới" };
+  return { cat: "other", severity: "info", verbLabel: verb || "" };
+}
+
 function ActivityTab() {
   const D = window.MGT_DATA;
+  // Per spec: "no warnings upon creation either" — `create` events are
+  // off by default in Lịch sử. Edits / deletes / money are the focus.
+  const [filters, setFilters] = React.useState({
+    money: true, edit: true, delete: true, create: false, system: false, other: false,
+  });
+  const toggle = (k) => setFilters(prev => ({ ...prev, [k]: !prev[k] }));
+
+  // Newest-first; classify + filter.
+  const rows = React.useMemo(() => {
+    const all = D.activityLog.slice().sort((a, b) => (b.at || "").localeCompare(a.at || ""));
+    return all.map(log => ({ log, ...classifyAction(log.action) }))
+      .filter(r => filters[r.cat]);
+  }, [D.activityLog, filters]);
+
+  const TONE = {
+    money:  { c: "var(--neon-lime)",   g: "var(--neon-lime-glow)" },
+    danger: { c: "var(--neon-pink)",   g: "var(--neon-pink-glow)" },
+    warn:   { c: "var(--neon-amber)",  g: "var(--neon-amber-glow)" },
+    info:   { c: "var(--neon-cyan)",   g: "var(--neon-cyan-glow)" },
+    system: { c: "var(--fg-3)",        g: "transparent" },
+  };
+
+  const FilterPill = ({ k, label, color }) => (
+    <button onClick={() => toggle(k)} style={{
+      padding: "5px 11px", borderRadius: 999,
+      background: filters[k] ? `color-mix(in oklab, ${color} 14%, transparent)` : "var(--ink-2)",
+      border: `1px solid ${filters[k] ? color : "var(--glass-stroke)"}`,
+      boxShadow: filters[k] ? `0 0 10px color-mix(in oklab, ${color} 40%, transparent)` : "none",
+      color: filters[k] ? "var(--fg-1)" : "var(--fg-3)",
+      fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase",
+      cursor: "pointer", transition: "all 140ms var(--ease-out)",
+    }}>{label}</button>
+  );
+
   return (
     <GlassCard padding={0}>
-      <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)" }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>Nhật ký hoạt động</span>
+      <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)",
+                    display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase", marginRight: 4 }}>
+          Nhật ký · {rows.length}/{D.activityLog.length}
+        </span>
+        <FilterPill k="money"  label="Thanh toán" color="var(--neon-lime)"/>
+        <FilterPill k="edit"   label="Sửa"        color="var(--neon-amber)"/>
+        <FilterPill k="delete" label="Xóa"        color="var(--neon-pink)"/>
+        <FilterPill k="create" label="Tạo mới"    color="var(--neon-cyan)"/>
+        <FilterPill k="system" label="Hệ thống"   color="var(--fg-3)"/>
       </div>
-      {D.activityLog.map((log, i) => {
+      {rows.length === 0 && (
+        <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--fg-3)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
+          Không có mục nào phù hợp với bộ lọc.
+        </div>
+      )}
+      {rows.map(({ log, severity, verbLabel }, i) => {
         const user = D.getStaff(log.userId) || { name: "Hệ thống", role: "system" };
+        const tone = TONE[severity] || TONE.info;
         return (
           <div key={log.id} style={{
-            display: "grid", gridTemplateColumns: "120px 1fr 1.6fr 1fr",
+            display: "grid", gridTemplateColumns: "150px 1fr 1.8fr 70px",
             padding: "14px 22px", gap: 14, alignItems: "center",
-            borderBottom: i < D.activityLog.length - 1 ? "1px solid var(--ink-4)" : "none",
+            borderBottom: i < rows.length - 1 ? "1px solid var(--ink-4)" : "none",
+            borderLeft: `3px solid ${tone.c}`,
+            background: severity === "danger" || severity === "money"
+              ? `color-mix(in oklab, ${tone.c} 4%, transparent)` : "transparent",
           }}>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{log.at}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Avatar name={user.name} size={24}/>
               <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-1)" }}>{user.name}</span>
             </div>
-            <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-2)" }}>
-              <span style={{ color: "var(--neon-cyan)" }}>{log.action}</span> · {log.target}
-            </span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)" }}>{user.role === "admin" ? "Admin" : user.role === "system" ? "Hệ thống" : "Nhân viên"}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+              <span style={{
+                fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700,
+                padding: "2px 7px", borderRadius: 999,
+                background: `color-mix(in oklab, ${tone.c} 18%, transparent)`,
+                border: `1px solid color-mix(in oklab, ${tone.c} 40%, transparent)`,
+                color: tone.c, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap",
+              }}>{log.action}</span>
+              <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{log.target}</span>
+            </div>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", textAlign: "right" }}>{user.role === "admin" ? "Admin" : user.role === "system" ? "Hệ thống" : "Nhân viên"}</span>
           </div>
         );
       })}

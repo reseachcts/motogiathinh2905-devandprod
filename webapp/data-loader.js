@@ -449,6 +449,27 @@
           if (p) { p.bienLaiPhoto = true; p.bienLaiPhoto_url = out.url; }
           this._bump(); return out;
         },
+        // GET /api/reports/dashboard.pdf — backend renders the Tổng quan
+        // page via headless chromium + returns a PDF blob. Triggers a
+        // browser download.
+        async downloadDashboardPdf() {
+          try {
+            window.MGT_TOAST && window.MGT_TOAST("Đang tạo báo cáo PDF…", { ms: 4000 });
+            const res = await fetch(API + '/reports/dashboard.pdf', { credentials: 'include' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tongquan-' + new Date().toISOString().slice(0,10) + '.pdf';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+            window.MGT_TOAST && window.MGT_TOAST("Đã tạo báo cáo PDF.");
+          } catch (e) {
+            window.MGT_TOAST && window.MGT_TOAST("Lỗi tạo PDF: " + (e.message || e));
+          }
+        },
+
         // POST a CCCD image to /api/ocr/cccd and return { fields, raw, ms,
         // confidence }. fields = { idNumber, name, dob, gender, queQuan,
         // address, ngayCapCCCD } (any subset may be null). Caller decides
