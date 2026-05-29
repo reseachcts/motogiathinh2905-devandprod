@@ -5,6 +5,15 @@
 // data-loader.js fetches all of these in parallel at boot, then computes
 // derived fields (paid/balance/paymentStatus/class.status) client-side per
 // frontend/CLAUDE.md "derived fields are NEVER read from the wire".
+//
+// Branch scoping (BACKEND.md §7 + SPEC §1):
+//   - admin: sees every row
+//   - staff: sees only their own branch's rows for branch-scoped tables
+//     (students, payments, classes, notifications)
+//   - The lookup tables (branches, fee_plans, promotions, teachers,
+//     vehicles, accounts) stay readable across branches so e.g. the
+//     class-detail page can resolve a teacher's name regardless of the
+//     viewer's branch.
 
 import { Router } from 'express';
 import { db, coerceBoolsAll } from '../db.js';
@@ -12,9 +21,26 @@ import { requireAuth, publicAccount } from '../auth.js';
 
 const router = Router();
 
+// Tables where each row carries a branchId and should be filtered for
+// staff role. Notifications scope via student.branchId (FK lookup).
+const BRANCH_SCOPED = new Set(['students', 'payments', 'classes']);
+
 function dump(table, mapRow) {
   return (req, res) => {
-    const rows = db.prepare(`SELECT * FROM ${table}`).all();
+    let rows;
+    if (BRANCH_SCOPED.has(table) && req.user.role !== 'admin') {
+      rows = db.prepare(`SELECT * FROM ${table} WHERE branchId = ?`).all(req.user.branchId);
+    } else if (table === 'notifications' && req.user.role !== 'admin') {
+      // Notifications without studentId are system-wide → visible to all.
+      // Notifications with studentId → only if the student is in user's branch.
+      rows = db.prepare(`
+        SELECT n.* FROM notifications n
+        LEFT JOIN students s ON s.id = n.studentId
+        WHERE n.studentId IS NULL OR s.branchId = ?
+      `).all(req.user.branchId);
+    } else {
+      rows = db.prepare(`SELECT * FROM ${table}`).all();
+    }
     coerceBoolsAll(table, rows);
     res.json(mapRow ? rows.map(mapRow) : rows);
   };

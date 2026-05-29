@@ -145,9 +145,13 @@ function seedAdminIfMissing() {
   const hash = bcrypt.hashSync(password, 10);
 
   if (admin) {
-    db.prepare('UPDATE accounts SET passwordHash = ?, email = ?, active = 1 WHERE id = ?')
-      .run(hash, email, admin.id);
-    console.log(`  ✓ password set on existing admin (id=${admin.id}, email=${email})`);
+    // Don't overwrite the CSV-seeded email — set the password on whatever
+    // email the CSV already has. The SEED_ADMIN_EMAIL env var is only used
+    // when NO admin row exists yet (initial bootstrap below).
+    db.prepare('UPDATE accounts SET passwordHash = ?, active = 1 WHERE id = ?')
+      .run(hash, admin.id);
+    console.log(`  ✓ password set on existing admin (id=${admin.id}, email=${admin.email})`);
+    console.log(`     login with that email, NOT SEED_ADMIN_EMAIL`);
   } else {
     const id = 'u-admin';
     db.prepare(

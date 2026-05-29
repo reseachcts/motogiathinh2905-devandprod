@@ -110,13 +110,14 @@ export function genId(prefix) {
   return `${prefix}-${stamp}-${seq}`;
 }
 
-// Next maHV (HV0001, HV0002, …). Picks max numeric suffix + 1.
+// Next maHV (HV001, HV002, …). Picks max numeric suffix + 1. Pads to 3
+// per SPEC §3.8; expands automatically when count exceeds 999.
 export function nextMaHV() {
   const row = db.prepare(
     "SELECT MAX(CAST(SUBSTR(maHV, 3) AS INTEGER)) AS m FROM students WHERE maHV GLOB 'HV[0-9]*'"
   ).get();
   const next = (row.m || 0) + 1;
-  return 'HV' + String(next).padStart(4, '0');
+  return 'HV' + String(next).padStart(3, '0');
 }
 
 // Next bienLaiId BL-YYYY-NNNN — yearly counter.
