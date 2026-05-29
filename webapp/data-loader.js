@@ -201,6 +201,8 @@
       return c;
     }
 
+    const _normPromo = (raw) => { raw.appliesTo = (raw.appliesTo_csv || '').split('|').filter(Boolean); };
+
     const MGT_DATA = {
       branches, accounts, feePlans, promotions, teachers, vehicles,
       classes, students, payments, notifications, activityLog,
@@ -295,37 +297,38 @@
       PROFILE_DOCS: profileDocs,
 
       api: {
-        // Fired after every successful write; AppRoot listens and re-renders
-        // so the new/updated row becomes visible without a tab-bounce.
+        // AppRoot listens for 'mgt:datachanged' and re-renders after writes.
         _bump() { try { window.dispatchEvent(new Event('mgt:datachanged')); } catch {} },
+        // Generic CRUD helper for admin support tables; POST/PATCH/DELETEs
+        // backend then patches the local array + byId map and _bumps.
+        async _crud(op, path, arr, byId, opts = {}) {
+          const { id, body, sub, normalize } = opts;
+          const method = { create: 'POST', update: 'PATCH', delete: 'DELETE', post: 'POST' }[op];
+          const raw = await api(path + (id ? '/' + encodeURIComponent(id) : '') + (sub || ''), { method, body });
+          if (op === 'create')      { normalize?.(raw); arr.push(raw); byId?.set(raw.id, raw); }
+          else if (op === 'update') { normalize?.(raw); const i = arr.findIndex(r => r.id === id);
+            if (i >= 0) { Object.assign(arr[i], raw); byId?.set(id, arr[i]); } }
+          else if (op === 'delete') { const i = arr.findIndex(r => r.id === id);
+            if (i >= 0) arr.splice(i, 1); byId?.delete(id); }
+          this._bump(); return raw;
+        },
         async createStudent(payload) { const r = patchStudentIn(await api('/students', { method: 'POST', body: payload })); this._bump(); return r; },
         async createPayment(payload) { const r = patchPaymentIn(await api('/payments', { method: 'POST', body: payload })); this._bump(); return r; },
         async createClass(payload)   { const r = patchClassIn(  await api('/classes',  { method: 'POST', body: payload })); this._bump(); return r; },
-        async createAccount(payload) {
-          const raw = await api('/accounts', { method: 'POST', body: payload });
-          accounts.push(raw); accountsById.set(raw.id, raw); this._bump(); return raw;
-        },
-        async createFeePlan(payload) {
-          const body = { ...payload, amount: parseInt(payload.amount, 10) || 0 };
-          const raw = await api('/fee-plans', { method: 'POST', body });
-          feePlans.push(raw); feePlansById.set(raw.id, raw); this._bump(); return raw;
-        },
-        async createPromotion(payload) {
-          const body = { ...payload, discount: parseInt(payload.discount, 10) || 0 };
-          const raw = await api('/promotions', { method: 'POST', body });
-          raw.appliesTo = (raw.appliesTo_csv || '').split('|').filter(Boolean);
-          promotions.push(raw); promotionsById.set(raw.id, raw); this._bump(); return raw;
-        },
-        async createTeacher(payload) {
-          const body = { ...payload, yearsExp: parseInt(payload.yearsExp, 10) || 0 };
-          const raw = await api('/teachers', { method: 'POST', body });
-          teachers.push(raw); this._bump(); return raw;
-        },
-        async createVehicle(payload) {
-          const body = { ...payload, year: parseInt(payload.year, 10) || null };
-          const raw = await api('/vehicles', { method: 'POST', body });
-          vehicles.push(raw); this._bump(); return raw;
-        },
+        createAccount(p)     { return this._crud('create', '/accounts',  accounts,   accountsById,   { body: p }); },
+        updateAccount(id, p) { return this._crud('update', '/accounts',  accounts,   accountsById,   { id, body: p }); },
+        resetPassword(id, newPassword) { return this._crud('post', '/accounts', accounts, null, { id, sub: '/reset-password', body: { newPassword } }); },
+        createFeePlan(p)     { return this._crud('create', '/fee-plans', feePlans,   feePlansById,   { body: { ...p, amount: parseInt(p.amount, 10) || 0 } }); },
+        updateFeePlan(id, p) { return this._crud('update', '/fee-plans', feePlans,   feePlansById,   { id, body: 'amount' in p ? { ...p, amount: parseInt(p.amount, 10) || 0 } : p }); },
+        createPromotion(p)     { return this._crud('create', '/promotions', promotions, promotionsById, { body: { ...p, discount: parseInt(p.discount, 10) || 0 }, normalize: _normPromo }); },
+        updatePromotion(id, p) { return this._crud('update', '/promotions', promotions, promotionsById, { id, body: 'discount' in p ? { ...p, discount: parseInt(p.discount, 10) || 0 } : p, normalize: _normPromo }); },
+        createTeacher(p)     { return this._crud('create', '/teachers',  teachers,   null,           { body: { ...p, yearsExp: parseInt(p.yearsExp, 10) || 0 } }); },
+        updateTeacher(id, p) { return this._crud('update', '/teachers',  teachers,   null,           { id, body: p }); },
+        createVehicle(p)     { return this._crud('create', '/vehicles',  vehicles,   null,           { body: { ...p, year: parseInt(p.year, 10) || null } }); },
+        updateVehicle(id, p) { return this._crud('update', '/vehicles',  vehicles,   null,           { id, body: p }); },
+        createBranch(p)      { return this._crud('create', '/branches',  branches,   branchesById,   { body: p }); },
+        updateBranch(id, p)  { return this._crud('update', '/branches',  branches,   branchesById,   { id, body: p }); },
+        deleteBranch(id)     { return this._crud('delete', '/branches',  branches,   branchesById,   { id }); },
         async deleteNotification(id) {
           await api('/notifications/' + encodeURIComponent(id), { method: 'DELETE' });
           const i = notifications.findIndex(n => n.id === id);
@@ -392,8 +395,5 @@
     return MGT_DATA;
   }
 
-  window.MGT_DATA_READY = boot().catch(err => {
-    console.error('[data-loader] boot failed:', err);
-    throw err;
-  });
+  window.MGT_DATA_READY = boot().catch(err => { console.error('[data-loader] boot failed:', err); throw err; });
 })();
