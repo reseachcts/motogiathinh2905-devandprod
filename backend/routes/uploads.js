@@ -106,6 +106,24 @@ function publicUrl(absPath) {
   return '/api/files/' + rel;
 }
 
+// Unlink a previously stored upload URL from disk. Returns silently if the
+// URL is empty/invalid; guarded with startsWith(UPLOAD_ROOT) so a crafted
+// URL can never escape the upload tree. Failure is non-fatal — caller should
+// proceed with the overwrite even if the old file can't be removed (it'll
+// just become an orphan in that case).
+function unlinkStoredUrl(url) {
+  if (!url || typeof url !== 'string') return;
+  try {
+    const rel = url.replace(/^\/api\/files\//, '').replace(/\\/g, '/');
+    if (rel.includes('..') || rel.startsWith('/')) return;
+    const abs = resolve(UPLOAD_ROOT, rel);
+    if (!abs.startsWith(UPLOAD_ROOT)) return;
+    if (existsSync(abs)) unlinkSync(abs);
+  } catch (e) {
+    console.warn('[uploads] unlink prior file failed:', e?.message || e);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/students/:id/docs/:key  (multipart, single file field "file")
 // ---------------------------------------------------------------------------
@@ -125,6 +143,10 @@ router.post('/students/:id/docs/:key', upload.single('file'), (req, res) => {
     return res.status(403).json({ error: 'wrong_branch' });
   }
 
+  // Remove the previous file on disk before overwriting the URL — without
+  // this the old file lingers forever (L5a finding: docs accumulate).
+  const priorUrl = student[`docs_${key}_url`];
+  if (priorUrl) unlinkStoredUrl(priorUrl);
   const url = publicUrl(req.file.path);
   db.prepare(`UPDATE students SET docs_${key} = 1, docs_${key}_url = ? WHERE id = ?`).run(url, id);
   logActivity(req.user.id, 'student.upload', `${student.maHV} ${key}`);
@@ -186,6 +208,9 @@ router.post('/payments/:id/bien-lai', upload.single('file'), (req, res) => {
     try { unlinkSync(req.file.path); } catch {}
     return res.status(403).json({ error: 'wrong_branch' });
   }
+  // Remove the previous biên-lai photo on disk before overwriting — same
+  // orphan-leak fix as student docs above.
+  if (pay.bienLaiPhoto_url) unlinkStoredUrl(pay.bienLaiPhoto_url);
   const url = publicUrl(req.file.path);
   db.prepare('UPDATE payments SET bienLaiPhoto = 1, bienLaiPhoto_url = ? WHERE id = ?').run(url, id);
   logActivity(req.user.id, 'payment.upload_bienlai', pay.bienLaiId);
