@@ -250,6 +250,12 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
   const newStatus = student
     ? (newPaid >= student.totalFee ? "100%" : newPaid > 0 ? "50%" : "0%")
     : "—";
+  // Per BACKEND.md §8.5, payments are an event log and compensating entries
+  // are intentional (deposits/holds), so over-payment is allowed by design.
+  // Surface a soft inline warning before submission so the user knows a
+  // surplus will be created. Does NOT block submission.
+  const overAmount = student && amount > 0 ? Math.max(0, newPaid - student.totalFee) : 0;
+  const isOverpayment = overAmount > 0;
 
   const submit = async () => {
     if (busyRef.current) return;
@@ -275,6 +281,11 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
            footerStart={err ? (
              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>
                Lỗi: {err}
+             </span>
+           ) : isOverpayment ? (
+             <span style={{ fontFamily: "var(--font-ui)", fontSize: 11, color: "var(--neon-amber)" }}
+                   data-testid="overpayment-warning">
+               Số tiền vượt tổng học phí (+{window.fmtVND(overAmount)}) — sẽ tạo dư.
              </span>
            ) : null}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
