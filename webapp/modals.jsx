@@ -121,7 +121,8 @@ function AddStudentModal({ open, onClose, onSave }) {
             <SectionTitle>Thông tin cá nhân</SectionTitle>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div style={{ gridColumn: "span 2" }}>
-                <Input label="Số CCCD"        value={form.idNumber}    onChange={v => setForm({ ...form, idNumber: v })}    placeholder="079 202 155 678" mono/>
+                <Input label="Số CCCD"        value={form.idNumber}    onChange={v => setForm({ ...form, idNumber: v })}    placeholder="079 202 155 678"
+                       digits maxDigits={12} format={window.fmtCCCD}/>
               </div>
               <div style={{ gridColumn: "span 2" }}>
                 <Input label="Họ và tên"      value={form.name}        onChange={v => setForm({ ...form, name: v })}        placeholder="Nguyễn Văn A"/>
@@ -143,7 +144,8 @@ function AddStudentModal({ open, onClose, onSave }) {
             <SectionTitle>Đăng ký & Lớp học</SectionTitle>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div style={{ gridColumn: "span 2" }}>
-                <Input label="SĐT" value={form.phone} onChange={v => setForm({ ...form, phone: v })} placeholder="090 123 4567" mono/>
+                <Input label="SĐT" value={form.phone} onChange={v => setForm({ ...form, phone: v })} placeholder="090 123 4567"
+                       digits maxDigits={11} format={window.fmtPhone}/>
               </div>
               <Select label="Lớp" value={form.classId} onChange={v => setForm({ ...form, classId: v })}
                       placeholder={openClasses.length === 0 ? "Chưa có lớp đang mở" : "Chọn lớp đang mở"}
@@ -376,7 +378,7 @@ function StudentSearchPicker({ label, value, onChange }) {
 
   React.useEffect(() => {
     // Whenever the parent's value changes externally, sync the visible text.
-    setQuery(selected ? `${selected.name} · ${selected.phone}` : "");
+    setQuery(selected ? `${selected.name} · ${window.fmtPhone(selected.phone)}` : "");
   }, [value]);   // eslint-disable-line
 
   React.useEffect(() => {
@@ -388,7 +390,7 @@ function StudentSearchPicker({ label, value, onChange }) {
 
   // Match against name, phone, and Mã HV — case-insensitive substring.
   const q = query.trim().toLowerCase();
-  const matches = (q === "" || (selected && query === `${selected.name} · ${selected.phone}`))
+  const matches = (q === "" || (selected && query === `${selected.name} · ${window.fmtPhone(selected.phone)}`))
     ? D.students.slice(0, 30)
     : D.students.filter(s => (s.name + " " + s.phone + " " + s.maHV).toLowerCase().includes(q)).slice(0, 30);
 
@@ -439,7 +441,7 @@ function StudentSearchPicker({ label, value, onChange }) {
               onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}>
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
                   <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600, color: "var(--fg-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{s.phone} · {s.maHV}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{window.fmtPhone(s.phone)} · {s.maHV}</span>
                 </div>
                 {isActive && <Icon name="check" size={13} color="var(--neon-cyan)"/>}
               </button>

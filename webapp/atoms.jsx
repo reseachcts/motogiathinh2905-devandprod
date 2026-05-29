@@ -187,8 +187,24 @@ function Avatar({ name, size = 32, glow = false }) {
 // "text". Callers wanting a masked password field pass type="password"
 // (RecordCreatorModal threads this through via field metadata).
 // --------------------------------------------------------------------
-function Input({ label, value, onChange, placeholder, mono = false, prefix, type = "text" }) {
+function Input({ label, value, onChange, placeholder, mono = false, prefix, type = "text",
+                 digits = false, maxDigits, format }) {
+  // digits=true  → strip non-digits on every keystroke (max N if maxDigits set).
+  //                Stored value is digits-only; rendered with optional format()
+  //                (e.g. window.fmtPhone) while NOT focused — focus shows raw
+  //                digits so the cursor doesn't fight a moving mask.
+  // format       → display-only mask fn (digits-only str → "090 555 0001").
   const [focused, setFocused] = React.useState(false);
+  const rawValue = String(value ?? "");
+  const display  = (!focused && digits && format) ? format(rawValue) : rawValue;
+  const handle = (raw) => {
+    if (!onChange) return;
+    if (!digits) return onChange(raw);
+    let d = raw.replace(/\D+/g, "");
+    if (maxDigits) d = d.slice(0, maxDigits);
+    onChange(d);
+  };
+  const usingMono = mono || digits;  // digit fields always render in tabular-nums
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {label && <label style={{
@@ -208,16 +224,17 @@ function Input({ label, value, onChange, placeholder, mono = false, prefix, type
         transition: "border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out)",
       }}>
         {prefix && <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg-3)" }}>{prefix}</span>}
-        <input value={value || ""} onChange={e => onChange && onChange(e.target.value)} placeholder={placeholder}
+        <input value={display} onChange={e => handle(e.target.value)} placeholder={placeholder}
                type={type}
+               inputMode={digits ? "numeric" : undefined}
                autoComplete={type === "password" ? "new-password" : undefined}
                onFocus={() => setFocused(true)}
                onBlur={() => setFocused(false)}
                style={{
                  flex: 1, background: "transparent", border: "none", outline: "none",
                  padding: "10px 0", color: "var(--fg-1)",
-                 fontFamily: mono ? "var(--font-mono)" : "var(--font-ui)",
-                 fontSize: 14, fontVariantNumeric: mono ? "tabular-nums" : "normal",
+                 fontFamily: usingMono ? "var(--font-mono)" : "var(--font-ui)",
+                 fontSize: 14, fontVariantNumeric: usingMono ? "tabular-nums" : "normal",
                  boxShadow: "none",  // disable the global *:focus-visible ring on the inner input
                }}/>
       </div>

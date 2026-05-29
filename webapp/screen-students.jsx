@@ -211,7 +211,7 @@ function StudentsScreen({ onOpenStudent, onAddStudent }) {
                 <Avatar name={s.name} size={32}/>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                   <span style={{ fontFamily: "var(--font-ui)", fontSize: 14, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{s.phone}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{window.fmtPhone(s.phone)}</span>
                 </div>
               </div>
               <Chip>{s.licence}</Chip>
@@ -355,7 +355,7 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <SectionTitle>Thông tin cá nhân</SectionTitle>
             <div>
-              <RowField label="Số CCCD"        value={s.idNumber}            mono/>
+              <RowField label="Số CCCD"        value={window.fmtCCCD(s.idNumber)} mono/>
               <RowField label="Họ và tên"      value={s.name}/>
               <RowField label="Ngày sinh"      value={s.dob}                 mono/>
               <RowField label="Giới tính"      value={s.gender}/>
@@ -376,7 +376,7 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
             <SectionTitle>Đăng ký & Lớp học</SectionTitle>
             <div>
               <RowField label="Mã HV"              value={s.maHV}      mono/>
-              <RowField label="SĐT"                value={s.phone}     mono/>
+              <RowField label="SĐT"                value={window.fmtPhone(s.phone)} mono/>
               <RowField label="Loại bằng"          value={s.licence}/>
               <RowField label="Lớp học"            value={cls ? cls.code : "—"}/>
               <RowField label="Nhân viên"          value={staff ? staff.name : "—"}/>

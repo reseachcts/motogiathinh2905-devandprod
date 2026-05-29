@@ -4,9 +4,11 @@
 //
 // Used by routes/writes.js; aim is friendly UI errors + locked spec rules.
 
-// Vietnamese phone — accept 9 or 10 digits, optional spaces / dots / hyphens.
-// Examples that pass: "0900000000", "090 000 0000", "0900.000.000".
-const PHONE_RE  = /^[\s.\-]*(?:\d[\s.\-]*){9,10}$/;
+// Vietnamese phone — canonical store form is digits-only (9–11 digits).
+// The accept regex tolerates spaces / dots / hyphens during transition;
+// new writes from the frontend Input atom (digits=true) arrive bare.
+const PHONE_RE  = /^[\s.\-]*(?:\d[\s.\-]*){9,11}$/;
+// CCCD — canonical store form is exactly 12 digits, no separators.
 const CCCD_RE   = /^\d{12}$/;
 const DDMMYYYY  = /^(\d{2})\/(\d{2})\/(\d{4})$/;
 const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

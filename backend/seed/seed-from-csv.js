@@ -86,9 +86,16 @@ function loadCsv(name) {
   return parseCsv(readFileSync(path, 'utf-8'), { columns: true, skip_empty_lines: true, bom: true });
 }
 
+// Phone / CCCD canonicalization. Migration 004 normalizes existing rows
+// but only runs once per DB; --reset re-inserts CSV-formatted data, so we
+// re-canonicalize here too. Keep in sync with window.fmtPhone / fmtCCCD
+// (frontend) and validation.js (backend).
+function digitsOnly(s) { return String(s || '').replace(/\D+/g, ''); }
 function castRow(row, spec) {
   for (const k of spec.intCols) row[k] = row[k] === '' || row[k] == null ? 0 : parseInt(row[k], 10);
   for (const k of spec.boolCols) row[k] = row[k] === 'true' ? 1 : 0;
+  if ('phone' in row && row.phone) row.phone = digitsOnly(row.phone);
+  if ('idNumber' in row && row.idNumber) row.idNumber = digitsOnly(row.idNumber).slice(0, 12);
   if (spec.extraCols) Object.assign(row, spec.extraCols);
   return row;
 }

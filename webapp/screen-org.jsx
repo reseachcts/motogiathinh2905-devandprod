@@ -274,7 +274,7 @@ function AccountsTab() {
   ];
   const accountCreateFields = [
     { id: "name",     label: "Họ tên",        type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
-    { id: "phone",    label: "Số điện thoại", type: "text",   placeholder: "090 123 4567" },
+    { id: "phone",    label: "Số điện thoại", type: "phone",  placeholder: "090 123 4567" },
     { id: "email",    label: "Email",         type: "text",   placeholder: "you@motogiathinh.vn" },
     { id: "role",     label: "Vai trò",       type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }] },
     { id: "branchId", label: "Chi nhánh",     type: "select", options: branchOpts },
@@ -358,7 +358,7 @@ function FeesTab() {
   const feeFields = [
     { id: "name",     label: "Tên gói",  type: "text",   placeholder: "A — Trọn gói" },
     { id: "licence",  label: "Bằng",     type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
-    { id: "amount",   label: "Số tiền",  type: "text",   placeholder: "1995000" },
+    { id: "amount",   label: "Số tiền",  type: "money",  placeholder: "1995000" },
   ];
   const editing = editingId ? D.getFeePlan(editingId) : null;
   return (
@@ -405,7 +405,7 @@ function PromosTab() {
   // plan ids → distinct licences before sending — preserved for parity).
   const promoEditFields = [
     { id: "name",      label: "Tên chương trình",   type: "text",      placeholder: "Hè Vui — Giảm 200K", fullWidth: true },
-    { id: "discount",  label: "Số tiền giảm (đ)",   type: "text",      placeholder: "200000",             fullWidth: true },
+    { id: "discount",  label: "Số tiền giảm (đ)",   type: "money",     placeholder: "200000",             fullWidth: true },
     { id: "appliesTo", label: "Áp dụng cho bằng",   type: "multipill", color: "lime",
       options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
   ];
@@ -481,7 +481,7 @@ function TeachersTab() {
   ];
   const teacherFields = [
     { id: "name",     label: "Họ tên",        type: "text",   placeholder: "Trần Văn B" },
-    { id: "phone",    label: "Số điện thoại", type: "text",   placeholder: "09…" },
+    { id: "phone",    label: "Số điện thoại", type: "phone",  placeholder: "09…" },
     { id: "branchId", label: "Chi nhánh",     type: "select", options: branchOpts },
   ];
   const editing = editingId ? D.teachers.find(x => x.id === editingId) : null;
@@ -519,7 +519,7 @@ function TeachersTab() {
               <Avatar name={t.name} size={32}/>
               <span style={{ fontFamily: "var(--font-ui)", fontSize: 14, fontWeight: 600, color: "var(--fg-1)" }}>{t.name}</span>
             </div>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-2)", fontVariantNumeric: "tabular-nums" }}>{t.phone}</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-2)", fontVariantNumeric: "tabular-nums" }}>{window.fmtPhone(t.phone)}</span>
             <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-2)" }}>{b ? b.name : "—"}</span>
             <span style={{
               fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700,
@@ -555,7 +555,7 @@ function VehiclesTab() {
     { id: "name",     label: "Tên xe",   type: "text",   placeholder: "Honda Wave Alpha" },
     { id: "licence",  label: "Bằng",     type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
     { id: "plate",    label: "Biển số",  type: "text",   placeholder: "59-K1 123.45" },
-    { id: "year",     label: "Năm sản xuất", type: "text", placeholder: "2024" },
+    { id: "year",     label: "Năm sản xuất", type: "int",  placeholder: "2024" },
     { id: "branchId", label: "Chi nhánh", type: "select", options: branchOpts },
   ];
   const editing = editingId ? D.vehicles.find(x => x.id === editingId) : null;
@@ -815,7 +815,11 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
                                        color={f.color || "cyan"}/>
               : <Input  label={f.label} value={draft[f.id]}
                         onChange={(v) => set(f.id, v)} placeholder={f.placeholder}
-                        type={f.type === "password" ? "password" : "text"}/>;
+                        type={f.type === "password" ? "password" : "text"}
+                        digits={f.type === "phone" || f.type === "cccd" || f.type === "money" || f.type === "int"}
+                        maxDigits={f.type === "phone" ? 11 : f.type === "cccd" ? 12 : f.type === "money" ? 12 : undefined}
+                        format={f.type === "phone" ? window.fmtPhone : f.type === "cccd" ? window.fmtCCCD : undefined}
+                        mono={f.type === "money" || f.type === "int"}/>;
             return (
               <div key={f.id} style={{ gridColumn: useGrid && span === 2 ? "span 2" : "auto" }}>
                 {node}
@@ -994,7 +998,11 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
                                        color={f.color || "cyan"}/>
               : <Input  label={f.label} value={draft[f.id]}
                         onChange={(v) => set(f.id, v)} placeholder={f.placeholder}
-                        type={f.type === "password" ? "password" : "text"}/>;
+                        type={f.type === "password" ? "password" : "text"}
+                        digits={f.type === "phone" || f.type === "cccd" || f.type === "money" || f.type === "int"}
+                        maxDigits={f.type === "phone" ? 11 : f.type === "cccd" ? 12 : f.type === "money" ? 12 : undefined}
+                        format={f.type === "phone" ? window.fmtPhone : f.type === "cccd" ? window.fmtCCCD : undefined}
+                        mono={f.type === "money" || f.type === "int"}/>;
             return (
               <div key={f.id} style={{ gridColumn: useGrid && span === 2 ? "span 2" : "auto" }}>
                 {node}

@@ -78,6 +78,23 @@
     if (abs >= 1e3) return (n / 1e3).toFixed(abs >= 1e4 ? 0 : 1).replace(/\.?0+$/, '') + 'Kđ';
     return n + 'đ';
   };
+  // Strip non-digits — canonical store form for phone/CCCD/digit-only fields.
+  window.digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
+  // VN mobile phone — render `0xx xxx xxxx` (10) or `0xxx xxx xxxx` (11) groups.
+  // Input may contain spaces/dots/hyphens; they're stripped before grouping.
+  window.fmtPhone = (s) => {
+    const d = window.digitsOnly(s);
+    if (d.length === 10) return `${d.slice(0,3)} ${d.slice(3,6)} ${d.slice(6)}`;
+    if (d.length === 11) return `${d.slice(0,4)} ${d.slice(4,7)} ${d.slice(7)}`;
+    if (d.length === 9)  return `${d.slice(0,3)} ${d.slice(3,6)} ${d.slice(6)}`;
+    return d;
+  };
+  // VN CCCD — render 12-digit ID as `xxx xxx xxx xxx` groups of 3.
+  window.fmtCCCD = (s) => {
+    const d = window.digitsOnly(s);
+    if (d.length === 12) return `${d.slice(0,3)} ${d.slice(3,6)} ${d.slice(6,9)} ${d.slice(9)}`;
+    return d;
+  };
 
   // Login overlay — vanilla DOM, only shown if /api/me returns 401.
   // Attaches to document.body (NOT #root) so React's reconciler doesn't
