@@ -2,6 +2,47 @@
 // App — routing between screens + modals + detail views
 // ====================================================================
 
+// ScreenErrorBoundary — isolates a single screen's render failure so a
+// crash in one tab doesn't take down the whole shell (sidebar, topbar,
+// other screens). Renders a minimal Vietnamese error card with a
+// "thử lại" button that re-mounts the child tree.
+class ScreenErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null, attempt: 0, key: props.resetKey }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  static getDerivedStateFromProps(props, state) {
+    // When the parent's resetKey changes (tab/detail change), clear any
+    // previous error BEFORE the next render — so the new screen gets a
+    // fresh shot. If it crashes too, getDerivedStateFromError catches it.
+    if (props.resetKey !== state.key) {
+      return { error: null, key: props.resetKey };
+    }
+    return null;
+  }
+  componentDidCatch(error, info) { try { console.error("[ScreenErrorBoundary]", error, info); } catch {} }
+  retry = () => this.setState(s => ({ error: null, attempt: s.attempt + 1 }));
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{
+          padding: 40, display: "flex", flexDirection: "column", gap: 12,
+          alignItems: "flex-start",
+        }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--neon-pink)" }}>Lỗi hiển thị màn hình</span>
+          <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-2)", maxWidth: 640 }}>
+            {String(this.state.error?.message || this.state.error)}
+          </span>
+          <button onClick={this.retry} style={{
+            marginTop: 4, padding: "8px 14px", borderRadius: 10, cursor: "pointer",
+            background: "var(--ink-2)", border: "1px solid var(--glass-stroke)",
+            color: "var(--fg-1)", fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600,
+          }}>Thử lại</button>
+        </div>
+      );
+    }
+    return <React.Fragment key={this.state.attempt}>{this.props.children}</React.Fragment>;
+  }
+}
+
 function App() {
   // ThemeProvider wraps the whole app so theme toggles instantly
   // propagate to any component reading `useTheme()` / `useBranchTones()`.
@@ -96,7 +137,7 @@ function AppRoot() {
           title={detail ? detailTitle.title : meta.title}
           right={
             !detail && tab === "dashboard"
-              ? <Button variant="ghost" size="sm" icon="download">Báo cáo</Button>
+              ? <Button variant="ghost" size="sm" icon="download" onClick={() => window.MGT_TOAST && window.MGT_TOAST("Tính năng đang phát triển")}>Báo cáo</Button>
               : !detail && tab === "students"
               ? <Button variant="primary" icon="plus" onClick={() => setAddStudent(true)}>Thêm học viên</Button>
               : !detail && tab === "payments"
@@ -108,35 +149,40 @@ function AppRoot() {
         />
 
         <div style={{ position: "relative", flex: 1 }}>
-          {/* Detail views (when set) */}
-          {detail?.type === "student" && (
-            <StudentDetail studentId={detail.id}
-                           initialTab={detail.tab}
-                           initialPaymentId={detail.paymentId}
-                           onBack={() => setDetail(null)}
-                           onAddPayment={(studentId, amount) => setAddPayment({ open: true, studentId, amount })}
-                           onOpenPayment={openPayment}/>
-          )}
-          {detail?.type === "payment" && (
-            <PaymentDetail paymentId={detail.id} onBack={() => setDetail(null)}
-                           onOpenStudent={openStudent}/>
-          )}
-          {detail?.type === "class" && (
-            <ClassDetail classId={detail.id} onBack={() => setDetail(null)}
-                         onOpenStudent={openStudent} isAdmin={isAdmin}/>
-          )}
+          {/* Each screen lives inside an error boundary so a single
+              broken render doesn't unmount the entire shell. resetKey
+              changes on tab/detail change so the boundary clears. */}
+          <ScreenErrorBoundary resetKey={`${tab}:${detail?.type || ""}:${detail?.id || ""}`}>
+            {/* Detail views (when set) */}
+            {detail?.type === "student" && (
+              <StudentDetail studentId={detail.id}
+                             initialTab={detail.tab}
+                             initialPaymentId={detail.paymentId}
+                             onBack={() => setDetail(null)}
+                             onAddPayment={(studentId, amount) => setAddPayment({ open: true, studentId, amount })}
+                             onOpenPayment={openPayment}/>
+            )}
+            {detail?.type === "payment" && (
+              <PaymentDetail paymentId={detail.id} onBack={() => setDetail(null)}
+                             onOpenStudent={openStudent}/>
+            )}
+            {detail?.type === "class" && (
+              <ClassDetail classId={detail.id} onBack={() => setDetail(null)}
+                           onOpenStudent={openStudent} isAdmin={isAdmin}/>
+            )}
 
-          {/* List/screen views */}
-          {!detail && tab === "dashboard"     && <DashboardScreen onOpenStudent={openStudent}/>}
-          {!detail && tab === "students"      && <StudentsScreen onOpenStudent={openStudent}
-                                                                 onAddStudent={() => setAddStudent(true)}/>}
-          {!detail && tab === "payments"      && <PaymentsScreen onOpenStudent={openStudent}
-                                                                 onAddPayment={() => setAddPayment({ open: true, studentId: null })}/>}
-          {!detail && tab === "classes"       && <ClassesScreen onOpenClass={openClass}
-                                                                onAddClass={() => setAddClass(true)}
-                                                                isAdmin={isAdmin}/>}
-          {!detail && tab === "notifications" && <NotificationsScreen onOpenStudent={openStudent}/>}
-          {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass}/>}
+            {/* List/screen views */}
+            {!detail && tab === "dashboard"     && <DashboardScreen onOpenStudent={openStudent}/>}
+            {!detail && tab === "students"      && <StudentsScreen onOpenStudent={openStudent}
+                                                                   onAddStudent={() => setAddStudent(true)}/>}
+            {!detail && tab === "payments"      && <PaymentsScreen onOpenStudent={openStudent}
+                                                                   onAddPayment={() => setAddPayment({ open: true, studentId: null })}/>}
+            {!detail && tab === "classes"       && <ClassesScreen onOpenClass={openClass}
+                                                                  onAddClass={() => setAddClass(true)}
+                                                                  isAdmin={isAdmin}/>}
+            {!detail && tab === "notifications" && <NotificationsScreen onOpenStudent={openStudent}/>}
+            {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass}/>}
+          </ScreenErrorBoundary>
         </div>
       </main>
 
