@@ -348,18 +348,27 @@ list endpoints to server-paginated + indexed.
 | User action | Endpoint | Body |
 |---|---|---|
 | Create student | `POST /students` | personal info + class/fee/promo/staff + docs presence |
-| Update student | `PATCH /students/:id` | partial |
-| Upload doc | `POST /students/:id/docs/:key` | multipart file |
+| Update student | `PATCH /students/:id` | partial; `feePlanId` / `promotionId` admin-only, totalFee recomputed |
+| Upload doc | `POST /students/:id/docs/:key` | multipart file (magic-byte sniffed, ≤8MB) |
+| Clear doc | `DELETE /students/:id/docs/:key` | admin or same-branch staff; removes file + zeroes URL |
 | Record payment | `POST /payments` | `{ studentId, amount, method, bienLaiId, bienLaiPhotoUrl? }` |
 | Upload receipt photo | `POST /payments/:id/bien-lai` | multipart file |
 | Create class | `POST /classes` (admin only) | |
 | Update class (status, dates) | `PATCH /classes/:id` (admin only) | |
-| Create account | `POST /accounts` (admin only) | |
-| Create fee plan | `POST /fee-plans` (admin only) | |
-| Create promotion | `POST /promotions` (admin only) | `appliesTo` is array of fee-plan ids (future) |
-| Create teacher / vehicle | `POST /teachers`, `POST /vehicles` (admin only) | |
-| Mark notification read | `PATCH /notifications/:id` `{ read: true }` | |
-| Log out | `POST /auth/logout` | |
+| Create account | `POST /accounts` (admin only) | password required + policy-checked; role/email/branchId validated |
+| Update account | `PATCH /accounts/:id` (admin only) | role validated against LOCKED_ROLE |
+| Reset account password | `POST /accounts/:id/reset-password` (admin only) | `{ newPassword }`; passwordPolicy enforced |
+| Create branch | `POST /branches` (admin only) | seed has 3, system supports any count |
+| Update branch | `PATCH /branches/:id` (admin only) | name / address / manager_id |
+| Delete branch | `DELETE /branches/:id` (admin only) | FK-protected — 409 `branch_in_use` if referenced |
+| Create fee plan | `POST /fee-plans` (admin only) | licence validated against `{A, A1}` |
+| Create promotion | `POST /promotions` (admin only) | `appliesTo` filtered to `{A, A1}` per SPEC §3 |
+| Update promotion | `PATCH /promotions/:id` (admin only) | same `appliesTo` filter as POST |
+| Create teacher / vehicle | `POST /teachers`, `POST /vehicles` (admin only) | licence validated on vehicles |
+| Mark notification read | `PATCH /notifications/:id` `{ read: true }` | branch-scoped for staff |
+| Dismiss notification | `DELETE /notifications/:id` | branch-scoped for staff |
+| Serve uploaded file | `GET /api/files/<kind>/<recId>/<filename>` | auth required; staff scoped to own-branch records |
+| Log out | `POST /auth/logout` | idempotent — 200 even without cookie |
 
 Every write must:
 1. Run authz check (see §7).

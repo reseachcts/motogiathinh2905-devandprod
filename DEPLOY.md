@@ -281,7 +281,7 @@ Two failure modes, both reversible:
 | Notifications auto-recompute | `backend/notifications.js`, fires every 5min + after each write | Watch logs for `[notifications] recompute: +X ~Y -Z` |
 | File uploads | `backend/data/uploads/{students,payments}/<id>/<key>-<ts>.<ext>` | Listed dir; URL form `/api/files/<kind>/<id>/<file>` |
 | Login rate-limit state | In-memory map, resets on restart | After 5 wrong tries an email gets 429 for 15min |
-| Tests | `cd backend && npm test` | Built-in `node:test` — 21 cases (~535ms) |
+| Tests | `cd backend && npm test` | Built-in `node:test` — 27 cases (~535ms) |
 | Smoke / E2E | `npm run smoke` / `npm run e2e` | Smoke = pure HTTP. E2E = headless Chromium walking all 6 screens |
 | DB backup | `sqlite3 data/motogiathinh.db ".backup ./bk.db"` while service runs | One file. Compress + offsite. |
 
@@ -332,10 +332,30 @@ visual or UX change** anywhere; only persistence plumbing was filled in.
 | `screen-org.jsx` × 5 | `RecordCreatorModal` callers | no `onCreate` prop | `onCreate={D.api.createAccount / createFeePlan / createPromotion / createTeacher / createVehicle}` |
 | `screen-notifs.jsx` | `markAllRead` / `deleteSelected` | local-only `setItems` | also `D.api.markNotificationRead` / `deleteNotification` per row |
 
+### New admin tooling landed in polish sessions
+
+These were not in the original frozen package but were added to support
+admin workflows the customer asked for. They follow the existing atom
+visual idiom (GlassCard, Chip, Modal, Input, MultiPill) and do not
+change any signed-off colors / fonts / layout.
+
+| Component | File | Purpose |
+|---|---|---|
+| `MoreMenu` | `webapp/screen-org.jsx` | `···` row-action popover (Sửa / Vô hiệu hoá / Đặt lại mật khẩu / Xóa). Portal-rendered, click-outside-to-close, scroll-anchored. |
+| `EditRecordModal` | `webapp/screen-org.jsx` | Shared edit dialog seeded from `initialValues`; same field schema as `RecordCreatorModal`. Used by every "Sửa" action in Tổ chức. |
+| `PasswordResetModal` | `webapp/screen-org.jsx` | Admin row action on accounts; calls `POST /api/accounts/:id/reset-password`. Masked input + inline error. |
+| `DocLightbox` | `webapp/atoms.jsx` | Inline viewer for uploaded student docs (image or PDF). Portal overlay, Escape-to-close, sandboxed iframe for PDFs. |
+| `BienLaiPreview` drag-drop | `webapp/modals.jsx` | The "Ảnh biên lai (tuỳ chọn)" slot in AddPaymentModal accepts drag-drop + click-to-pick and uploads to `/payments/:id/bien-lai` after save. |
+| Branches CRUD UI | `webapp/screen-org.jsx` `BranchesTab` | Admin can `+ Thêm chi nhánh` / Sửa / Xóa. DELETE is FK-protected on the server (409 `branch_in_use`). |
+| `ScreenErrorBoundary` | `webapp/app.jsx` | Per-screen wrapper so one broken screen doesn't blank the whole app. |
+| `MGT_TOAST` | `webapp/data-loader.js` | Vanilla bottom-right toast helper for soft-failure notices (replaces inline `alert()` in plumbing). |
+
 Per `webapp/CLAUDE.md`, the spirit of "frozen" is visual/UX preservation;
-the empty callbacks were never meant to ship. The verification checklist
-in `webapp/CLAUDE.md` plus `backend/seed/e2e-browser.js` (13 automated
-checks including a write-flow round-trip) confirms zero visual regression.
+the empty callbacks were never meant to ship and the admin tooling above
+fills bona-fide product gaps. The verification checklist in
+`webapp/CLAUDE.md` plus `backend/seed/e2e-browser.js` (75 sweep checks
+covering write-flow round-trips and these admin actions) confirms zero
+visual regression.
 
 One field-shape compat fix lives in `data-loader.js`:
 - Backend returns `notifications[i].message`, frontend reads

@@ -68,7 +68,14 @@ These are decisions that override anything older in this file:
 10. **Hồ sơ status** displays as **a single right-aligned badge** —
     green tick (✓) when complete, red exclamation when incomplete. No
     "Đủ hồ sơ" / "Thiếu hồ sơ" word label in lists.
-11. **Branches are renamed** (see §1).
+11. **Branches are CRUD-able by admin.** The seed ships with the 3 named in
+    §1, but the system supports any count — admin can create, edit, and
+    delete branches from `Tổ chức → Chi nhánh`. Delete is destructive and
+    refused if the branch still references any class, student, payment,
+    account, teacher, or vehicle (FK-style guard with a 409 + `branch_in_use`
+    structured error). See `backend/routes/writes.js` `POST/PATCH/DELETE
+    /branches` and `webapp/screen-org.jsx` `BranchesTab` for the
+    implementation.
 12. **Giáo viên** and **Phương tiện** are **sub-tabs inside Tổ chức**,
     not top-level nav items.
 13. **Class lifecycle has 3 statuses:** `đang mở`, `đang diễn ra`, `đã

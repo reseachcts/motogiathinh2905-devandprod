@@ -64,3 +64,16 @@ locally per the contract.
 
 Write endpoints follow BACKEND.md §6. Each write logs to `activity_log` and
 returns the fresh row so the client can patch in-memory state without a reload.
+
+## Tests
+
+```bash
+npm test            # 27 cases (~535ms) — node:test, runs validation +
+                    # auth-policy + branch-scope + notifications.
+npm run smoke       # POSTs the full happy-path round-trip against a live :3001.
+npm run e2e         # headless-Chromium sweep (75 cases) of every screen + write.
+```
+
+`branch-scope.test.js` and a few cases in `auth-policy.test.js` skip
+gracefully when the server isn't reachable — start it with
+`PORT=3001 node server.js` before `npm test` to get the full suite.

@@ -3,54 +3,63 @@
 > **You are an AI agent integrating this frontend with a backend.**
 > Read this entire file before touching anything.
 
-This folder is a **frozen, take-it-as-is frontend package**. It has
-been visually + behaviourally signed off. The customer-facing UI must
-look + behave **identically** to what `index.html` produces today.
+This folder ships with a **frozen visual design system**: the colors,
+fonts, atom structure, layout, choreography, and screen-level information
+hierarchy are signed off and must not regress. Polish sessions have
+since landed a small set of admin-tool plumbing primitives (MoreMenu,
+EditRecordModal, PasswordResetModal, DocLightbox) that live alongside
+the original atoms — these are explicitly in-scope for future work.
 
-You have **exactly one job**: wire the in-memory CSV loader to your
-real backend.
+You have **two jobs**:
+1. wire the in-memory loader to your real backend, and
+2. plumb new admin tooling consistent with the existing atom vocabulary.
+
+If you're unsure whether a UX change is plumbing vs. visual, stop and ask.
 
 ---
 
 ## What you may edit
 
-**Only this file** — and the lines inside it explicitly marked with
-`// EDIT-ME ⇩` / `// ⇧ EDIT-ME`:
+**`data-loader.js`** — the HTTP seam. Replace per-table fetches with
+calls to your backend. The shape of `window.MGT_DATA` is frozen (see
+`../BACKEND.md` "§5 Read endpoints" for the canonical entity schemas).
+If your backend returns the data in a different shape, transform inside
+`data-loader.js` to match.
 
-```
-frontend/data-loader.js
-```
+**`*.jsx`** — for plumbing-only callback wiring + new admin tooling
+that follows the existing visual idiom. Examples that landed in the
+polish session:
 
-That file fetches CSVs from `frontend/data/*.csv` at boot, normalises
-them into `window.MGT_DATA`, and exposes the query interface that the
-rest of the app reads. Your job is to **replace those CSV fetches with
-HTTP calls** to your backend.
+- `MoreMenu` (the `···` row-action popover used across `screen-org.jsx`)
+- `EditRecordModal` + `RecordCreatorModal` (shared field-driven dialogs)
+- `PasswordResetModal` (admin row action for accounts)
+- `DocLightbox` (inline preview for uploaded student docs)
+- `ScreenErrorBoundary` (per-screen isolation wrapper)
+- `branches CRUD UI` (`BranchesTab` create/edit/delete)
+- `BienLaiPreview` drag-drop upload state in the payment modal
 
-The **shape** of `window.MGT_DATA` is frozen — see `../BACKEND.md`
-"§5 Read endpoints" for the canonical entity schemas and the methods
-the frontend calls on it. If your backend returns the data in a
-different shape, transform it inside `data-loader.js` to match.
+See `../DEPLOY.md §14 — Frontend deviations` for the authoritative
+running list of what landed and why.
 
-## What you may NOT edit
+## What you may NOT edit without sign-off
 
-**Everything else.** Specifically:
+The frozen visual design system. Specifically:
 
 ```
 frontend/index.html              ← entry HTML, asset wiring, CSS keyframes
 frontend/colors_and_type.css     ← design tokens (colors, type, spacing)
 frontend/fonts/*                 ← SF Pro Display + SF Pro Text font files
 frontend/assets/*                ← logo + brand SVGs
-frontend/app.jsx                 ← routing + <Boot/> data-ready guard
-frontend/shell.jsx               ← Sidebar, TopBar, Modal, ThemeProvider, VehicleMode toggle
-frontend/atoms.jsx               ← primitives (GlassCard, Button, Icon, Chip, Avatar, …)
-frontend/list-tools.jsx          ← FloatingFilterPanel, DateRangeField, ChipButton, paginator
-frontend/modals.jsx              ← Add student / payment / class dialogs
-frontend/screen-*.jsx            ← every dashboard / list / detail screen
 ```
 
-If you find a bug or limitation in a frozen file, **stop and ask**.
-Do not fix it yourself. The customer trusts that the visual + UX
-artefacts are unchanged.
+For `app.jsx`, `shell.jsx`, `atoms.jsx`, `list-tools.jsx`, `modals.jsx`,
+`screen-*.jsx`: plumbing edits and admin-tool additions are in-scope,
+but **changes to colors, fonts, spacing, animation timings, atom
+structure, or screen layout require design sign-off**.
+
+**If you find a UX bug in a frozen visual, stop and ask.** Don't fix
+it yourself. The customer trusts that the visual + UX artefacts are
+unchanged unless explicitly approved.
 
 ---
 
