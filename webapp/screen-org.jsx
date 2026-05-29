@@ -206,23 +206,17 @@ function BranchExpanded({ branchId, onClose, onOpenClass }) {
     return { cls, count: studentsInClass.length, revenue,
              _openMs: dateMs(cls.openDate), _examMs: dateMs(cls.examDate) };
   });
-  const sortOpts = [
-    { id: "open:desc",  label: "Ngày mở: Mới → Cũ" },
-    { id: "open:asc",   label: "Ngày mở: Cũ → Mới" },
-    { id: "exam:desc",  label: "Ngày thi: Mới → Cũ" },
-    { id: "exam:asc",   label: "Ngày thi: Cũ → Mới" },
-    { id: "count:desc", label: "Sĩ số ↓" },
-    { id: "count:asc",  label: "Sĩ số ↑" },
-    { id: "rev:desc",   label: "Doanh thu ↓" },
-    { id: "rev:asc",    label: "Doanh thu ↑" },
+  const sortFields = [
+    { id: "_openMs",  label: "Ngày mở"   },
+    { id: "_examMs",  label: "Ngày thi"  },
+    { id: "count",    label: "Sĩ số"     },
+    { id: "revenue",  label: "Doanh thu" },
   ];
-  const [sortKey, setSortKey] = React.useState("open:desc");
-  const [skField, skDir] = sortKey.split(":");
-  const skMap = { open: "_openMs", exam: "_examMs", count: "count", rev: "revenue" };
-  const skProp = skMap[skField];
+  const [sortField, setSortField] = React.useState("_openMs");
+  const [sortDir,   setSortDir]   = React.useState("desc");
   const classWithRevenue = enriched.slice().sort((a, c) => {
-    const av = a[skProp] || 0, cv = c[skProp] || 0;
-    return skDir === "asc" ? av - cv : cv - av;
+    const av = a[sortField] || 0, cv = c[sortField] || 0;
+    return sortDir === "asc" ? av - cv : cv - av;
   });
 
   return (
@@ -246,7 +240,9 @@ function BranchExpanded({ branchId, onClose, onOpenClass }) {
               <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{b.name}</h3>
               <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-3)" }}>{b.address} · Quản lý: {D.getStaff(b.manager_id)?.name || "—"}</span>
             </div>
-            <SortMenu value={sortKey} onChange={setSortKey} options={sortOpts}/>
+            <SortMenu sortField={sortField} sortDir={sortDir}
+                      onSortField={setSortField} onSortDir={setSortDir}
+                      options={sortFields}/>
           </div>
 
           {/* Staff cards */}
@@ -605,6 +601,32 @@ function VehiclesTab() {
     { id: "year",     label: "Năm sản xuất", type: "int",    placeholder: "2024" },
   ];
   const toggle  = (id) => setSelectedId(s => s === id ? null : id);
+
+  // The expanded detail card is inserted INSIDE the grid right after
+  // the last card of the row that contains the selected vehicle, so it
+  // pushes subsequent rows down (rather than living at the bottom of
+  // the page). To do that we need to know how many columns the grid
+  // currently has; that depends on viewport width, so we observe the
+  // grid container and re-measure on resize.
+  const gridRef = React.useRef(null);
+  const [cols, setCols] = React.useState(1);
+  React.useEffect(() => {
+    if (!gridRef.current) return;
+    const TILE = 280, GAP = 16;
+    const update = () => {
+      const w = gridRef.current.clientWidth;
+      setCols(Math.max(1, Math.floor((w + GAP) / (TILE + GAP))));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(gridRef.current);
+    return () => ro.disconnect();
+  }, []);
+  const selectedIdx = selectedId ? D.vehicles.findIndex(v => v.id === selectedId) : -1;
+  const panelAfter  = selectedIdx >= 0
+    ? Math.min(Math.ceil((selectedIdx + 1) / cols) * cols - 1, D.vehicles.length - 1)
+    : -1;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -624,13 +646,20 @@ function VehiclesTab() {
       <RentVehicleModal open={rentOpen} onClose={() => setRentOpen(false)}
         defaultVehicleId={selectedId || D.vehicles[0]?.id}/>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-        {D.vehicles.map((v, i) => <VehicleCard key={v.id} v={v} num={i + 1}
-                                                isSelected={selectedId === v.id}
-                                                onToggle={() => toggle(v.id)}/>)}
+      <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+        {D.vehicles.map((v, i) => (
+          <React.Fragment key={v.id}>
+            <VehicleCard v={v} num={i + 1}
+                         isSelected={selectedId === v.id}
+                         onToggle={() => toggle(v.id)}/>
+            {i === panelAfter && (
+              <div style={{ gridColumn: "1 / -1" }}>
+                <VehicleExpanded vehicleId={selectedId}/>
+              </div>
+            )}
+          </React.Fragment>
+        ))}
       </div>
-
-      {selectedId && <VehicleExpanded vehicleId={selectedId}/>}
     </div>
   );
 }
@@ -757,19 +786,16 @@ function VehicleExpanded({ vehicleId }) {
   const b = D.getBranch(v?.branchId);
   const rentals = D.rentalsForVehicle(vehicleId);
   const tone = window.useBranchTone(v?.branchId);
-  const sortOpts = [
-    { id: "createdAtMs:desc", label: "Mới → Cũ" },
-    { id: "createdAtMs:asc",  label: "Cũ → Mới" },
-    { id: "amount:desc",      label: "Số tiền ↓" },
-    { id: "amount:asc",       label: "Số tiền ↑" },
-    { id: "rentalRounds:desc",label: "Số lượt ↓" },
-    { id: "rentalRounds:asc", label: "Số lượt ↑" },
+  const sortFields = [
+    { id: "createdAtMs",  label: "Thời điểm" },
+    { id: "amount",       label: "Số tiền" },
+    { id: "rentalRounds", label: "Số lượt" },
   ];
-  const [sortKey, setSortKey] = React.useState("createdAtMs:desc");
-  const [field, dir] = sortKey.split(":");
+  const [sortField, setSortField] = React.useState("createdAtMs");
+  const [sortDir,   setSortDir]   = React.useState("desc");
   const sorted = [...rentals].sort((a, c) => {
-    const av = a[field] || 0, cv = c[field] || 0;
-    return dir === "asc" ? av - cv : cv - av;
+    const av = a[sortField] || 0, cv = c[sortField] || 0;
+    return sortDir === "asc" ? av - cv : cv - av;
   });
   const totalAmount = rentals.reduce((s, r) => s + r.amount, 0);
   const totalRounds = rentals.reduce((s, r) => s + (r.rentalRounds || 0), 0);
@@ -788,7 +814,9 @@ function VehicleExpanded({ vehicleId }) {
                 {v.licence || "—"} · Số xe {v.plate || "—"} · {v.year || "—"} · {b ? b.name : "—"} · Giá {v.price ? window.fmtVND(v.price) : "chưa đặt"}
               </span>
             </div>
-            <SortMenu value={sortKey} onChange={setSortKey} options={sortOpts}/>
+            <SortMenu sortField={sortField} sortDir={sortDir}
+                      onSortField={setSortField} onSortDir={setSortDir}
+                      options={sortFields}/>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
@@ -838,10 +866,14 @@ function VehicleExpanded({ vehicleId }) {
 }
 
 // --------------------------------------------------------------------
-// SortMenu — small dropdown atom used in expanded detail cards. Single-
-// select cycle through (field, dir) options.
+// SortMenu — matches the ListToolbar advanced-filter sort treatment:
+// pill-shaped active label (cyan border + text glow) with an attached
+// asc/desc arrow chip and a dropdown for switching the sort field.
+//
+// API: sortField + sortDir as separate values, mirroring ListToolbar so
+// callers can wire up sort logic identically.
 // --------------------------------------------------------------------
-function SortMenu({ value, onChange, options }) {
+function SortMenu({ sortField, sortDir, onSortField, onSortDir, options }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
   React.useEffect(() => {
@@ -850,40 +882,69 @@ function SortMenu({ value, onChange, options }) {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
-  const current = options.find(o => o.id === value) || options[0];
+  const active = options.find(o => o.id === sortField) || options[0];
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button onClick={() => setOpen(o => !o)} style={{
+    <div ref={ref} style={{ position: "relative", display: "inline-flex", alignItems: "stretch", gap: 0 }}>
+      {/* Active sort label — pill left half, neon-cyan border + text glow. */}
+      <button onClick={() => setOpen(v => !v)} style={{
         display: "inline-flex", alignItems: "center", gap: 8,
-        padding: "7px 12px", borderRadius: 10,
-        background: "var(--glass-2)", border: "1px solid var(--glass-stroke)",
-        color: "var(--fg-1)", fontFamily: "var(--font-ui)", fontWeight: 600, fontSize: 12,
-        cursor: "pointer",
-      }}>
-        <Icon name="filter" size={13}/>
-        <span>Sắp xếp: {current.label}</span>
-        <Icon name="arrow-down" size={11} style={{ transition: "transform 160ms var(--ease-out)", transform: open ? "rotate(180deg)" : "none" }}/>
+        height: 36, padding: "0 14px",
+        borderRadius: "999px 0 0 999px", cursor: "pointer",
+        background: "var(--ink-2)",
+        border: "1px solid var(--neon-cyan)",
+        borderRight: "none",
+        color: "var(--neon-cyan)",
+        fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600,
+        boxShadow: open ? "0 0 14px var(--neon-cyan-haze)" : "none",
+        transition: "all 140ms var(--ease-out)",
+        textShadow: "0 0 8px var(--neon-cyan-glow)",
+      }}>{active.label}</button>
+
+      {/* Direction arrow — pill right half. */}
+      <button onClick={() => onSortDir(sortDir === "asc" ? "desc" : "asc")}
+              title={sortDir === "asc" ? "Tăng dần" : "Giảm dần"}
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 38, height: 36, padding: 0,
+                borderRadius: "0 999px 999px 0", cursor: "pointer",
+                background: "var(--ink-2)",
+                border: "1px solid var(--neon-cyan)",
+                color: "var(--neon-cyan)",
+                transition: "all 140ms var(--ease-out)",
+              }}>
+        <Icon name={sortDir === "asc" ? "arrow-up" : "arrow-down"} size={14}
+              color="var(--neon-cyan)"
+              style={{ filter: "drop-shadow(0 0 4px var(--neon-cyan-glow))" }}/>
       </button>
+
       {open && (
         <div style={{
-          position: "absolute", right: 0, top: "100%", marginTop: 6, zIndex: 50,
-          minWidth: 180, padding: 4, borderRadius: 12,
-          background: "var(--glass-3)", backdropFilter: "var(--glass-blur)",
-          border: "1px solid var(--glass-stroke-strong)", boxShadow: "var(--shadow-3)",
+          position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 40,
+          minWidth: 200,
+          background: "var(--glass-3)",
+          backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
+          border: "1px solid var(--glass-stroke-strong)", borderRadius: 12,
+          padding: 6, boxShadow: "var(--shadow-3)",
         }}>
-          {options.map(o => (
-            <div key={o.id} onClick={() => { onChange(o.id); setOpen(false); }}
-                 style={{
-                   padding: "8px 12px", borderRadius: 8, cursor: "pointer",
-                   fontFamily: "var(--font-ui)", fontSize: 13,
-                   color: o.id === value ? "var(--neon-cyan)" : "var(--fg-1)",
-                   background: o.id === value ? "color-mix(in oklab, var(--neon-cyan) 12%, transparent)" : "transparent",
-                 }}
-                 onMouseEnter={(e) => { if (o.id !== value) e.currentTarget.style.background = "var(--glass-2)"; }}
-                 onMouseLeave={(e) => { if (o.id !== value) e.currentTarget.style.background = "transparent"; }}>
-              {o.label}
-            </div>
-          ))}
+          {options.map(o => {
+            const isActive = o.id === sortField;
+            return (
+              <button key={o.id} onClick={() => { onSortField(o.id); setOpen(false); }} style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "8px 10px", borderRadius: 8, cursor: "pointer",
+                background: isActive ? "var(--ink-3)" : "transparent",
+                border: "none", color: isActive ? "var(--fg-1)" : "var(--fg-2)",
+                fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: isActive ? 600 : 500,
+                textAlign: "left",
+                transition: "background 120ms var(--ease-out)",
+              }}
+              onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--ink-2)"; }}
+              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}>
+                {isActive && <Icon name="check" size={12} color="var(--neon-cyan)"/>}
+                <span style={{ marginLeft: isActive ? 0 : 18 }}>{o.label}</span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
