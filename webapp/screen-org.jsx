@@ -860,9 +860,6 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
            ) : null}
            width={560}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <h4 style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>
-          Thông tin
-        </h4>
         <div style={{
           display: useGrid ? "grid" : "flex",
           gridTemplateColumns: useGrid ? "1fr 1fr" : undefined,
@@ -1047,9 +1044,6 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
            ) : null}
            width={560}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <h4 style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>
-          Thông tin
-        </h4>
         <div style={{
           display: useGrid ? "grid" : "flex",
           gridTemplateColumns: useGrid ? "1fr 1fr" : undefined,
