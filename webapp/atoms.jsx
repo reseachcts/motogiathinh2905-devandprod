@@ -31,6 +31,8 @@ const ICONS = {
   "minus":      <path d="M5 12h14"/>,
   "graduation": <g><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></g>,
   "edit":       <g><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/></g>,
+  "eye":        <g><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></g>,
+  "eye-off":    <g><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></g>,
 };
 
 function Icon({ name, size = 18, color = "currentColor", className = "", style = {} }) {
@@ -199,10 +201,16 @@ function Input({ label, value, onChange, placeholder, mono = false, prefix, type
   // of the caret, then restore that digit-count after re-format. This keeps
   // the caret intuitively placed even when masks add/remove separators.
   const [focused, setFocused] = React.useState(false);
+  // Password-only: toggle visibility. The eye button on the right swaps
+  // the rendered `type` between "password" and "text". Lives next to the
+  // input inside the same focus-styled wrapper.
+  const [revealed, setRevealed] = React.useState(false);
   const inputRef = React.useRef(null);
   const caretRef = React.useRef(null);
   const rawValue = String(value ?? "");
   const display  = format ? format(rawValue) : rawValue;
+  const isPassword     = type === "password";
+  const effectiveType  = isPassword && revealed ? "text" : type;
   // After every render where a caret target is queued, restore selection.
   React.useEffect(() => {
     if (!inputRef.current || caretRef.current == null) return;
@@ -253,9 +261,9 @@ function Input({ label, value, onChange, placeholder, mono = false, prefix, type
       }}>
         {prefix && <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--fg-3)" }}>{prefix}</span>}
         <input ref={inputRef} value={display} onChange={handle} placeholder={placeholder}
-               type={type}
+               type={effectiveType}
                inputMode={digits ? "numeric" : undefined}
-               autoComplete={type === "password" ? "new-password" : undefined}
+               autoComplete={isPassword ? "new-password" : undefined}
                onFocus={() => setFocused(true)}
                onBlur={() => setFocused(false)}
                style={{
@@ -265,6 +273,27 @@ function Input({ label, value, onChange, placeholder, mono = false, prefix, type
                  fontSize: 14, fontVariantNumeric: usingMono ? "tabular-nums" : "normal",
                  boxShadow: "none",  // disable the global *:focus-visible ring on the inner input
                }}/>
+        {isPassword && (
+          // tabIndex=-1 so the eye sits outside the natural tab order
+          // (users tabbing past the password shouldn't land on the toggle).
+          // onMouseDown preventDefault keeps the password input focused
+          // when the icon is clicked, so the caret doesn't jump away.
+          <button type="button" tabIndex={-1}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setRevealed(v => !v)}
+                  aria-label={revealed ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  title={revealed ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  style={{
+                    background: "transparent", border: "none", padding: 4,
+                    margin: 0, display: "flex", alignItems: "center",
+                    cursor: "pointer", color: "var(--fg-3)",
+                    transition: "color 140ms var(--ease-out)",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = "var(--fg-1)"}
+                  onMouseLeave={(e) => e.currentTarget.style.color = "var(--fg-3)"}>
+            <Icon name={revealed ? "eye-off" : "eye"} size={16}/>
+          </button>
+        )}
       </div>
     </div>
   );
