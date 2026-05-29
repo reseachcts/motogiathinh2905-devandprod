@@ -110,6 +110,11 @@ router.post('/students', (req, res) => {
 });
 
 // PATCH /api/students/:id — partial update.
+//
+// Fee/promo changes are admin-only and trigger a server-side totalFee
+// recompute per BACKEND.md §8.4 (totalFee = feePlan.amount - promo.discount)
+// so the derived paid/balance/paymentStatus stays consistent. Staff users
+// editing the same row keep their existing scope (branch-only, no fee fields).
 router.patch('/students/:id', (req, res) => {
   const id = req.params.id;
   const existing = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
@@ -117,8 +122,35 @@ router.patch('/students/:id', (req, res) => {
   if (req.user.role !== 'admin' && existing.branchId !== req.user.branchId) {
     return bad(res, 403, 'wrong_branch');
   }
-  const vErr = validateStudentForm(req.body || {}, { isCreate: false });
+  const body = req.body || {};
+  // Fee / promo changes are admin-only — staff would otherwise be able to
+  // discount a student's tuition by editing the linked plan/promo.
+  if (req.user.role !== 'admin' && ('feePlanId' in body || 'promotionId' in body)) {
+    return bad(res, 403, 'admin_required');
+  }
+  const vErr = validateStudentForm(body, { isCreate: false });
   if (vErr) return badV(res, vErr);
+
+  // If feePlanId or promotionId is changing, recompute totalFee from the
+  // *new* combination (falling back to existing values for whichever field
+  // wasn't touched). Validate the referenced rows up front so the UPDATE
+  // doesn't half-apply.
+  let derivedTotalFee = null;
+  if ('feePlanId' in body || 'promotionId' in body) {
+    const newFeeId = ('feePlanId'   in body) ? body.feePlanId   : existing.feePlanId;
+    const newPromoId = ('promotionId' in body) ? body.promotionId : existing.promotionId;
+    const feePlan = newFeeId
+      ? db.prepare('SELECT * FROM fee_plans WHERE id = ?').get(newFeeId)
+      : null;
+    if (newFeeId && !feePlan) return bad(res, 400, 'invalid_feePlanId');
+    const promo = newPromoId && newPromoId !== 'promo-none'
+      ? db.prepare('SELECT * FROM promotions WHERE id = ?').get(newPromoId)
+      : null;
+    if (newPromoId && newPromoId !== 'promo-none' && !promo) {
+      return bad(res, 400, 'invalid_promotionId');
+    }
+    derivedTotalFee = feePlan ? (feePlan.amount - (promo?.discount || 0)) : 0;
+  }
 
   const allowed = ['name', 'phone', 'dob', 'gender', 'idNumber', 'address', 'queQuan',
     'ngayCapCCCD', 'noiCapCCCD', 'classId', 'licence', 'feePlanId', 'promotionId',
@@ -126,11 +158,15 @@ router.patch('/students/:id', (req, res) => {
     'docs_cccd', 'docs_gksk', 'docs_donDeNghi', 'docs_the3x4'];
   const sets = [], vals = [];
   for (const k of allowed) {
-    if (k in req.body) {
-      let v = req.body[k];
+    if (k in body) {
+      let v = body[k];
       if (k.startsWith('docs_') || k === 'profileComplete') v = v ? 1 : 0;
       sets.push(`${k} = ?`); vals.push(v);
     }
+  }
+  if (derivedTotalFee != null) {
+    sets.push('totalFee = ?');
+    vals.push(derivedTotalFee);
   }
   if (!sets.length) return bad(res, 400, 'no_fields_to_update');
   vals.push(id);
@@ -282,11 +318,32 @@ router.delete('/branches/:id', requireAdmin, (req, res) => {
   res.json({ ok: true, id });
 });
 
-router.post('/accounts', requireAdmin, makeAdminCreator('accounts', 'u',
+// POST /accounts — admin-only account creation.
+//   - role / email validated against the locked enums + regex in validation.js
+//   - branchId must reference an existing row (FK is not declared SQLite-side
+//     because branches were historically fixed; now CRUD-able, so we check).
+//   - password goes through passwordPolicy() before bcrypt, so weak passwords
+//     bail with a 400 + structured error (UI maps the code to a friendly msg).
+router.post('/accounts', requireAdmin, (req, res, next) => {
+  const { role, email, branchId, password } = req.body || {};
+  // Enum / regex validation up front so the user sees a clear error before
+  // the generic creator runs an INSERT that would have to be rolled back.
+  const vErr = check(V.role(role), V.email(email));
+  if (vErr) return badV(res, vErr);
+  if (branchId) {
+    const branchOk = db.prepare('SELECT 1 FROM branches WHERE id = ?').get(branchId);
+    if (!branchOk) return bad(res, 400, 'invalid_branchId');
+  }
+  // Password is required at creation time — without it the account can never
+  // log in. passwordPolicy enforces length + char-class rules.
+  const pol = passwordPolicy(password);
+  if (!pol.ok) return bad(res, 400, pol.code, { message: pol.message });
+  next();
+}, makeAdminCreator('accounts', 'u',
   ['name', 'role', 'branchId', 'phone', 'email'], {
     required: ['name', 'email', 'role'],
     preInsert: (row, req) => {
-      if (req.body.password) row.passwordHash = hashPassword(req.body.password);
+      row.passwordHash = hashPassword(req.body.password);
       row.lastActive = nowDdMmYyyyHHMMSS();
     },
     extraCols: { passwordHash: null, lastActive: null, active: 1 },
@@ -297,11 +354,17 @@ router.post('/fee-plans', requireAdmin, makeAdminCreator('fee_plans', 'fee',
   ['name', 'licence', 'amount'], { required: ['name', 'licence', 'amount'] }));
 
 // promotions: appliesTo is an array on the wire, joined to pipe-string for DB.
+// Filter the incoming array down to the canonical licence set {A, A1} per
+// SPEC §3; legacy fee-plan ids (e.g. "fee-a") slipping in here would break
+// the frontend's `selectedFeePlan.licence`-based promo matcher.
 router.post('/promotions', requireAdmin, (req, res) => {
   const { name, appliesTo, discount } = req.body || {};
   if (!name) return bad(res, 400, 'missing_name');
+  const filtered = Array.isArray(appliesTo)
+    ? appliesTo.filter(v => v === 'A' || v === 'A1')
+    : [];
   const id = genId('promo');
-  const csv = Array.isArray(appliesTo) ? appliesTo.join('|') : (appliesTo || '');
+  const csv = filtered.join('|');
   db.prepare('INSERT INTO promotions (id, name, appliesTo_csv, discount) VALUES (?, ?, ?, ?)')
     .run(id, name, csv, parseInt(discount, 10) || 0);
   logActivity(req.user.id, 'promotion.create', id);
@@ -371,12 +434,42 @@ const PATCHABLE = {
 
 const BOOL_PATCH_FIELDS = { accounts: ['active'], teachers: ['active'] };
 
+// Locked-enum gate: tables here have field→validator pairs that must pass
+// before the column gets included in the UPDATE. Catches PATCH payloads that
+// try to elevate a staff account to `superadmin`, change a fee plan's licence
+// to `B2`, etc. — clearer 400 than letting the value land in the DB.
+const ENUM_VALIDATORS = {
+  accounts:   { role: V.role },
+  fee_plans:  { licence: V.licence },
+  promotions: {},
+  teachers:   {},
+  vehicles:   { licence: V.licence },
+  branches:   {},
+};
+
 function makeAdminPatcher(table) {
   return (req, res) => {
     const id = req.params.id;
     const existing = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
     if (!existing) return bad(res, 404, 'not_found');
     const allowed = PATCHABLE[table];
+    // Run enum validators before building the SET clause so a bad value
+    // surfaces as a structured field error instead of silently sticking.
+    const enums = ENUM_VALIDATORS[table] || {};
+    for (const k of Object.keys(enums)) {
+      if (k in req.body) {
+        const e = enums[k](req.body[k]);
+        if (e) return badV(res, e);
+      }
+    }
+    // promotions.appliesTo on the wire is an array; canonicalize to
+    // {'A','A1'} per SPEC §3 so legacy fee-plan ids can't sneak through.
+    if (table === 'promotions' && 'appliesTo' in (req.body || {})) {
+      const raw = req.body.appliesTo;
+      if (Array.isArray(raw)) {
+        req.body.appliesTo = raw.filter(v => v === 'A' || v === 'A1');
+      }
+    }
     const sets = [], vals = [];
     for (const k of allowed) {
       if (!(k in req.body)) continue;
