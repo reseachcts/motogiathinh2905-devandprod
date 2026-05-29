@@ -15,6 +15,9 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { requireAuth, COOKIE_NAME } from '../auth.js';
+import { buildReportData } from '../reports/data.js';
+import { buildExcel } from '../reports/excel.js';
+import { buildFormalHtml } from '../reports/html.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -85,6 +88,61 @@ router.get('/reports/dashboard.pdf', async (req, res) => {
     res.send(pdf);
   } catch (e) {
     console.error('[reports] pdf failed:', e?.message || e);
+    res.status(500).json({ error: 'pdf_failed', message: String(e?.message || e) });
+  } finally {
+    if (page) await page.close().catch(() => {});
+    if (context) await context.close().catch(() => {});
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Formal weekly report — Excel
+// GET /api/reports/data.xlsx?since=dd/mm/yyyy&until=dd/mm/yyyy
+//   Defaults: last 7 days inclusive.
+// ---------------------------------------------------------------------------
+router.get('/reports/data.xlsx', async (req, res) => {
+  const t0 = Date.now();
+  try {
+    const data = buildReportData({ since: req.query.since, until: req.query.until });
+    const buf  = await buildExcel(data);
+    const fname = `baocao-${data.period.label.replace(/[\/\s→]/g, '')}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.setHeader('X-Render-Ms', String(Date.now() - t0));
+    res.end(Buffer.from(buf));
+  } catch (e) {
+    console.error('[reports] xlsx failed:', e?.message || e);
+    res.status(500).json({ error: 'xlsx_failed', message: String(e?.message || e) });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Formal weekly report — PDF (table-only, no charts).
+// GET /api/reports/data.pdf?since=&until=
+// Uses page.setContent() — does NOT require a logged-in browser session.
+// ---------------------------------------------------------------------------
+router.get('/reports/data.pdf', async (req, res) => {
+  let context, page;
+  const t0 = Date.now();
+  try {
+    const data = buildReportData({ since: req.query.since, until: req.query.until });
+    const html = buildFormalHtml(data);
+    const browser = await getChromium();
+    context = await browser.newContext({ viewport: { width: 1080, height: 1500 } });
+    page = await context.newPage();
+    await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    await page.emulateMedia({ media: 'print' });
+    const pdf = await page.pdf({
+      format: 'A4', printBackground: true,
+      margin: { top: '14mm', bottom: '14mm', left: '12mm', right: '12mm' },
+    });
+    const fname = `baocao-${data.period.label.replace(/[\/\s→]/g, '')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.setHeader('X-Render-Ms', String(Date.now() - t0));
+    res.send(pdf);
+  } catch (e) {
+    console.error('[reports] data.pdf failed:', e?.message || e);
     res.status(500).json({ error: 'pdf_failed', message: String(e?.message || e) });
   } finally {
     if (page) await page.close().catch(() => {});

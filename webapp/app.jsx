@@ -83,6 +83,7 @@ function AppRoot() {
   const [addStudent, setAddStudent] = React.useState(false);
   const [addPayment, setAddPayment] = React.useState({ open: false, studentId: null, amount: null });
   const [addClass, setAddClass]     = React.useState(false);
+  const [reportPick, setReportPick] = React.useState(false);
 
   const unread = D.notifications.filter(n => !n.read).length;
 
@@ -143,7 +144,7 @@ function AppRoot() {
           title={detail ? detailTitle.title : meta.title}
           right={
             !detail && tab === "dashboard"
-              ? <Button variant="ghost" size="sm" icon="download" onClick={() => D.api.downloadDashboardPdf()}>Báo cáo</Button>
+              ? <Button variant="ghost" size="sm" icon="download" onClick={() => setReportPick(true)}>Báo cáo</Button>
               : !detail && tab === "students"
               ? <Button variant="primary" icon="plus" onClick={() => setAddStudent(true)}>Thêm học viên</Button>
               : !detail && tab === "payments"
@@ -230,7 +231,58 @@ function AppRoot() {
                        }}/>
       <AddClassModal   open={addClass} onClose={() => setAddClass(false)}
                        onSave={(payload) => D.api.createClass(payload)}/>
+      <ReportChoiceModal open={reportPick} onClose={() => setReportPick(false)}/>
     </div>
+  );
+}
+
+// --------------------------------------------------------------------
+// ReportChoiceModal — three-way picker triggered by the "Báo cáo"
+// button on the Tổng quan screen. Two distinct outputs:
+//   • Trực quan  — the artistic dashboard PDF (charts + KPIs)
+//   • Số liệu    — a formal table-only PDF, last 7 days, signed footer
+//   • Excel      — same 7-day window, multi-sheet workbook
+// --------------------------------------------------------------------
+function ReportChoiceModal({ open, onClose }) {
+  const D = window.MGT_DATA;
+  const choose = async (fn) => { onClose && onClose(); await fn(); };
+  const Option = ({ icon, title, hint, onClick }) => (
+    <button onClick={onClick} style={{
+      display: "flex", alignItems: "flex-start", gap: 14, padding: "14px 16px",
+      background: "var(--glass-2)", border: "1px solid var(--glass-stroke)",
+      borderRadius: 14, cursor: "pointer", textAlign: "left", color: "var(--fg-1)",
+      fontFamily: "var(--font-ui)", transition: "background 160ms var(--ease-out), border-color 160ms var(--ease-out)",
+    }}
+    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--glass-3)"; e.currentTarget.style.borderColor = "var(--glass-stroke-strong)"; }}
+    onMouseLeave={(e) => { e.currentTarget.style.background = "var(--glass-2)"; e.currentTarget.style.borderColor = "var(--glass-stroke)"; }}>
+      <div style={{
+        width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+        background: "var(--ink-2)", display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Icon name={icon} size={18}/>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>{title}</span>
+        <span style={{ fontSize: 12, color: "var(--fg-3)", lineHeight: 1.45 }}>{hint}</span>
+      </div>
+    </button>
+  );
+  return (
+    <Modal open={open} onClose={onClose} width={520}
+           title="Xuất báo cáo"
+           subtitle="Chọn định dạng phù hợp với mục đích sử dụng">
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Option icon="chart" title="Trực quan (PDF)"
+                hint="Bảng tổng quan có biểu đồ và KPI — phù hợp để xem nhanh."
+                onClick={() => choose(() => D.api.downloadDashboardPdf())}/>
+        <Option icon="card" title="Số liệu (PDF)"
+                hint="Bảng số liệu chính thức 7 ngày gần nhất — phù hợp để lưu trữ, gửi chủ doanh nghiệp."
+                onClick={() => choose(() => D.api.downloadFormalReportPdf())}/>
+        <Option icon="download" title="Số liệu (Excel)"
+                hint="Workbook 6 sheet — cùng dữ liệu 7 ngày, tiện chỉnh sửa, lọc và in lại."
+                onClick={() => choose(() => D.api.downloadFormalReportXlsx())}/>
+      </div>
+    </Modal>
   );
 }
 

@@ -484,21 +484,24 @@
         // GET /api/reports/dashboard.pdf — backend renders the Tổng quan
         // page via headless chromium + returns a PDF blob. Triggers a
         // browser download.
-        async downloadDashboardPdf() {
+        async downloadDashboardPdf() { return this._downloadReport('/reports/dashboard.pdf', 'tongquan', 'pdf', 'báo cáo trực quan'); },
+        async downloadFormalReportPdf()  { return this._downloadReport('/reports/data.pdf',  'baocao',   'pdf',  'báo cáo số liệu PDF'); },
+        async downloadFormalReportXlsx() { return this._downloadReport('/reports/data.xlsx', 'baocao',   'xlsx', 'báo cáo Excel'); },
+        async _downloadReport(path, prefix, ext, humanLabel) {
           try {
-            window.MGT_TOAST && window.MGT_TOAST("Đang tạo báo cáo PDF…", { ms: 4000 });
-            const res = await fetch(API + '/reports/dashboard.pdf', { credentials: 'include' });
+            window.MGT_TOAST && window.MGT_TOAST(`Đang tạo ${humanLabel}…`, { ms: 6000 });
+            const res = await fetch(API + path, { credentials: 'include' });
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'tongquan-' + new Date().toISOString().slice(0,10) + '.pdf';
+            a.download = `${prefix}-${new Date().toISOString().slice(0,10)}.${ext}`;
             document.body.appendChild(a); a.click(); a.remove();
             setTimeout(() => URL.revokeObjectURL(url), 1500);
-            window.MGT_TOAST && window.MGT_TOAST("Đã tạo báo cáo PDF.");
+            window.MGT_TOAST && window.MGT_TOAST(`Đã tạo ${humanLabel}.`);
           } catch (e) {
-            window.MGT_TOAST && window.MGT_TOAST("Lỗi tạo PDF: " + (e.message || e));
+            window.MGT_TOAST && window.MGT_TOAST(`Lỗi tạo ${humanLabel}: ` + (e.message || e));
           }
         },
 
