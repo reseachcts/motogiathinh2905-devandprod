@@ -653,8 +653,10 @@ function StudentRentalsCard({ student }) {
   return (
     <GlassCard padding={24}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        {/* Stat tiles — match the SummaryStat treatment used by the payment card. */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        {/* Stat tiles — same 4-column grid as the payment card so each
+            tile occupies 1/4 of the row, matching SummaryStat sizing.
+            Right two slots stay empty (rentals only carry two metrics). */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14 }}>
           <SummaryStat label="Lượt thi"      value={totalRounds}/>
           <SummaryStat label="Tổng phí thuê" value={window.fmtVND(totalAmount)} color="var(--neon-lime)"/>
         </div>
@@ -672,10 +674,14 @@ function StudentRentalsCard({ student }) {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {/* Header row — column widths chosen to echo the payment row
-                grid below (date / mã / target / qty / amount / method). */}
+            {/* Header row — column widths copied from the payment grid so
+                the two tables line up visually. Cols by position:
+                  1 Thời điểm  2 Mã  3 Xe  4 Lượt  5 Số tiền  6 Hình thức  7 Biên lai
+                The lime "Số tiền" sits in the 5th column (same width slot
+                as the payment card's "Còn nợ"); col-3 hosts the vehicle
+                so a scanner reads "what was rented · how many · how much". */}
             <div style={{
-              display: "grid", gridTemplateColumns: "130px 140px 1fr 80px 1.1fr 100px",
+              display: "grid", gridTemplateColumns: "130px 90px 1.1fr 1.1fr 1.1fr 100px 60px",
               padding: "10px 12px", gap: 12, borderBottom: "1px solid var(--ink-4)",
               fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)",
             }}>
@@ -685,27 +691,38 @@ function StudentRentalsCard({ student }) {
               <span style={{ textAlign: "right" }}>Lượt</span>
               <span style={{ textAlign: "right" }}>Số tiền</span>
               <span>Hình thức</span>
+              <span style={{ textAlign: "center" }}>Biên lai</span>
             </div>
             {sorted.map((r, i) => {
               const v = D.getVehicle(r.vehicleId);
               const isLast = i === sorted.length - 1;
               return (
                 <div key={r.id} style={{
-                  display: "grid", gridTemplateColumns: "130px 140px 1fr 80px 1.1fr 100px",
+                  display: "grid", gridTemplateColumns: "130px 90px 1.1fr 1.1fr 1.1fr 100px 60px",
                   padding: "14px 12px", gap: 12, alignItems: "center",
                   borderBottom: isLast ? "none" : "1px solid var(--ink-4)",
                 }}>
+                  {/* Thời điểm — date + time stacked, same style as the payment row */}
                   <div style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 2 }}>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--fg-1)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt.split(" ").slice(0, 2).join(" ")}</span>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt.split(" ")[2] || ""}</span>
                   </div>
+                  {/* Mã thuê */}
                   <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-1)", fontWeight: 600, letterSpacing: "0.04em",
                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.id}</span>
+                  {/* Xe */}
                   <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-1)",
                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v ? v.name : (r.vehicleId || "—")}</span>
+                  {/* Lượt */}
                   <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--fg-1)", fontWeight: 600 }}>{r.rentalRounds || 0}</span>
+                  {/* Số tiền — lime, same colour treatment as the payment row's Số tiền */}
                   <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--neon-lime)", fontWeight: 600 }}>+{window.fmtVND(r.amount)}</span>
+                  {/* Hình thức */}
                   <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-2)" }}>{r.method}</span>
+                  {/* Biên lai */}
+                  <div style={{ display: "flex", justifyContent: "center" }}>
+                    <BienLaiMark hasPhoto={r.bienLaiPhoto}/>
+                  </div>
                 </div>
               );
             })}
