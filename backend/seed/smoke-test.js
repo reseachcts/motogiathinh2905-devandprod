@@ -27,7 +27,7 @@ const assert = (cond, msg) => { if (!cond) { console.error('  ✗', msg); proces
   assert(h.ok === true, 'health ok');
 
   console.log('2. login');
-  const login = await api('/api/auth/login', { method: 'POST', body: { email: 'admin@motogiathinh.local', password: 'changeme' } });
+  const login = await api('/api/auth/login', { method: 'POST', body: { email: 'thinh@motogiathinh.vn', password: 'changeme' } });
   assert(login.user.role === 'admin', 'logged in as admin');
   assert(typeof login.user.active === 'boolean', 'active coerced to boolean');
 
