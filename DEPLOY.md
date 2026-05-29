@@ -349,6 +349,10 @@ change any signed-off colors / fonts / layout.
 | Branches CRUD UI | `webapp/screen-org.jsx` `BranchesTab` | Admin can `+ Thêm chi nhánh` / Sửa / Xóa. DELETE is FK-protected on the server (409 `branch_in_use`). |
 | `ScreenErrorBoundary` | `webapp/app.jsx` | Per-screen wrapper so one broken screen doesn't blank the whole app. |
 | `MGT_TOAST` | `webapp/data-loader.js` | Vanilla bottom-right toast helper for soft-failure notices (replaces inline `alert()` in plumbing). |
+| Over-payment soft warning | `webapp/modals.jsx` `AddPaymentModal` | When `amount > student.balance`, the form renders a non-blocking yellow notice "Vượt số dư còn nợ — chuyển thành ghi tạm". Backend still allows it (compensating-entry use case); UI just makes the operator's intent explicit. |
+| Orphan file cleanup on upload overwrite | `backend/routes/uploads.js` (commit 0898152) | Re-uploading a student doc or biên-lai photo unlinks the prior file on disk before writing the new one. Prevents orphan blobs accumulating in `backend/data/uploads/`. Hard-asserted in `seed/e2e-deep.js` test 06. |
+| Synchronous `useRef` busy guard | 6 modals: `AddStudent`/`AddPayment`/`AddClass` in `modals.jsx`, `EditRecordModal`/`RecordCreatorModal`/`PasswordResetModal` in `screen-org.jsx` | React state updates are async, so a triple-click burst can race past a `setBusy(true)` flag before re-render. Each modal now also holds `busyRef.current = true` synchronously and bails on re-entry. Covered by `seed/e2e-deep.js` tests 14 & 14b. |
+| `FloatingFilterPanel` Esc handler | `webapp/list-tools.jsx` (commit 7439a46) | Document-level `keydown === 'Escape'` listener gated on `open`, mirroring the Modal pattern in `shell.jsx`. The floating advanced-filter panel (all 4 list screens) no longer traps keyboard users. |
 
 Per `webapp/CLAUDE.md`, the spirit of "frozen" is visual/UX preservation;
 the empty callbacks were never meant to ship and the admin tooling above

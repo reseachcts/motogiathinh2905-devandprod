@@ -398,23 +398,28 @@ Every write must:
 
 ## 8. Invariants & business rules
 
-1. **Banded payment status** (§3.3): only `0%`, `50%`, `100%` exist.
-2. **Three classes status values** only (`đang mở`, `đang diễn ra`, `đã kết thúc`).
-3. **A & A1 share classes** — never split by licence.
-4. **`student.totalFee` is locked at enrolment.** Changing fee plan or
+Commit messages cite individual rules as `§8.<n>` where `<n>` is the
+item number below (e.g. `§8.4` = `totalFee` lock, `§8.5` = payment
+immutability). The numbering is stable — do not renumber existing
+rules; append new ones.
+
+1. **(§8.1) Banded payment status** (§3.3): only `0%`, `50%`, `100%` exist.
+2. **(§8.2) Three classes status values** only (`đang mở`, `đang diễn ra`, `đã kết thúc`).
+3. **(§8.3) A & A1 share classes** — never split by licence.
+4. **(§8.4) `student.totalFee` is locked at enrolment.** Changing fee plan or
    promotion later requires an explicit admin override and re-write of
    `totalFee`.
-5. **Payments are immutable.** Treat as ledger. To correct a payment,
+5. **(§8.5) Payments are immutable.** Treat as ledger. To correct a payment,
    write a compensating event (e.g. negative-amount entry) — never
    `DELETE`.
-6. **`responsibleStaffId` is required on every student.**
-7. **`maHV` and `idNumber` must be unique.** Conflict → 409.
-8. **`payment.bienLaiId` must be unique.**
-9. **Money is integer đ** (no decimals). Store as `numeric(12,0)`.
-10. **Dates of birth, ngày cấp, ngày mở, ngày thi** are stored as date
+6. **(§8.6) `responsibleStaffId` is required on every student.**
+7. **(§8.7) `maHV` and `idNumber` must be unique.** Conflict → 409.
+8. **(§8.8) `payment.bienLaiId` must be unique.**
+9. **(§8.9) Money is integer đ** (no decimals). Store as `numeric(12,0)`.
+10. **(§8.10) Dates of birth, ngày cấp, ngày mở, ngày thi** are stored as date
     only — format `dd/mm/yyyy` over the wire for compatibility with the
     current UI; backend can use ISO internally and reformat at the edge.
-11. **`createdAt` keeps the original timestamp; never bump on update.**
+11. **(§8.11) `createdAt` keeps the original timestamp; never bump on update.**
     Use `updatedAt` for that.
 
 ---
