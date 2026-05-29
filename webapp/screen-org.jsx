@@ -687,7 +687,11 @@ function VehicleCard({ v, isSelected, onToggle }) {
                  transform: isSelected ? "translateY(-2px)" : "none",
                }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Header — bike logo · name + reg-code subheading (left)  ·  branch name (right, toned) */}
+          {/* Header — 5-row template, matching the class card spacing:
+                Row 1  bike logo + name (h3)
+                Row 2  "XE SỐ X" (left) + branch name (right, toned)
+              The remaining 3 rows live inside the 2×2 meta grid below
+              (label row, value row, bare-big-value row). */}
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
             <div style={{
               width: 44, height: 44, borderRadius: 12, flexShrink: 0,
@@ -700,14 +704,19 @@ function VehicleCard({ v, isSelected, onToggle }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em",
                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.name}</h3>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums",
-                             letterSpacing: "0.04em" }}>
-                Số xe {v.plate || "—"}
-              </span>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 2 }}>
+                <span style={{ flex: 1, minWidth: 0,
+                               fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700,
+                               letterSpacing: "0.18em", textTransform: "uppercase",
+                               color: "var(--fg-3)",
+                               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  XE SỐ {v.plate || "—"}
+                </span>
+                <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600, color: tone, whiteSpace: "nowrap" }}>
+                  {b ? b.name : "—"}
+                </span>
+              </div>
             </div>
-            <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600, color: tone, whiteSpace: "nowrap", paddingTop: 6 }}>
-              {b ? b.name : "—"}
-            </span>
           </div>
 
           {/* Meta — 2×2 grid mirroring the class card. */}
