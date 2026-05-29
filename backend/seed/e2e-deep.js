@@ -707,45 +707,49 @@ async function run() {
   // ============ 14b. Triple-click guard on AddClassModal (Lớp học) ============
   // Covers the modals.jsx AddClassModal primaryAction. Same race as
   // RecordCreatorModal: 3 synchronous .click() bursts must create Δ=1
-  // class, not 3.
+  // class, not 3. Drives the form values programmatically via the React
+  // change handler so we don't fight the custom Select widget.
   await safe(page, '14b-addclass-triple-submit', async () => {
     await gotoTab(page, 'Lớp học');
     await page.waitForTimeout(220);
     const before = await page.evaluate(() => window.MGT_DATA.classes.length);
-    // Open Tạo lớp button (admin only).
+    const branchId = await page.evaluate(() => window.MGT_DATA.branches[0]?.id || null);
+    if (!branchId) { WARN('no branches available — skip 14b'); return; }
     const openBtn = page.locator('button:has-text("Tạo lớp")').first();
     if (!(await openBtn.count())) { WARN('Tạo lớp button not visible (non-admin?)'); return; }
     await openBtn.click({ force: true });
     await page.waitForFunction(() => Array.from(document.body.children).some(el =>
       el.tagName === 'DIV' && /position:\s*fixed/i.test(el.getAttribute('style') || '')), null, { timeout: 4000 });
-    // Fill required fields: Mã lớp + Chi nhánh select.
-    const codeInput = page.locator('input[placeholder="MÔ TÔ 06/2026"]').first();
-    await codeInput.evaluate(el => el.focus());
-    await page.keyboard.type(`L5-DBL-${SALT}`);
-    // Pick the first branch option via the Select (custom Select component).
-    // Use a programmatic dispatch: click the select trigger, then the first option.
-    const selectClicked = await page.evaluate(() => {
+    // Fill Mã lớp via native React input dispatch — bypasses focus issues.
+    const codeFilled = await page.evaluate((salt) => {
       const portals = Array.from(document.body.children).filter(el =>
         el.tagName === 'DIV' && /position:\s*fixed/i.test(el.getAttribute('style') || ''));
       const modal = portals[portals.length - 1];
       if (!modal) return false;
-      // Find the Chi nhánh trigger — first button that says "Chọn chi nhánh".
-      const trigger = Array.from(modal.querySelectorAll('button')).find(b => /Chọn chi nhánh/.test(b.textContent || ''));
-      if (trigger) { trigger.click(); return true; }
-      return false;
-    });
-    await page.waitForTimeout(180);
-    if (selectClicked) {
-      await page.evaluate(() => {
-        // Click the first option in the now-open dropdown panel.
-        const panels = Array.from(document.body.children).filter(el =>
-          el.tagName === 'DIV' && /position:\s*fixed/i.test(el.getAttribute('style') || ''));
-        // The dropdown is the last fixed-positioned portal.
-        const lastPanel = panels[panels.length - 1];
-        const opt = lastPanel?.querySelector('button');
-        if (opt) opt.click();
-      });
-    }
+      const codeInput = modal.querySelector('input[placeholder="MÔ TÔ 06/2026"]');
+      if (!codeInput) return false;
+      const proto = Object.getPrototypeOf(codeInput);
+      const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      setter?.call(codeInput, `L5-DBL-${salt}`);
+      codeInput.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    }, SALT);
+    if (!codeFilled) { FAIL('14b Mã lớp input not located'); return; }
+    // Pick a branch via the native <select> — Select atom is a real <select> element.
+    const branchPicked = await page.evaluate((bid) => {
+      const portals = Array.from(document.body.children).filter(el =>
+        el.tagName === 'DIV' && /position:\s*fixed/i.test(el.getAttribute('style') || ''));
+      const modal = portals[portals.length - 1];
+      if (!modal) return null;
+      const sel = modal.querySelector('select');
+      if (!sel) return null;
+      const proto = Object.getPrototypeOf(sel);
+      const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      setter?.call(sel, bid);
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return sel.value;
+    }, branchId);
+    if (!branchPicked) { WARN('14b could not pick a branch via native select'); return; }
     await page.waitForTimeout(180);
     // Now triple-click the Tạo lớp submit button.
     const btnState = await page.evaluate(() => {
@@ -754,16 +758,17 @@ async function run() {
       const modal = portals[portals.length - 1];
       const btn = Array.from(modal.querySelectorAll('button')).find(b => /^Tạo lớp$/.test((b.textContent || '').trim()));
       if (!btn) return { found: false };
-      const state = { found: true, clicks: [] };
+      const state = { found: true, disabledBefore: btn.disabled, clicks: [] };
       for (let i = 0; i < 3; i++) { btn.click(); state.clicks.push({ i, disabledAfter: btn.disabled }); }
       return state;
     });
     if (!btnState.found) { FAIL('14b Tạo lớp button not located'); return; }
+    if (btnState.disabledBefore) { WARN('14b submit button was disabled before click', JSON.stringify(btnState)); return; }
     await page.waitForTimeout(1500);
     const after = await page.evaluate(() => window.MGT_DATA.classes.length);
     const delta = after - before;
-    if (delta === 1) PASS('AddClassModal triple-submit guarded', `Δ=${delta}`);
-    else if (delta === 0) WARN('AddClassModal triple-submit Δ=0 (validation may have rejected)', `Δ=${delta}`);
+    if (delta === 1) PASS('AddClassModal triple-submit guarded', `Δ=${delta} branch=${branchPicked}`);
+    else if (delta === 0) WARN('AddClassModal triple-submit Δ=0 (validation may have rejected)', `Δ=${delta} state=${JSON.stringify(btnState)}`);
     else FAIL('AddClassModal triple-submit created N rows', `Δ=${delta}`);
   });
 
