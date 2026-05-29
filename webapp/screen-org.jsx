@@ -625,8 +625,9 @@ function VehiclesTab() {
         defaultVehicleId={selectedId || D.vehicles[0]?.id}/>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-        {D.vehicles.map(v => <VehicleCard key={v.id} v={v} isSelected={selectedId === v.id}
-                                          onToggle={() => toggle(v.id)}/>)}
+        {D.vehicles.map((v, i) => <VehicleCard key={v.id} v={v} num={i + 1}
+                                                isSelected={selectedId === v.id}
+                                                onToggle={() => toggle(v.id)}/>)}
       </div>
 
       {selectedId && <VehicleExpanded vehicleId={selectedId}/>}
@@ -666,7 +667,7 @@ function VehicleMetaCell({ label, value, mono }) {
   );
 }
 
-function VehicleCard({ v, isSelected, onToggle }) {
+function VehicleCard({ v, num, isSelected, onToggle }) {
   const D = window.MGT_DATA;
   const b = D.getBranch(v.branchId);
   const rentals = D.rentalsForVehicle(v.id);
@@ -710,7 +711,7 @@ function VehicleCard({ v, isSelected, onToggle }) {
                                letterSpacing: "0.18em", textTransform: "uppercase",
                                color: "var(--fg-3)",
                                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  XE SỐ {v.plate || "—"}
+                  XE SỐ {num}
                 </span>
                 <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600, color: tone, whiteSpace: "nowrap" }}>
                   {b ? b.name : "—"}
