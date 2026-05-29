@@ -601,7 +601,7 @@ function VehiclesTab() {
     { id: "name",     label: "Tên xe",       type: "text",   placeholder: "Honda Wave Alpha", fullWidth: true },
     { id: "licence",  label: "Bằng",         type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
     { id: "branchId", label: "Chi nhánh",    type: "select", options: branchOpts },
-    { id: "plate",    label: "Biển số",      type: "text",   placeholder: "59-K1 123.45" },
+    { id: "plate",    label: "Số xe",        type: "text",   placeholder: "VEH-001" },
     { id: "year",     label: "Năm sản xuất", type: "int",    placeholder: "2024" },
   ];
   const toggle  = (id) => setSelectedId(s => s === id ? null : id);
@@ -635,14 +635,17 @@ function VehiclesTab() {
 }
 
 // --------------------------------------------------------------------
-// VehicleCard — exact mirror of the ClassCard template.
-//   Header  : h3 name (left)  +  status pill + branch name (right stack)
+// VehicleCard — bike-iconed card, branch-toned, no status pill.
+//   Header  : bike logo + name (left)  +  branch name (right, toned)
+//             "Số xe XXX" sits under the name as the subheading. Practice-
+//             range vehicles get an internal vehicle number rather than a
+//             road plate, so the label is "Số xe", not "Biển số".
 //   Meta    : 2×2 grid
-//             top row    — small labelled cells: Biển số · Bằng
+//             top row    — small labelled cells: Bằng · Giá
 //             bottom row — bare big values: revenue (left) · "{n} lượt thuê" (right)
 //
-// No buttons on the card — per user spec it's view-only; admin reaches
-// "Thêm phương tiện" + "Ghi nhận lượt thuê" from the tab header above.
+// No buttons on the card — view-only; admin reaches "Thêm phương tiện"
+// + "Ghi nhận lượt thuê" from the tab header above.
 // --------------------------------------------------------------------
 function sampleRevenueFor(v) {
   // Deterministic per-vehicle placeholder until the mock dataset rehaul
@@ -650,27 +653,6 @@ function sampleRevenueFor(v) {
   // rentalsForVehicle sum the moment any rental lands for that vehicle.
   const n = parseInt((String(v.id).match(/\d+/) || [1])[0], 10) || 1;
   return (n * 7 + 13) * 137000;
-}
-
-function VehicleStatusPill({ status }) {
-  const map = {
-    "đang hoạt động":  { c: "var(--neon-lime)",  label: "Đang hoạt động" },
-    "đang bảo trì":    { c: "var(--neon-amber)", label: "Đang bảo trì" },
-    "ngừng sử dụng":   { c: "var(--fg-3)",       label: "Ngừng sử dụng" },
-  };
-  const m = map[status] || map["đang hoạt động"];
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 6,
-      fontFamily: "var(--font-ui)", fontSize: 11, fontWeight: 600,
-      padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap",
-      background: `color-mix(in oklab, ${m.c} 12%, transparent)`,
-      color: m.c, border: `1px solid color-mix(in oklab, ${m.c} 32%, transparent)`,
-    }}>
-      <span style={{ width: 5, height: 5, borderRadius: 999, background: m.c, boxShadow: `0 0 8px ${m.c}` }}/>
-      {m.label}
-    </span>
-  );
 }
 
 // Local mirror of screen-classes.jsx's MetaCell (not exported there).
@@ -705,23 +687,34 @@ function VehicleCard({ v, isSelected, onToggle }) {
                  transform: isSelected ? "translateY(-2px)" : "none",
                }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Header — title (left) + (status pill above, branch below) stack (right). */}
+          {/* Header — bike logo · name + reg-code subheading (left)  ·  branch name (right, toned) */}
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+              background: `linear-gradient(135deg, ${tone}, color-mix(in oklab, ${tone} 55%, var(--ink-0)))`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `0 0 16px color-mix(in oklab, ${tone} 52%, transparent)`,
+            }}>
+              <Icon name="bike" size={20} color="var(--ink-0)"/>
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em",
+              <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em",
                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.name}</h3>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums",
+                             letterSpacing: "0.04em" }}>
+                Số xe {v.plate || "—"}
+              </span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-              <VehicleStatusPill status={v.status}/>
-              <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600, color: tone, whiteSpace: "nowrap" }}>{b ? b.name : "—"}</span>
-            </div>
+            <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600, color: tone, whiteSpace: "nowrap", paddingTop: 6 }}>
+              {b ? b.name : "—"}
+            </span>
           </div>
 
           {/* Meta — 2×2 grid mirroring the class card. */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", rowGap: 10, columnGap: 14,
                         fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" }}>
-            <VehicleMetaCell label="Biển số" value={v.plate || "—"} mono/>
-            <VehicleMetaCell label="Bằng"    value={v.licence || "—"}/>
+            <VehicleMetaCell label="Bằng" value={v.licence || "—"}/>
+            <VehicleMetaCell label="Giá"  value={v.price ? window.fmtVND(v.price) : "—"} mono/>
             {/* Bottom row — bare big values: revenue (left), lượt thuê (right). */}
             <span style={{
               fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700,
@@ -782,7 +775,7 @@ function VehicleExpanded({ vehicleId }) {
             <div style={{ flex: 1 }}>
               <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{v.name}</h3>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-3)" }}>
-                {v.licence || "—"} · {v.plate || "—"} · {v.year || "—"} · {b ? b.name : "—"} · Giá {v.price ? window.fmtVND(v.price) : "chưa đặt"}
+                {v.licence || "—"} · Số xe {v.plate || "—"} · {v.year || "—"} · {b ? b.name : "—"} · Giá {v.price ? window.fmtVND(v.price) : "chưa đặt"}
               </span>
             </div>
             <SortMenu value={sortKey} onChange={setSortKey} options={sortOpts}/>
@@ -940,7 +933,7 @@ function RentVehicleModal({ open, onClose, defaultVehicleId }) {
     }
   };
 
-  const vehicleOpts = D.vehicles.map(v => ({ value: v.id, label: `${v.name} · ${v.plate || "—"}${v.price ? ` · ${window.fmtVND(v.price)}/lượt` : " · chưa đặt giá"}` }));
+  const vehicleOpts = D.vehicles.map(v => ({ value: v.id, label: `${v.name} · Số xe ${v.plate || "—"}${v.price ? ` · ${window.fmtVND(v.price)}/lượt` : " · chưa đặt giá"}` }));
   return (
     <Modal open={open} onClose={onClose} width={560}
            title="Ghi nhận lượt thuê xe"

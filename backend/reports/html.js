@@ -167,7 +167,7 @@ function tableRentals(data) {
     `${rows.length} lượt thuê · Tổng thu: ${fmtVND(total)} · Không tính vào doanh thu chính`, `
     <table class="dense">
       <thead><tr>
-        <th>Thời điểm</th><th>Xe</th><th>Biển số</th><th>Bằng</th>
+        <th>Thời điểm</th><th>Xe</th><th>Số xe</th><th>Bằng</th>
         <th>Học viên</th><th>Mã HV</th>
         <th class="num">Số lượt</th><th class="num">Số tiền</th>
         <th>Hình thức</th><th>Nhân viên</th>
