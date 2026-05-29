@@ -266,6 +266,9 @@ async function run() {
     await fillByPlaceholder(page, '090 123 4567',        '0922' + Math.floor(Math.random() * 1e6));
     await fillByPlaceholder(page, 'you@motogiathinh.vn', `e2e+${SALT}@motogiathinh.vn`);
     await selectByLabel(page,     'Chi nhánh',           '.+');
+    // Password is mandatory at create — backend enforces passwordPolicy()
+    // (≥ 10 chars, mixed alpha+num). Fill via the placeholder.
+    await fillByPlaceholder(page, '≥10 ký tự, có chữ + số', `Pass${SALT}word1`);
     await clickPrimary(page, 'Tạo mới');
     await assertGrew(page, consoleErrors, '5: Tạo tài khoản', 'accounts', before);
   });
@@ -425,6 +428,7 @@ async function run() {
     await fillByPlaceholder(page, '090 123 4567',        '0933' + Math.floor(Math.random() * 1e6));
     await fillByPlaceholder(page, 'you@motogiathinh.vn', dupEmail);
     await selectByLabel(page,     'Chi nhánh',           '.+');
+    await fillByPlaceholder(page, '≥10 ký tự, có chữ + số', `Pass${SALT}word1`);
     await clickPrimary(page, 'Tạo mới');
     await page.waitForFunction((e) => !!window.MGT_DATA.accounts.find(a => a.email === e), dupEmail, { timeout: 6000 });
     await dismissAnyModal(page);
@@ -435,6 +439,7 @@ async function run() {
     await fillByPlaceholder(page, '090 123 4567',        '0944' + Math.floor(Math.random() * 1e6));
     await fillByPlaceholder(page, 'you@motogiathinh.vn', dupEmail);
     await selectByLabel(page,     'Chi nhánh',           '.+');
+    await fillByPlaceholder(page, '≥10 ký tự, có chữ + số', `Pass${SALT}word2`);
     await clickPrimary(page, 'Tạo mới');
     // Give the failed request a moment to land
     await page.waitForTimeout(800);
