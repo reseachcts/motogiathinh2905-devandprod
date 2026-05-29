@@ -65,7 +65,7 @@ const TABLE_SPECS = {
   },
   vehicles: {
     csv: 'vehicles.csv',
-    intCols: ['year'],
+    intCols: ['year', 'price'],
     boolCols: [],
   },
   notifications: {

@@ -649,7 +649,7 @@ function VehiclesTab() {
       <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
         {D.vehicles.map((v, i) => (
           <React.Fragment key={v.id}>
-            <VehicleCard v={v} num={i + 1}
+            <VehicleCard v={v}
                          isSelected={selectedId === v.id}
                          onToggle={() => toggle(v.id)}/>
             {i === panelAfter && (
@@ -696,7 +696,7 @@ function VehicleMetaCell({ label, value, mono }) {
   );
 }
 
-function VehicleCard({ v, num, isSelected, onToggle }) {
+function VehicleCard({ v, isSelected, onToggle }) {
   const D = window.MGT_DATA;
   const b = D.getBranch(v.branchId);
   const rentals = D.rentalsForVehicle(v.id);
@@ -740,7 +740,7 @@ function VehicleCard({ v, num, isSelected, onToggle }) {
                                letterSpacing: "0.18em", textTransform: "uppercase",
                                color: "var(--fg-3)",
                                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  XE SỐ {num}
+                  XE SỐ {v.plate || "—"}
                 </span>
                 <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600, color: tone, whiteSpace: "nowrap" }}>
                   {b ? b.name : "—"}
