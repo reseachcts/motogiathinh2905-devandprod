@@ -715,9 +715,9 @@ function StudentRentalsCard({ student }) {
                   <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--neon-lime)", fontWeight: 600 }}>+{window.fmtVND(r.amount)}</span>
                   {/* Lượt */}
                   <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--fg-1)", fontWeight: 600 }}>{r.rentalRounds || 0}</span>
-                  {/* Xe — explicit left align so it lines up with the Xe header */}
+                  {/* Xe — abbreviated reference (Xe số N) per spec, not the full model name */}
                   <span style={{ textAlign: "left", fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-1)",
-                                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v ? v.name : (r.vehicleId || "—")}</span>
+                                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v ? `Xe số ${v.plate || "—"}` : (r.vehicleId || "—")}</span>
                   {/* Hình thức */}
                   <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-2)" }}>{r.method}</span>
                   {/* Biên lai */}

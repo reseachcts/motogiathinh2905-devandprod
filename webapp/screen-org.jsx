@@ -590,6 +590,17 @@ function VehiclesTab() {
   const [selectedId, setSelectedId] = React.useState(null);
   const isAdmin = D.currentUser?.role === "admin";
   const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
+  // Vehicle reg code is the internal "Xe số N" identifier, not a road
+  // plate. Admin picks an unused number from a dropdown; numbers already
+  // assigned to existing vehicles are excluded so two cards can't share
+  // the same "Xe số 1" label. Pool runs up to MAX_VEHICLE_NUMBER so
+  // there's headroom past the seed data without flooding the dropdown.
+  const MAX_VEHICLE_NUMBER = 50;
+  const taken = new Set(D.vehicles.map(v => parseInt(v.plate, 10)).filter(n => Number.isFinite(n)));
+  const plateOpts = [];
+  for (let n = 1; n <= MAX_VEHICLE_NUMBER; n++) {
+    if (!taken.has(n)) plateOpts.push({ id: String(n), label: `Xe số ${n}` });
+  }
   // `price` is intentionally NOT editable here — it ships from the seed
   // dataset (see task #53). Surfacing it in the create/edit dialog would
   // tempt operators to bypass the source-of-truth CSV.
@@ -597,7 +608,7 @@ function VehiclesTab() {
     { id: "name",     label: "Tên xe",       type: "text",   placeholder: "Honda Wave Alpha", fullWidth: true },
     { id: "licence",  label: "Bằng",         type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
     { id: "branchId", label: "Chi nhánh",    type: "select", options: branchOpts },
-    { id: "plate",    label: "Số xe",        type: "text",   placeholder: "VEH-001" },
+    { id: "plate",    label: "Xe số",        type: "select", options: plateOpts },
     { id: "year",     label: "Năm sản xuất", type: "int",    placeholder: "2024" },
   ];
   const toggle  = (id) => setSelectedId(s => s === id ? null : id);
@@ -811,7 +822,7 @@ function VehicleExpanded({ vehicleId }) {
             <div style={{ flex: 1 }}>
               <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{v.name}</h3>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-3)" }}>
-                {v.licence || "—"} · Số xe {v.plate || "—"} · {v.year || "—"} · {b ? b.name : "—"} · Giá {v.price ? window.fmtVND(v.price) : "chưa đặt"}
+                {v.licence || "—"} · Xe số {v.plate || "—"} · {v.year || "—"} · {b ? b.name : "—"} · Giá {v.price ? window.fmtVND(v.price) : "chưa đặt"}
               </span>
             </div>
             <SortMenu sortField={sortField} sortDir={sortDir}
@@ -1008,7 +1019,7 @@ function RentVehicleModal({ open, onClose, defaultVehicleId, defaultStudentId })
     }
   };
 
-  const vehicleOpts = D.vehicles.map(v => ({ value: v.id, label: `${v.name} · Số xe ${v.plate || "—"}${v.price ? ` · ${window.fmtVND(v.price)}/lượt` : " · chưa đặt giá"}` }));
+  const vehicleOpts = D.vehicles.map(v => ({ value: v.id, label: `Xe số ${v.plate || "—"} · ${v.name}${v.price ? ` · ${window.fmtVND(v.price)}/lượt` : " · chưa đặt giá"}` }));
   return (
     <Modal open={open} onClose={onClose} width={560}
            title="Ghi nhận lượt thuê xe"

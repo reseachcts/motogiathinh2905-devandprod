@@ -201,7 +201,7 @@ function sheetRentals(wb, data) {
   const cols = [
     { header: 'Thời điểm',  width: 18 },
     { header: 'Xe',         width: 22 },
-    { header: 'Số xe',      width: 16 },
+    { header: 'Xe số',      width: 16 },
     { header: 'Bằng',       width: 8  },
     { header: 'Học viên',   width: 22 },
     { header: 'Mã HV',      width: 10 },
