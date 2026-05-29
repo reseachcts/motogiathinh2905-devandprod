@@ -380,7 +380,8 @@ function PaymentDetailCard({ row, isClosing, onOpenStudent }) {
             display: "flex", flexDirection: "column", gap: 10,
           }}>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>Ảnh biên lai</span>
-            <BienLaiPreview hasPhoto={p.bienLaiPhoto}/>
+            <BienLaiPreview hasPhoto={p.bienLaiPhoto} photoUrl={p.bienLaiPhoto_url}
+                            onUpload={(file) => D.api.uploadBienLai(p.id, file).catch(e => alert("Lỗi tải ảnh biên lai: " + e.message))}/>
           </div>
         </div>
       </div>
@@ -390,9 +391,30 @@ function PaymentDetailCard({ row, isClosing, onOpenStudent }) {
 
 // --------------------------------------------------------------------
 // BienLaiPreview — placeholder slot showing the receipt photo state.
+//   Plumbed: when no photo is attached and `onUpload` is supplied, the
+//   amber empty-state becomes a drop / click target that uploads the
+//   selected File via the caller's handler. When a photoUrl is present
+//   we render the actual image (still visually framed in lime/cyan).
 // --------------------------------------------------------------------
-function BienLaiPreview({ hasPhoto }) {
+function BienLaiPreview({ hasPhoto, photoUrl, onUpload }) {
+  const fileRef = React.useRef(null);
+  const [hover, setHover] = React.useState(false);
+
   if (hasPhoto) {
+    if (photoUrl) {
+      return (
+        <a href={photoUrl} target="_blank" rel="noopener" style={{
+          display: "block", textDecoration: "none",
+          height: 140, borderRadius: 10, overflow: "hidden",
+          background: "linear-gradient(135deg, color-mix(in oklab, var(--neon-lime) 14%, transparent), color-mix(in oklab, var(--neon-cyan) 10%, transparent))",
+          border: "1px dashed color-mix(in oklab, var(--neon-lime) 40%, transparent)",
+        }}>
+          <img src={photoUrl} alt="Ảnh biên lai" style={{
+            width: "100%", height: "100%", objectFit: "contain", display: "block",
+          }}/>
+        </a>
+      );
+    }
     return (
       <div style={{
         height: 140, borderRadius: 10,
@@ -406,13 +428,30 @@ function BienLaiPreview({ hasPhoto }) {
       </div>
     );
   }
+
+  // Empty state — if onUpload is wired, allow drop / click to attach.
+  const canUpload = typeof onUpload === "function";
+  const pick = (file) => { if (file && canUpload) onUpload(file); };
+
   return (
-    <div style={{
-      height: 140, borderRadius: 10,
-      background: "color-mix(in oklab, var(--neon-amber) 8%, transparent)",
-      border: "1px dashed color-mix(in oklab, var(--neon-amber) 40%, transparent)",
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
-    }}>
+    <div
+      onClick={canUpload ? () => fileRef.current && fileRef.current.click() : undefined}
+      onDragOver={canUpload ? (e => { e.preventDefault(); setHover(true); }) : undefined}
+      onDragLeave={canUpload ? (() => setHover(false)) : undefined}
+      onDrop={canUpload ? (e => { e.preventDefault(); setHover(false); pick(e.dataTransfer?.files?.[0]); }) : undefined}
+      style={{
+        height: 140, borderRadius: 10, position: "relative",
+        background: hover ? "color-mix(in oklab, var(--neon-cyan) 12%, transparent)" : "color-mix(in oklab, var(--neon-amber) 8%, transparent)",
+        border: `1px dashed color-mix(in oklab, ${hover ? "var(--neon-cyan)" : "var(--neon-amber)"} 40%, transparent)`,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
+        cursor: canUpload ? "pointer" : "default",
+        transition: "background 140ms var(--ease-out), border-color 140ms var(--ease-out)",
+      }}>
+      {canUpload && (
+        <input ref={fileRef} type="file" accept="image/*"
+               onChange={e => pick(e.target.files?.[0])}
+               style={{ display: "none" }}/>
+      )}
       <span style={{
         width: 32, height: 32, borderRadius: 999,
         background: "color-mix(in oklab, var(--neon-amber) 22%, transparent)",
@@ -422,7 +461,9 @@ function BienLaiPreview({ hasPhoto }) {
         display: "inline-flex", alignItems: "center", justifyContent: "center",
       }}>!</span>
       <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}>Chưa có ảnh biên lai</span>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)" }}>Kéo & thả ảnh để đính kèm</span>
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)" }}>
+        {canUpload ? "Kéo & thả ảnh — hoặc bấm để chọn" : "Kéo & thả ảnh để đính kèm"}
+      </span>
     </div>
   );
 }
