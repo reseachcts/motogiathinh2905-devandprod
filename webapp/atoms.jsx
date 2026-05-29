@@ -332,15 +332,20 @@ function FilterChip({ active, onClick, icon, label, color = "cyan" }) {
 // --------------------------------------------------------------------
 function DocSlot({ doc, filled, onDrop, onClear, compact = false, previewUrl }) {
   const [hover, setHover] = React.useState(false);
+  const [lightbox, setLightbox] = React.useState(false);
   // Click-to-pick via hidden <input type=file> alongside DnD. Both invoke
   // onDrop(key, file?) — second arg is the File for callers who upload it.
+  // When the slot has a previewUrl (already uploaded), the click opens a
+  // lightbox to view it; the small upload-arrow button replaces it.
   const fileRef = React.useRef(null);
   const pick = (file) => { setHover(false); onDrop && onDrop(doc.key, file || null); };
+  const openPicker = (e) => { e.stopPropagation(); fileRef.current && fileRef.current.click(); };
+  const openLightbox = (e) => { e.stopPropagation(); setLightbox(true); };
   return (
     <div onDragOver={e => { e.preventDefault(); setHover(true); }}
          onDragLeave={() => setHover(false)}
          onDrop={e => { e.preventDefault(); pick(e.dataTransfer?.files?.[0]); }}
-         onClick={() => fileRef.current && fileRef.current.click()}
+         onClick={previewUrl ? openLightbox : openPicker}
          style={{
            borderRadius: 16, padding: compact ? 14 : 18,
            border: `1px dashed ${filled ? "var(--neon-lime)" : hover ? "var(--neon-cyan)" : "var(--glass-stroke-strong)"}`,
@@ -363,16 +368,27 @@ function DocSlot({ doc, filled, onDrop, onClear, compact = false, previewUrl }) 
                        color: filled ? "var(--neon-lime)" : "var(--fg-3)" }}>
           {doc.label}
         </span>
-        {filled && onClear && (
-          <button onClick={(e) => { e.stopPropagation(); onClear(doc.key); }}
-                  style={{ marginLeft: "auto", background: "transparent", border: "none", color: "var(--fg-3)", cursor: "pointer", padding: 0 }}>
-            <Icon name="x" size={12}/>
-          </button>
-        )}
+        <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+          {previewUrl && (
+            <button onClick={openPicker}
+                    title="Thay tệp"
+                    style={{ background: "transparent", border: "none", color: "var(--fg-3)", cursor: "pointer", padding: 0 }}>
+              <Icon name="upload" size={12}/>
+            </button>
+          )}
+          {filled && onClear && (
+            <button onClick={(e) => { e.stopPropagation(); onClear(doc.key); }}
+                    title="Xóa"
+                    style={{ background: "transparent", border: "none", color: "var(--fg-3)", cursor: "pointer", padding: 0 }}>
+              <Icon name="x" size={12}/>
+            </button>
+          )}
+        </span>
       </div>
       {!compact && (
         <span style={{ fontFamily: "var(--font-ui)", fontSize: 11, color: "var(--fg-3)", lineHeight: 1.4 }}>
-          {filled ? "Đã có tệp · nhấn để xem" : doc.hint || "Kéo & thả · chụp · paste"}
+          {previewUrl ? "Nhấn để xem · biểu tượng tải lên để thay" :
+           filled ? "Đã có tệp · nhấn để xem" : doc.hint || "Kéo & thả · chụp · paste"}
         </span>
       )}
       {filled && (
@@ -388,7 +404,58 @@ function DocSlot({ doc, filled, onDrop, onClear, compact = false, previewUrl }) 
               </span>}
         </div>
       )}
+      {lightbox && previewUrl && (
+        <DocLightbox url={previewUrl} label={doc.label} onClose={() => setLightbox(false)}/>
+      )}
     </div>
+  );
+}
+
+// Lightbox — vanilla portal-style overlay for viewing an uploaded file.
+// Image renders inline; PDF / unknown opens in a new tab as fallback.
+function DocLightbox({ url, label, onClose }) {
+  React.useEffect(() => {
+    const esc = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [onClose]);
+  const isPdf = /\.pdf(?:$|\?)/i.test(url);
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, zIndex: 2000,
+      background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 30,
+      animation: "fadeIn 180ms ease-out",
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        maxWidth: "92vw", maxHeight: "92vh", display: "flex", flexDirection: "column",
+        background: "var(--ink-1)", borderRadius: 16, border: "1px solid var(--glass-stroke)",
+        boxShadow: "0 30px 80px rgba(0,0,0,0.6)", overflow: "hidden",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "12px 16px",
+                      borderBottom: "1px solid var(--glass-stroke)", gap: 10 }}>
+          <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 10,
+                         letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>{label}</span>
+          <a href={url} target="_blank" rel="noopener noreferrer"
+             style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--neon-cyan)",
+                      textDecoration: "none", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            Mở trong tab mới ↗
+          </a>
+          <button onClick={onClose} style={{ background: "transparent", border: "none",
+                  color: "var(--fg-3)", cursor: "pointer", padding: 4 }}>
+            <Icon name="x" size={16}/>
+          </button>
+        </div>
+        <div style={{ flex: 1, minHeight: 200, minWidth: 320,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      background: "var(--bg-0)" }}>
+          {isPdf
+            ? <iframe src={url} title={label} style={{ width: "80vw", height: "80vh", border: "none" }}/>
+            : <img src={url} alt={label} style={{ maxWidth: "88vw", maxHeight: "82vh", objectFit: "contain" }}/>}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 

@@ -78,11 +78,19 @@ function AddStudentModal({ open, onClose, onSave }) {
     <Modal open={open} onClose={onClose} width={880}
            primaryLabel="Lưu học viên"
            primaryAction={() => { onSave && onSave({ form, docs, profileComplete, docFiles }); onClose(); }}
-           primaryDisabled={!form.name || !form.classId || !form.responsibleStaffId || openClasses.length === 0}
+           primaryDisabled={
+             !form.name || !form.classId || !form.responsibleStaffId
+             || !form.feePlanId  /* required so totalFee/balance can be tracked — SPEC §3 */
+             || openClasses.length === 0
+           }
            footerStart={
              openClasses.length === 0 ? (
                <span style={{ fontFamily: "var(--font-ui)", fontSize: 11, color: "var(--neon-pink)" }}>
                  Không có lớp đang mở — hãy tạo lớp trước.
+               </span>
+             ) : !form.feePlanId ? (
+               <span style={{ fontFamily: "var(--font-ui)", fontSize: 11, color: "var(--neon-pink)" }}>
+                 Chưa chọn gói học phí — không thể theo dõi học phí / công nợ.
                </span>
              ) : !profileComplete ? (
                <span style={{ fontFamily: "var(--font-ui)", fontSize: 11, color: "var(--neon-amber)" }}>
