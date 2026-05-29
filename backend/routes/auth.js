@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import {
   COOKIE_NAME, cookieOptions, findAccountByEmail, findAccountById,
-  hashPassword, publicAccount, requireAuth, signToken, verifyPassword,
+  hashPassword, publicAccount, requireAuth, signToken, verifyPassword, verifyToken,
   passwordPolicy, checkLoginAttempt, recordLoginFailure, clearLoginFailures,
 } from '../auth.js';
 import { db, logActivity } from '../db.js';
@@ -34,9 +34,19 @@ router.post('/auth/login', (req, res) => {
   res.json({ user: publicAccount(account) });
 });
 
+// Logout is idempotent: it always clears the cookie and returns 200, even on
+// double-logout when the cookie has already been cleared. When a valid session
+// IS present, we resolve req.user (so we can write an activity_log entry that
+// names the actor instead of dropping the audit trail).
 router.post('/auth/logout', (req, res) => {
+  const token = req.cookies?.[COOKIE_NAME];
+  const claims = token ? verifyToken(token) : null;
+  const account = claims ? findAccountById(claims.sub) : null;
+  if (account?.active) {
+    req.user = account;
+    logActivity(account.id, 'auth.logout', account.email);
+  }
   res.clearCookie(COOKIE_NAME, { path: '/' });
-  if (req.user) logActivity(req.user.id, 'auth.logout', req.user.email);
   res.json({ ok: true });
 });
 
