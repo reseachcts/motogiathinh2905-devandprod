@@ -591,7 +591,6 @@ function VehiclesTab() {
   const D = window.MGT_DATA;
   const [createOpen, setCreateOpen] = React.useState(false);
   const [rentOpen,   setRentOpen]   = React.useState(false);
-  const [editingId,  setEditingId]  = React.useState(null);
   const [selectedId, setSelectedId] = React.useState(null);
   const isAdmin = D.currentUser?.role === "admin";
   const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
@@ -605,7 +604,6 @@ function VehiclesTab() {
     { id: "plate",    label: "Biển số",      type: "text",   placeholder: "59-K1 123.45" },
     { id: "year",     label: "Năm sản xuất", type: "int",    placeholder: "2024" },
   ];
-  const editing = editingId ? D.vehicles.find(x => x.id === editingId) : null;
   const toggle  = (id) => setSelectedId(s => s === id ? null : id);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -623,18 +621,12 @@ function VehiclesTab() {
         title="Thêm phương tiện"
         onCreate={(d) => window.MGT_DATA.api.createVehicle(d).catch(e => reportWriteError(e, "Lỗi tạo phương tiện"))}
         fields={vehicleFields}/>
-      <EditRecordModal open={!!editing} onClose={() => setEditingId(null)}
-        title="Sửa phương tiện" subtitle={editing?.name}
-        initialValues={editing || {}} fields={vehicleFields}
-        onSave={(d) => window.MGT_DATA.api.updateVehicle(editingId, d)}/>
       <RentVehicleModal open={rentOpen} onClose={() => setRentOpen(false)}
         defaultVehicleId={selectedId || D.vehicles[0]?.id}/>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
         {D.vehicles.map(v => <VehicleCard key={v.id} v={v} isSelected={selectedId === v.id}
-                                          isAdmin={isAdmin}
-                                          onToggle={() => toggle(v.id)}
-                                          onEdit={() => setEditingId(v.id)}/>)}
+                                          onToggle={() => toggle(v.id)}/>)}
       </div>
 
       {selectedId && <VehicleExpanded vehicleId={selectedId}/>}
@@ -643,30 +635,60 @@ function VehiclesTab() {
 }
 
 // --------------------------------------------------------------------
-// VehicleCard — branch-toned card mirroring the ClassCard pattern.
-//   Header     : icon · name (left)  +  branch name (top-right, toned)
-//                + small Sửa chip (admin only, stops card-click)
-//   Subheading : plate only (year removed per spec)
-//   Body       : 3-up microstat row (Bằng · Giá · Lượt thuê)
-//   Bottom-rt  : sample total revenue (large, lime). The sample comes
-//                from sampleRevenueFor() and is replaced by real rental
-//                sums once the seed rehaul (task #53) lands.
+// VehicleCard — exact mirror of the ClassCard template.
+//   Header  : h3 name (left)  +  status pill + branch name (right stack)
+//   Meta    : 2×2 grid
+//             top row    — small labelled cells: Biển số · Bằng
+//             bottom row — bare big values: revenue (left) · "{n} lượt thuê" (right)
+//
+// No buttons on the card — per user spec it's view-only; admin reaches
+// "Thêm phương tiện" + "Ghi nhận lượt thuê" from the tab header above.
 // --------------------------------------------------------------------
 function sampleRevenueFor(v) {
   // Deterministic per-vehicle placeholder until the mock dataset rehaul
-  // populates real rental history. Scaled to look like a couple-million-
-  // VND-per-month number so the card has visual weight at demo time.
+  // populates real rental history (task #53). Replaced by the real
+  // rentalsForVehicle sum the moment any rental lands for that vehicle.
   const n = parseInt((String(v.id).match(/\d+/) || [1])[0], 10) || 1;
   return (n * 7 + 13) * 137000;
 }
 
-function VehicleCard({ v, isSelected, isAdmin, onToggle, onEdit }) {
+function VehicleStatusPill({ status }) {
+  const map = {
+    "đang hoạt động":  { c: "var(--neon-lime)",  label: "Đang hoạt động" },
+    "đang bảo trì":    { c: "var(--neon-amber)", label: "Đang bảo trì" },
+    "ngừng sử dụng":   { c: "var(--fg-3)",       label: "Ngừng sử dụng" },
+  };
+  const m = map[status] || map["đang hoạt động"];
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 6,
+      fontFamily: "var(--font-ui)", fontSize: 11, fontWeight: 600,
+      padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap",
+      background: `color-mix(in oklab, ${m.c} 12%, transparent)`,
+      color: m.c, border: `1px solid color-mix(in oklab, ${m.c} 32%, transparent)`,
+    }}>
+      <span style={{ width: 5, height: 5, borderRadius: 999, background: m.c, boxShadow: `0 0 8px ${m.c}` }}/>
+      {m.label}
+    </span>
+  );
+}
+
+// Local mirror of screen-classes.jsx's MetaCell (not exported there).
+function VehicleMetaCell({ label, value, mono }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-3)" }}>{label}</span>
+      <span style={{ fontFamily: mono ? "var(--font-mono)" : "var(--font-ui)", fontSize: 13, fontWeight: 600, color: "var(--fg-2)",
+                     fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
+    </div>
+  );
+}
+
+function VehicleCard({ v, isSelected, onToggle }) {
   const D = window.MGT_DATA;
   const b = D.getBranch(v.branchId);
   const rentals = D.rentalsForVehicle(v.id);
   const tone = window.useBranchTone(v.branchId);
-  // Prefer real rental revenue if any exists; fall back to sample so
-  // every card shows a populated number during the visual-data gap.
   const realRevenue = rentals.reduce((s, r) => s + r.amount, 0);
   const revenue = realRevenue > 0 ? realRevenue : sampleRevenueFor(v);
   return (
@@ -682,54 +704,39 @@ function VehicleCard({ v, isSelected, isAdmin, onToggle, onEdit }) {
                  background: `linear-gradient(135deg, color-mix(in oklab, ${tone} 9%, transparent), transparent 70%), var(--glass-2)`,
                  transform: isSelected ? "translateY(-2px)" : "none",
                }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {/* Header — icon + name (left), Sửa chip (right, admin only) */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: `linear-gradient(135deg, ${tone}, color-mix(in oklab, ${tone} 55%, var(--ink-0)))`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 0 16px color-mix(in oklab, ${tone} 52%, transparent)`,
-          }}>
-            <Icon name="bike" size={20} color="var(--ink-0)"/>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em",
-                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.name}</h3>
-            {/* Subheading row — plate (left) + branch name (right, toned). */}
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums",
-                             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.plate || "—"}</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Header — title (left) + (status pill above, branch below) stack (right). */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em",
+                           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.name}</h3>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              <VehicleStatusPill status={v.status}/>
               <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600, color: tone, whiteSpace: "nowrap" }}>{b ? b.name : "—"}</span>
             </div>
           </div>
-          {isAdmin && (
-            <span onClick={(e) => { e.stopPropagation(); onEdit(); }}
-                  style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase",
-                           color: "var(--fg-3)", cursor: "pointer", padding: "4px 8px", borderRadius: 8,
-                           border: "1px solid var(--glass-stroke)", whiteSpace: "nowrap" }}>Sửa</span>
-          )}
-        </div>
 
-        <Divider/>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-          <MicroStat label="Bằng"       value={v.licence || "—"}/>
-          <MicroStat label="Giá"        value={v.price ? window.fmtVND(v.price) : "—"} mono/>
-          <MicroStat label="Lượt thuê"  value={rentals.length} mono/>
+          {/* Meta — 2×2 grid mirroring the class card. */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", rowGap: 10, columnGap: 14,
+                        fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" }}>
+            <VehicleMetaCell label="Biển số" value={v.plate || "—"} mono/>
+            <VehicleMetaCell label="Bằng"    value={v.licence || "—"}/>
+            {/* Bottom row — bare big values: revenue (left), lượt thuê (right). */}
+            <span style={{
+              fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700,
+              color: "var(--neon-lime)", fontVariantNumeric: "tabular-nums",
+              letterSpacing: "-0.02em", lineHeight: 1,
+              textShadow: "0 0 12px color-mix(in oklab, var(--neon-lime) 55%, transparent)",
+            }}>{window.fmtVND(revenue)}</span>
+            <span style={{
+              fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700,
+              color: "var(--fg-1)", fontVariantNumeric: "tabular-nums",
+              letterSpacing: "-0.02em", lineHeight: 1,
+              textShadow: "0 0 10px rgba(255,255,255,0.18)",
+            }}>{rentals.length} <span style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600 }}>lượt thuê</span></span>
+          </div>
         </div>
-
-        {/* Bottom-right: total revenue. Big, lime, glowing — same visual
-            weight as the class card's revenue cell. */}
-        <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 2 }}>
-          <span style={{
-            fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700,
-            color: "var(--neon-lime)", fontVariantNumeric: "tabular-nums",
-            letterSpacing: "-0.02em", lineHeight: 1,
-            textShadow: "0 0 12px color-mix(in oklab, var(--neon-lime) 55%, transparent)",
-          }}>{window.fmtVND(revenue)}</span>
-        </div>
-      </div>
     </GlassCard>
   );
 }
