@@ -686,17 +686,18 @@ function VehiclesTab({ onOpenStudent, selectedId: selectedIdProp, onSelectedIdCh
 }
 
 // --------------------------------------------------------------------
-// VehicleCard — bike-iconed card, branch-toned, no status pill.
-//   Header  : bike logo + name (left)  +  branch name (right, toned)
-//             "Số xe XXX" sits under the name as the subheading. Practice-
-//             range vehicles get an internal vehicle number rather than a
-//             road plate, so the label is "Số xe", not "Biển số".
-//   Meta    : 2×2 grid
-//             top row    — small labelled cells: Bằng · Giá
-//             bottom row — bare big values: revenue (left) · "{n} lượt thuê" (right)
+// VehicleCard — bike-iconed card, branch-toned, no buttons. 5-row layout
+// mirroring ClassCard:
+//   Row 1 (header)  bike logo · h3 name (left)
+//   Row 2 (sub)     "XE SỐ N" (left) · branch name (right, toned)
+//   Row 3 (meta)    Bằng label  ·  Giá label
+//   Row 4 (meta)    Bằng value  ·  Giá value
+//   Row 5 (bare)    revenue (lime) · "{n} lượt thuê" (white)
 //
-// No buttons on the card — view-only; admin reaches "Thêm phương tiện"
-// + "Ghi nhận lượt thuê" from the tab header above.
+// "N" is the internal Xe số number (v.plate) — practice-range vehicles
+// don't have road plates, so the seed assigns sequential 1..6 integers.
+// Admin reaches "Thêm phương tiện" + "Ghi nhận lượt thuê" from the tab
+// header above; the card itself is view-only.
 // --------------------------------------------------------------------
 function sampleRevenueFor(v) {
   // Deterministic per-vehicle placeholder until the mock dataset rehaul
