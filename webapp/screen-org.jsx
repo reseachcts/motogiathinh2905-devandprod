@@ -870,6 +870,11 @@ function PasswordResetModal({ open, onClose, account, onSubmit }) {
 // Helper — unified error toast for write failures. Surfaces a friendly
 // Vietnamese message; falls back to the raw error.message for unknown
 // codes. Called by every MoreMenu action.
+//
+// Routes through window.MGT_TOAST (vanilla bottom-right) for consistency
+// with the rest of the app's soft-failure UX. Falls back to alert() only
+// if MGT_TOAST is unavailable (e.g. in unit-test harnesses that strip the
+// data-loader.js bootstrap).
 // --------------------------------------------------------------------
 function reportWriteError(e, fallback = "Lỗi") {
   const msg = String(e?.message || e || "");
@@ -879,7 +884,8 @@ function reportWriteError(e, fallback = "Lỗi") {
   else if (/password_too_short|password_too|password_weak/.test(msg)) friendly = "Mật khẩu chưa đạt yêu cầu (≥ 10 ký tự, có chữ và số).";
   else if (/forbidden|admin_only|requireAdmin/i.test(msg)) friendly = "Chỉ admin mới thực hiện được thao tác này.";
   else friendly = fallback + ": " + msg;
-  alert(friendly);
+  if (window.MGT_TOAST) window.MGT_TOAST(friendly);
+  else alert(friendly);
 }
 
 Object.assign(window, {

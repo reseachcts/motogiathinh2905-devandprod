@@ -192,11 +192,20 @@ function AppRoot() {
                            const { docFiles, ...rest } = payload;
                            const created = await D.api.createStudent(rest);
                            // Then upload any captured files. Independent so a
-                           // failed upload doesn't block the rest.
+                           // failed upload doesn't block the rest — but surface
+                           // each failure via toast (was console.warn-only,
+                           // invisible to the user).
                            await Promise.all(Object.entries(docFiles || {}).map(
-                             ([key, file]) => file ? D.api.uploadStudentDoc(created.id, key, file).catch(e => console.warn('upload failed', key, e)) : null
+                             ([key, file]) => file ? D.api.uploadStudentDoc(created.id, key, file).catch(e => {
+                               console.warn('upload failed', key, e);
+                               if (window.MGT_TOAST) window.MGT_TOAST(`Lỗi tải tài liệu ${key}: ${e.message}`);
+                             }) : null
                            ));
-                         } catch (e) { alert("Lỗi: " + e.message); }
+                         } catch (e) {
+                           // Surface the create failure as a toast (was alert).
+                           if (window.MGT_TOAST) window.MGT_TOAST("Lỗi tạo học viên: " + e.message);
+                           else alert("Lỗi: " + e.message);
+                         }
                        }}/>
       <AddPaymentModal open={addPayment.open} defaultStudentId={addPayment.studentId}
                        defaultAmount={addPayment.amount}

@@ -38,10 +38,12 @@ const assert = (cond, msg) => { if (!cond) { console.error('  ✗', msg); proces
     api('/api/payments'), api('/api/notifications'), api('/api/activity-log'),
     api('/api/constants/profile-docs'),
   ]);
-  assert(branches.length === 3, `branches=${branches.length}`);
-  assert(students.length === 1208, `students=${students.length}`);
-  assert(payments.length === 1332, `payments=${payments.length}`);
-  assert(classes.length === 167, `classes=${classes.length}`);
+  // Use lower-bound thresholds rather than exact counts so the smoke test
+  // doesn't flake when prior e2e / write-flow runs add to the seeded DB.
+  assert(branches.length >= 3, `branches=${branches.length}`);
+  assert(students.length >= 1208, `students=${students.length}`);
+  assert(payments.length >= 1332, `payments=${payments.length}`);
+  assert(classes.length >= 167, `classes=${classes.length}`);
   assert(docs.length === 4, `profile docs=${docs.length}`);
   assert(typeof students[0].docs_cccd === 'boolean', 'student docs_cccd is bool');
   assert(typeof payments[0].bienLaiPhoto === 'boolean', 'payment bienLaiPhoto is bool');
