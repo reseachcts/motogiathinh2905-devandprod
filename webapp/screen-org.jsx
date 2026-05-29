@@ -595,13 +595,15 @@ function VehiclesTab() {
   const [selectedId, setSelectedId] = React.useState(null);
   const isAdmin = D.currentUser?.role === "admin";
   const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
+  // `price` is intentionally NOT editable here — it ships from the seed
+  // dataset (see task #53). Surfacing it in the create/edit dialog would
+  // tempt operators to bypass the source-of-truth CSV.
   const vehicleFields = [
     { id: "name",     label: "Tên xe",       type: "text",   placeholder: "Honda Wave Alpha", fullWidth: true },
     { id: "licence",  label: "Bằng",         type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
     { id: "branchId", label: "Chi nhánh",    type: "select", options: branchOpts },
     { id: "plate",    label: "Biển số",      type: "text",   placeholder: "59-K1 123.45" },
     { id: "year",     label: "Năm sản xuất", type: "int",    placeholder: "2024" },
-    { id: "price",    label: "Giá thuê (đ/lượt)", type: "money", placeholder: "20,000", fullWidth: true },
   ];
   const editing = editingId ? D.vehicles.find(x => x.id === editingId) : null;
   const toggle  = (id) => setSelectedId(s => s === id ? null : id);
@@ -629,66 +631,106 @@ function VehiclesTab() {
         defaultVehicleId={selectedId || D.vehicles[0]?.id}/>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
-        {D.vehicles.map(v => {
-          const b = D.getBranch(v.branchId);
-          const isSelected = selectedId === v.id;
-          const rentals = D.rentalsForVehicle(v.id);
-          const tone = "var(--neon-cyan)";
-          return (
-            <GlassCard key={v.id} padding={22}
-                       onClick={() => toggle(v.id)}
-                       style={{
-                         cursor: "pointer",
-                         transition: "all 220ms var(--ease-out)",
-                         borderColor: isSelected ? tone : "var(--glass-stroke)",
-                         boxShadow: isSelected
-                           ? `0 0 0 1px ${tone}, 0 0 28px color-mix(in oklab, ${tone} 42%, transparent), var(--shadow-2)`
-                           : `0 0 18px color-mix(in oklab, ${tone} 14%, transparent), var(--shadow-2)`,
-                         background: `linear-gradient(135deg, color-mix(in oklab, ${tone} 9%, transparent), transparent 70%), var(--glass-2)`,
-                         transform: isSelected ? "translateY(-2px)" : "none",
-                       }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: 12,
-                    background: `linear-gradient(135deg, ${tone}, color-mix(in oklab, ${tone} 55%, var(--ink-0)))`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    boxShadow: `0 0 16px color-mix(in oklab, ${tone} 52%, transparent)`,
-                  }}>
-                    <Icon name="bike" size={20} color="var(--ink-0)"/>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em",
-                                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.name}</h3>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{v.plate || "—"} · {v.year || "—"}</span>
-                  </div>
-                </div>
-
-                <Divider/>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                  <MicroStat label="Bằng" value={v.licence || "—"}/>
-                  <MicroStat label="Giá"  value={v.price ? window.fmtVND(v.price) : "—"} mono color="var(--neon-lime)"/>
-                  <MicroStat label="Lượt thuê" value={rentals.length} mono/>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 4 }}>
-                  <span style={{ flex: 1, fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-3)" }}>{b ? b.name : "—"}</span>
-                  {isAdmin && (
-                    <span onClick={(e) => { e.stopPropagation(); setEditingId(v.id); }}
-                          style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase",
-                                   color: "var(--fg-3)", cursor: "pointer", padding: "4px 8px", borderRadius: 8,
-                                   border: "1px solid var(--glass-stroke)" }}>Sửa</span>
-                  )}
-                </div>
-              </div>
-            </GlassCard>
-          );
-        })}
+        {D.vehicles.map(v => <VehicleCard key={v.id} v={v} isSelected={selectedId === v.id}
+                                          isAdmin={isAdmin}
+                                          onToggle={() => toggle(v.id)}
+                                          onEdit={() => setEditingId(v.id)}/>)}
       </div>
 
       {selectedId && <VehicleExpanded vehicleId={selectedId}/>}
     </div>
+  );
+}
+
+// --------------------------------------------------------------------
+// VehicleCard — branch-toned card mirroring the ClassCard pattern.
+//   Header     : icon · name (left)  +  branch name (top-right, toned)
+//                + small Sửa chip (admin only, stops card-click)
+//   Subheading : plate only (year removed per spec)
+//   Body       : 3-up microstat row (Bằng · Giá · Lượt thuê)
+//   Bottom-rt  : sample total revenue (large, lime). The sample comes
+//                from sampleRevenueFor() and is replaced by real rental
+//                sums once the seed rehaul (task #53) lands.
+// --------------------------------------------------------------------
+function sampleRevenueFor(v) {
+  // Deterministic per-vehicle placeholder until the mock dataset rehaul
+  // populates real rental history. Scaled to look like a couple-million-
+  // VND-per-month number so the card has visual weight at demo time.
+  const n = parseInt((String(v.id).match(/\d+/) || [1])[0], 10) || 1;
+  return (n * 7 + 13) * 137000;
+}
+
+function VehicleCard({ v, isSelected, isAdmin, onToggle, onEdit }) {
+  const D = window.MGT_DATA;
+  const b = D.getBranch(v.branchId);
+  const rentals = D.rentalsForVehicle(v.id);
+  const tone = window.useBranchTone(v.branchId);
+  // Prefer real rental revenue if any exists; fall back to sample so
+  // every card shows a populated number during the visual-data gap.
+  const realRevenue = rentals.reduce((s, r) => s + r.amount, 0);
+  const revenue = realRevenue > 0 ? realRevenue : sampleRevenueFor(v);
+  return (
+    <GlassCard padding={22}
+               onClick={onToggle}
+               style={{
+                 cursor: "pointer",
+                 transition: "all 220ms var(--ease-out)",
+                 borderColor: isSelected ? tone : "var(--glass-stroke)",
+                 boxShadow: isSelected
+                   ? `0 0 0 1px ${tone}, 0 0 28px color-mix(in oklab, ${tone} 42%, transparent), var(--shadow-2)`
+                   : `0 0 18px color-mix(in oklab, ${tone} 14%, transparent), var(--shadow-2)`,
+                 background: `linear-gradient(135deg, color-mix(in oklab, ${tone} 9%, transparent), transparent 70%), var(--glass-2)`,
+                 transform: isSelected ? "translateY(-2px)" : "none",
+               }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* Header — icon + name (left), Sửa chip (right, admin only) */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12,
+            background: `linear-gradient(135deg, ${tone}, color-mix(in oklab, ${tone} 55%, var(--ink-0)))`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: `0 0 16px color-mix(in oklab, ${tone} 52%, transparent)`,
+          }}>
+            <Icon name="bike" size={20} color="var(--ink-0)"/>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em",
+                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.name}</h3>
+            {/* Subheading row — plate (left) + branch name (right, toned). */}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+              <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums",
+                             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.plate || "—"}</span>
+              <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600, color: tone, whiteSpace: "nowrap" }}>{b ? b.name : "—"}</span>
+            </div>
+          </div>
+          {isAdmin && (
+            <span onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                  style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase",
+                           color: "var(--fg-3)", cursor: "pointer", padding: "4px 8px", borderRadius: 8,
+                           border: "1px solid var(--glass-stroke)", whiteSpace: "nowrap" }}>Sửa</span>
+          )}
+        </div>
+
+        <Divider/>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <MicroStat label="Bằng"       value={v.licence || "—"}/>
+          <MicroStat label="Giá"        value={v.price ? window.fmtVND(v.price) : "—"} mono/>
+          <MicroStat label="Lượt thuê"  value={rentals.length} mono/>
+        </div>
+
+        {/* Bottom-right: total revenue. Big, lime, glowing — same visual
+            weight as the class card's revenue cell. */}
+        <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 2 }}>
+          <span style={{
+            fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700,
+            color: "var(--neon-lime)", fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.02em", lineHeight: 1,
+            textShadow: "0 0 12px color-mix(in oklab, var(--neon-lime) 55%, transparent)",
+          }}>{window.fmtVND(revenue)}</span>
+        </div>
+      </div>
+    </GlassCard>
   );
 }
 
@@ -704,7 +746,7 @@ function VehicleExpanded({ vehicleId }) {
   const v = D.getVehicle(vehicleId);
   const b = D.getBranch(v?.branchId);
   const rentals = D.rentalsForVehicle(vehicleId);
-  const tone = "var(--neon-cyan)";
+  const tone = window.useBranchTone(v?.branchId);
   const sortOpts = [
     { id: "createdAtMs:desc", label: "Mới → Cũ" },
     { id: "createdAtMs:asc",  label: "Cũ → Mới" },
