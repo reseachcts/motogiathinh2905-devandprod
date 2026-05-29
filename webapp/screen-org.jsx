@@ -36,9 +36,14 @@ function PasswordChecks({ value, checks = PASSWORD_CHECKS }) {
   );
 }
 
-function OrganizationScreen({ onOpenClass, onOpenStudent }) {
+function OrganizationScreen({ onOpenClass, onOpenStudent,
+                              tab: tabProp, onTabChange,
+                              vehicleSelectedId, onVehicleSelectedIdChange }) {
   const D = window.MGT_DATA;
-  const [tab, setTab] = React.useState("branches");
+  // Controlled tab when App lifts it; otherwise self-managed.
+  const [localTab, setLocalTab] = React.useState("branches");
+  const tab    = tabProp ?? localTab;
+  const setTab = onTabChange ?? setLocalTab;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -57,7 +62,9 @@ function OrganizationScreen({ onOpenClass, onOpenStudent }) {
       {tab === "fees"     && <FeesTab/>}
       {tab === "promos"   && <PromosTab/>}
       {tab === "teachers" && <TeachersTab/>}
-      {tab === "vehicles" && <VehiclesTab onOpenStudent={onOpenStudent}/>}
+      {tab === "vehicles" && <VehiclesTab onOpenStudent={onOpenStudent}
+                                           selectedId={vehicleSelectedId}
+                                           onSelectedIdChange={onVehicleSelectedIdChange}/>}
       {tab === "activity" && <ActivityTab/>}
     </div>
   );
@@ -583,11 +590,14 @@ function TeachersTab() {
   );
 }
 
-function VehiclesTab({ onOpenStudent }) {
+function VehiclesTab({ onOpenStudent, selectedId: selectedIdProp, onSelectedIdChange }) {
   const D = window.MGT_DATA;
   const [createOpen, setCreateOpen] = React.useState(false);
   const [rentOpen,   setRentOpen]   = React.useState(false);
-  const [selectedId, setSelectedId] = React.useState(null);
+  // Controlled selection (when App lifts it) or self-managed fallback.
+  const [localSelectedId, setLocalSelectedId] = React.useState(null);
+  const selectedId    = selectedIdProp !== undefined ? selectedIdProp : localSelectedId;
+  const setSelectedId = onSelectedIdChange       || setLocalSelectedId;
   const isAdmin = D.currentUser?.role === "admin";
   const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
   // Vehicle reg code is the internal "Xe số N" identifier, not a road
@@ -857,7 +867,11 @@ function VehicleExpanded({ vehicleId, onOpenStudent }) {
                 const clickable = !!onOpenStudent && !!stu;
                 return (
                   <div key={r.id}
-                       onClick={() => clickable && onOpenStudent(r.studentId, { tab: "payments", rentalId: r.id })}
+                       onClick={() => clickable && onOpenStudent(r.studentId, {
+                         tab: "payments",
+                         rentalId: r.id,
+                         from: { type: "vehicle", vehicleId: v.id, plate: v.plate },
+                       })}
                        style={{
                          display: "grid", gridTemplateColumns: "150px 1fr 80px 120px 1fr",
                          padding: "12px 14px", gap: 12, alignItems: "center",

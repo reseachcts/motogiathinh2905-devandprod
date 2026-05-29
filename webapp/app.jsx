@@ -78,6 +78,13 @@ function AppRoot() {
   const [tab, setTab]       = React.useState("dashboard");
   const [detail, setDetail] = React.useState(null);
   const [navCollapsed, setNavCollapsed] = React.useState(!!printMode);
+  // Lifted state for the Tổ chức screen — needed because clicking a
+  // vehicle's rental row swaps detail to a student profile, unmounting
+  // OrganizationScreen. Holding these at App level lets the back-button
+  // from a vehicle-sourced student profile return to the exact same
+  // Phương tiện sub-tab with the same vehicle card still open.
+  const [orgTab, setOrgTab]                 = React.useState("branches");
+  const [orgVehicleSelectedId, setOrgVehSel] = React.useState(null);
 
   // modals
   const [addStudent, setAddStudent] = React.useState(false);
@@ -87,11 +94,29 @@ function AppRoot() {
 
   const unread = D.notifications.filter(n => !n.read).length;
 
-  // Navigation helpers
+  // Navigation helpers — openStudent flips the top-level tab to
+  // "students" so the sidebar reflects what's actually being viewed
+  // (the student profile), regardless of which list the user came from.
   const goTab = (id) => { setTab(id); setDetail(null); };
-  const openStudent = (id, opts) => setDetail({ type: "student", id, ...(opts || {}) });
+  const openStudent = (id, opts) => { setTab("students"); setDetail({ type: "student", id, ...(opts || {}) }); };
   const openPayment = (id) => setDetail({ type: "payment", id });
   const openClass   = (id) => { setTab("classes"); setDetail({ type: "class", id }); };
+
+  // Back-button handler. Honours the optional `from` marker on the
+  // current detail object — including the vehicle-card case which jumps
+  // back to Tổ chức → Phương tiện with the selected vehicle restored.
+  const goBack = () => {
+    const f = detail?.from;
+    if (f?.type === "vehicle") {
+      setOrgTab("vehicles");
+      setOrgVehSel(f.vehicleId);
+      setTab("organization");
+      setDetail(null);
+      return;
+    }
+    if (f) { setDetail(f); return; }
+    setDetail(null);
+  };
 
   const TITLES = {
     dashboard:    { title: "Tổng quan"            },
@@ -125,14 +150,15 @@ function AppRoot() {
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         {/* Detail back link sits ABOVE the title row */}
         {detail && (
-          <button onClick={() => detail.from ? setDetail(detail.from) : setDetail(null)} style={{
+          <button onClick={goBack} style={{
             background: "transparent", border: "none", color: "var(--fg-3)",
             fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 500, cursor: "pointer",
             display: "inline-flex", alignItems: "center", gap: 6, padding: 0, alignSelf: "flex-start",
             marginBottom: 8,
           }}>
             <Icon name="arrow-up" size={14} style={{ transform: "rotate(-90deg)" }}/>
-            {detail.from?.type === "class"     ? `Quay lại lớp ${D.getClass(detail.from.id)?.code || ""}` :
+            {detail.from?.type === "vehicle"   ? `Quay lại Xe số ${detail.from.plate || ""}` :
+             detail.from?.type === "class"     ? `Quay lại lớp ${D.getClass(detail.from.id)?.code || ""}` :
              detail.from?.type === "student"   ? `Quay lại học viên ${D.getStudent(detail.from.id)?.name || ""}` :
              detail.from?.type === "payment"   ? "Quay lại thanh toán" :
              /* Fall back to the current tab — label the list the user came from. */
@@ -189,7 +215,10 @@ function AppRoot() {
                                                                   onAddClass={() => setAddClass(true)}
                                                                   isAdmin={isAdmin}/>}
             {!detail && tab === "notifications" && <NotificationsScreen onOpenStudent={openStudent}/>}
-            {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass} onOpenStudent={openStudent}/>}
+            {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass} onOpenStudent={openStudent}
+                                                                        tab={orgTab} onTabChange={setOrgTab}
+                                                                        vehicleSelectedId={orgVehicleSelectedId}
+                                                                        onVehicleSelectedIdChange={setOrgVehSel}/>}
           </ScreenErrorBoundary>
         </div>
       </main>
