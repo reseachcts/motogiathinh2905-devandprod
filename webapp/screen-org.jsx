@@ -7,33 +7,29 @@
 // Used by both the "Tạo tài khoản mới" dialog and PasswordResetModal so
 // the rules shown match what the server will accept on submit.
 const PASSWORD_CHECKS = [
-  { label: "≥ 8 ký tự",         test: (v) => (v || "").length >= 8 },
-  { label: "≥ 1 chữ thường (a–z)",  test: (v) => /[a-z]/.test(v || "") },
-  { label: "≥ 1 chữ HOA (A–Z)",     test: (v) => /[A-Z]/.test(v || "") },
-  { label: "≥ 1 chữ số",        test: (v) => /\d/.test(v || "") },
-  { label: "≥ 1 ký tự đặc biệt", test: (v) => /[!@#$%^&*()_+\-={}\[\]|\\:;"'<>,.?/~`]/.test(v || "") },
+  { label: "≥ 8 ký tự",                       test: (v) => (v || "").length >= 8 },
+  { label: "≥ 1 chữ cái thường (a–z)",        test: (v) => /[a-z]/.test(v || "") },
+  { label: "≥ 1 chữ cái HOA (A–Z)",           test: (v) => /[A-Z]/.test(v || "") },
+  { label: "≥ 1 chữ số (0–9)",                test: (v) => /\d/.test(v || "") },
+  { label: "≥ 1 ký tự đặc biệt (!@#$…)",      test: (v) => /[!@#$%^&*()_+\-={}\[\]|\\:;"'<>,.?/~`]/.test(v || "") },
 ];
 function pwOk(v) { return PASSWORD_CHECKS.every(c => c.test(v)); }
 
 function PasswordChecks({ value, checks = PASSWORD_CHECKS }) {
   return (
     <div style={{
-      display: "grid", gridTemplateColumns: "1fr 1fr",
-      gap: "4px 16px", marginTop: 6,
+      display: "flex", flexDirection: "column",
+      gap: 3, marginTop: 6,
     }}>
       {checks.map((c, i) => {
         const pass = c.test(value || "");
         return (
-          <div key={i} style={{
-            display: "flex", alignItems: "center", gap: 6,
+          <span key={i} style={{
             fontFamily: "var(--font-mono)", fontSize: 10,
             letterSpacing: "0.06em",
             color: pass ? "var(--neon-lime)" : "var(--fg-4)",
             transition: "color 160ms var(--ease-out)",
-          }}>
-            <Icon name={pass ? "check" : "minus"} size={11}/>
-            <span>{c.label}</span>
-          </div>
+          }}>{c.label}</span>
         );
       })}
     </div>
@@ -304,10 +300,10 @@ function AccountsTab() {
   const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
   const accountCreateFields = [
     { id: "name",     label: "Họ tên",                  type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
-    { id: "phone",    label: "Số điện thoại",           type: "phone",  placeholder: "090 123 4567" },
-    { id: "email",    label: "Tên đăng nhập (Email)",   type: "text",   placeholder: "you@motogiathinh.vn" },
     { id: "role",     label: "Vai trò",                 type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }] },
     { id: "branchId", label: "Chi nhánh",               type: "select", options: branchOpts },
+    { id: "email",    label: "Tên đăng nhập (Email)",   type: "text",   placeholder: "you@motogiathinh.vn" },
+    { id: "phone",    label: "Số điện thoại",           type: "phone",  placeholder: "090 123 4567" },
     { id: "password", label: "Mật khẩu tạm thời",       type: "password", placeholder: "Mật khẩu mới",
       fullWidth: true, checks: PASSWORD_CHECKS },
   ];
