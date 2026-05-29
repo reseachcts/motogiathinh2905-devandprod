@@ -242,7 +242,7 @@ function StudentsScreen({ onOpenStudent, onAddStudent }) {
 // ====================================================================
 // Student Detail — pill tabs: Thông tin / Thanh toán
 // ====================================================================
-function StudentDetail({ studentId, initialTab, initialPaymentId, onBack, onOpenPayment, onAddPayment }) {
+function StudentDetail({ studentId, initialTab, initialPaymentId, initialRentalId, onBack, onOpenPayment, onAddPayment }) {
   const D = window.MGT_DATA;
   const s = D.getStudent(studentId);
   const [tab, setTab] = React.useState(initialTab || "info");
@@ -288,6 +288,7 @@ function StudentDetail({ studentId, initialTab, initialPaymentId, onBack, onOpen
       {tab === "payments" && (
         <StudentPaymentsTab student={s} payments={studentPayments}
                              initialPaymentId={initialPaymentId}
+                             initialRentalId={initialRentalId}
                              onAddPayment={onAddPayment}/>
       )}
     </div>
@@ -458,7 +459,7 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
   );
 }
 
-function StudentPaymentsTab({ student, payments, initialPaymentId, onAddPayment }) {
+function StudentPaymentsTab({ student, payments, initialPaymentId, initialRentalId, onAddPayment }) {
   // Wrapper render below assembles two stacked cards: the original
   // payment ledger card + the new vehicle-rental card. We keep the
   // payments logic in the inner Card component so this outer fn stays
@@ -468,7 +469,7 @@ function StudentPaymentsTab({ student, payments, initialPaymentId, onAddPayment 
       <StudentPaymentsCard student={student} payments={payments}
                             initialPaymentId={initialPaymentId}
                             onAddPayment={onAddPayment}/>
-      <StudentRentalsCard student={student}/>
+      <StudentRentalsCard student={student} initialRentalId={initialRentalId}/>
     </div>
   );
 }
@@ -639,7 +640,7 @@ function StudentPaymentsCard({ student, payments, initialPaymentId, onAddPayment
 // cumulative columns. The action button reuses the same RentVehicleModal
 // used on the Phương tiện page, with the student pre-locked.
 // --------------------------------------------------------------------
-function StudentRentalsCard({ student }) {
+function StudentRentalsCard({ student, initialRentalId }) {
   const D = window.MGT_DATA;
   const RentVehicleModal = window.RentVehicleModal;
   const [rentOpen, setRentOpen] = React.useState(false);
@@ -650,6 +651,21 @@ function StudentRentalsCard({ student }) {
   );
   const totalAmount = rentals.reduce((s, r) => s + r.amount, 0);
   const totalRounds = rentals.reduce((s, r) => s + (r.rentalRounds || 0), 0);
+
+  // When the page is opened with `initialRentalId` (e.g. coming from the
+  // vehicle detail card via onOpenStudent), scroll that row into view and
+  // flash a brief cyan highlight so the user sees where they landed.
+  const rowRefs = React.useRef({});
+  const [flashId, setFlashId] = React.useState(initialRentalId || null);
+  React.useEffect(() => {
+    if (!initialRentalId) return;
+    const el = rowRefs.current[initialRentalId];
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    setFlashId(initialRentalId);
+    const t = setTimeout(() => setFlashId(null), 2200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRentalId]);
   return (
     <GlassCard padding={24}>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -697,12 +713,18 @@ function StudentRentalsCard({ student }) {
             {sorted.map((r, i) => {
               const v = D.getVehicle(r.vehicleId);
               const isLast = i === sorted.length - 1;
+              const isFlash = flashId === r.id;
               return (
-                <div key={r.id} style={{
-                  display: "grid", gridTemplateColumns: "130px 90px 1.1fr 1.1fr 1.1fr 100px 60px",
-                  padding: "14px 12px", gap: 12, alignItems: "center",
-                  borderBottom: isLast ? "none" : "1px solid var(--ink-4)",
-                }}>
+                <div key={r.id}
+                     ref={el => { if (el) rowRefs.current[r.id] = el; }}
+                     style={{
+                       display: "grid", gridTemplateColumns: "130px 90px 1.1fr 1.1fr 1.1fr 100px 60px",
+                       padding: "14px 12px", gap: 12, alignItems: "center",
+                       borderBottom: isLast ? "none" : "1px solid var(--ink-4)",
+                       background: isFlash ? "color-mix(in oklab, var(--neon-cyan) 14%, transparent)" : "transparent",
+                       boxShadow: isFlash ? "inset 0 0 0 1px var(--neon-cyan), 0 0 22px var(--neon-cyan-haze)" : "none",
+                       transition: "background 600ms var(--ease-out), box-shadow 600ms var(--ease-out)",
+                     }}>
                   {/* Thời điểm — date + time stacked, same style as the payment row */}
                   <div style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 2 }}>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--fg-1)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt.split(" ").slice(0, 2).join(" ")}</span>

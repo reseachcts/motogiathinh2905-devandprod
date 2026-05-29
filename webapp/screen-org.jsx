@@ -36,7 +36,7 @@ function PasswordChecks({ value, checks = PASSWORD_CHECKS }) {
   );
 }
 
-function OrganizationScreen({ onOpenClass }) {
+function OrganizationScreen({ onOpenClass, onOpenStudent }) {
   const D = window.MGT_DATA;
   const [tab, setTab] = React.useState("branches");
 
@@ -57,7 +57,7 @@ function OrganizationScreen({ onOpenClass }) {
       {tab === "fees"     && <FeesTab/>}
       {tab === "promos"   && <PromosTab/>}
       {tab === "teachers" && <TeachersTab/>}
-      {tab === "vehicles" && <VehiclesTab/>}
+      {tab === "vehicles" && <VehiclesTab onOpenStudent={onOpenStudent}/>}
       {tab === "activity" && <ActivityTab/>}
     </div>
   );
@@ -583,7 +583,7 @@ function TeachersTab() {
   );
 }
 
-function VehiclesTab() {
+function VehiclesTab({ onOpenStudent }) {
   const D = window.MGT_DATA;
   const [createOpen, setCreateOpen] = React.useState(false);
   const [rentOpen,   setRentOpen]   = React.useState(false);
@@ -665,7 +665,7 @@ function VehiclesTab() {
                          onToggle={() => toggle(v.id)}/>
             {i === panelAfter && (
               <div style={{ gridColumn: "1 / -1" }}>
-                <VehicleExpanded vehicleId={selectedId}/>
+                <VehicleExpanded vehicleId={selectedId} onOpenStudent={onOpenStudent}/>
               </div>
             )}
           </React.Fragment>
@@ -791,7 +791,7 @@ function VehicleCard({ v, isSelected, onToggle }) {
 // top-right hosts a Sort menu (no Đóng button — re-click the same card
 // to collapse) per user spec.
 // --------------------------------------------------------------------
-function VehicleExpanded({ vehicleId }) {
+function VehicleExpanded({ vehicleId, onOpenStudent }) {
   const D = window.MGT_DATA;
   const v = D.getVehicle(vehicleId);
   const b = D.getBranch(v?.branchId);
@@ -854,12 +854,19 @@ function VehicleExpanded({ vehicleId }) {
               {sorted.map((r, i) => {
                 const stu = D.getStudent(r.studentId);
                 const staff = D.getStaff(r.staffId);
+                const clickable = !!onOpenStudent && !!stu;
                 return (
-                  <div key={r.id} style={{
-                    display: "grid", gridTemplateColumns: "150px 1fr 80px 120px 1fr",
-                    padding: "12px 14px", gap: 12, alignItems: "center",
-                    borderBottom: i < sorted.length - 1 ? "1px solid var(--ink-4)" : "none",
-                  }}>
+                  <div key={r.id}
+                       onClick={() => clickable && onOpenStudent(r.studentId, { tab: "payments", rentalId: r.id })}
+                       style={{
+                         display: "grid", gridTemplateColumns: "150px 1fr 80px 120px 1fr",
+                         padding: "12px 14px", gap: 12, alignItems: "center",
+                         borderBottom: i < sorted.length - 1 ? "1px solid var(--ink-4)" : "none",
+                         cursor: clickable ? "pointer" : "default",
+                         transition: "background 140ms var(--ease-out)",
+                       }}
+                       onMouseEnter={(e) => { if (clickable) e.currentTarget.style.background = "var(--glass-2)"; }}
+                       onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-2)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt}</span>
                     <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-1)" }}>{stu?.name || r.studentId}</span>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--fg-1)", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{r.rentalRounds || 0}</span>

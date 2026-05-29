@@ -165,6 +165,7 @@ function AppRoot() {
               <StudentDetail studentId={detail.id}
                              initialTab={detail.tab}
                              initialPaymentId={detail.paymentId}
+                             initialRentalId={detail.rentalId}
                              onBack={() => setDetail(null)}
                              onAddPayment={(studentId, amount) => setAddPayment({ open: true, studentId, amount })}
                              onOpenPayment={openPayment}/>
@@ -188,7 +189,7 @@ function AppRoot() {
                                                                   onAddClass={() => setAddClass(true)}
                                                                   isAdmin={isAdmin}/>}
             {!detail && tab === "notifications" && <NotificationsScreen onOpenStudent={openStudent}/>}
-            {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass}/>}
+            {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass} onOpenStudent={openStudent}/>}
           </ScreenErrorBoundary>
         </div>
       </main>
