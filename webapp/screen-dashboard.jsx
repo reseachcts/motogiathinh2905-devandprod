@@ -799,13 +799,32 @@ function useTimeFrame(initial = "rolling-30") {
 
   const presets = presetsForGrain(grain);
   const active  = presets.find(p => p.id === preset) || presets[1];
-  const frame   = customRange
-    ? { count: Math.max(1, Math.round((customRange.end - customRange.start) / 86400000)), mode: "rolling" }
+
+  // Custom-range bucket count is grain-aware: hours / days / months
+  // depending on the active unit (was always days before — caused month
+  // grain + custom range to produce hundreds of monthly buckets).
+  function customCount(range, gr) {
+    if (gr === "hour")  return Math.max(1, Math.ceil((range.end - range.start) / 3_600_000));
+    if (gr === "month") return Math.max(1,
+      (range.end.getFullYear() - range.start.getFullYear()) * 12
+      + (range.end.getMonth() - range.start.getMonth()) + 1);
+    return Math.max(1, Math.round((range.end - range.start) / 86_400_000) + 1);
+  }
+  const frame = customRange
+    ? { count: customCount(customRange, grain), mode: "rolling" }
     : active.getFrame(grain);
+
+  // Heading suffix for the chart. Row-0 presets are anonymous numbers
+  // ("rolling 30") — leave the heading as "N units gần nhất". Row-1
+  // presets and custom ranges have a human label ("Tháng này",
+  // "Tùy chỉnh") that should appear instead.
+  const frameLabel = customRange
+    ? "Tùy chỉnh"
+    : (active.row === 1 ? active.label : null);
 
   return {
     grain, setGrain, preset, setPreset, customRange, setCustomRange,
-    count: frame.count, mode: frame.mode, presets,
+    count: frame.count, mode: frame.mode, presets, frameLabel,
   };
 }
 
@@ -814,7 +833,7 @@ function useTimeFrame(initial = "rolling-30") {
 // ====================================================================
 function SectionTong() {
   const tf = useTimeFrame();
-  const { grain, count, mode } = tf;
+  const { grain, count, mode, frameLabel } = tf;
 
   const D = window.MGT_DATA;
   const revCum = D.revenueCumulative(grain, count, mode);
@@ -847,8 +866,8 @@ function SectionTong() {
       {/* 2 cumulative line charts — clicking a card expands it to full width.
           Click again (or click the other card) to swap focus. */}
       <ExpandableChartGrid charts={[
-        { key: "revenue",  node: (exp, tog, prev, setPrev, pos) => <CumChart kind="revenue"  data={revCum} count={count} expanded={exp} onToggle={tog} previewing={prev} setPreviewing={setPrev} position={pos}/> },
-        { key: "students", node: (exp, tog, prev, setPrev, pos) => <CumChart kind="students" data={stuCum} count={count} expanded={exp} onToggle={tog} previewing={prev} setPreviewing={setPrev} position={pos}/> },
+        { key: "revenue",  node: (exp, tog, prev, setPrev, pos) => <CumChart kind="revenue"  data={revCum} grain={grain} frameLabel={frameLabel} expanded={exp} onToggle={tog} previewing={prev} setPreviewing={setPrev} position={pos}/> },
+        { key: "students", node: (exp, tog, prev, setPrev, pos) => <CumChart kind="students" data={stuCum} grain={grain} frameLabel={frameLabel} expanded={exp} onToggle={tog} previewing={prev} setPreviewing={setPrev} position={pos}/> },
       ]}/>
     </>
   );
@@ -981,7 +1000,7 @@ function TongKpi({ label, value, color, big, dim }) {
   );
 }
 
-function CumChart({ kind, data, count, expanded, onToggle, previewing, setPreviewing, position }) {
+function CumChart({ kind, data, grain, frameLabel, expanded, onToggle, previewing, setPreviewing, position }) {
   const [hidden, setHidden] = React.useState(new Set());
   const toggle = (id) => { const n = new Set(hidden); n.has(id) ? n.delete(id) : n.add(id); setHidden(n); };
   const labels = data.map(d => d.label);
@@ -991,6 +1010,14 @@ function CumChart({ kind, data, count, expanded, onToggle, previewing, setPrevie
   // When expanded, give the LineChart a wider aspect (matches SoSanhChart).
   const chartW = expanded ? 1100 : 720;
   const chartH = expanded ? 300  : 240;
+  // Heading driven by grain prop (NOT inferred from label shape — "29/05"
+  // and "05/26" both match the day pattern, mislabeling month-grain charts).
+  // frameLabel is set for row-1 presets ("Tháng này") and custom ranges;
+  // otherwise we use the generic "N units gần nhất" form.
+  const unit = grain === "hour" ? "giờ" : grain === "month" ? "tháng" : "ngày";
+  const heading = frameLabel
+    ? `${frameLabel} · ${data.length} ${unit}`
+    : `${data.length} ${unit} gần nhất`;
 
   if (kind === "revenue") {
     const series = [
@@ -1007,7 +1034,7 @@ function CumChart({ kind, data, count, expanded, onToggle, previewing, setPrevie
               <div style={{ display: "flex", alignItems: "flex-start" }}>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>DOANH THU · CỘNG DỒN</span>
-                  <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{data.length} {labels[0].includes("h") ? "giờ" : labels[0].split("/").length === 2 && labels[0].length === 5 ? "ngày" : "tháng"} gần nhất</h3>
+                  <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{heading}</h3>
                 </div>
               </div>
               <ToggleLegend items={series} hidden={hidden} onToggle={toggle}/>
@@ -1034,7 +1061,7 @@ function CumChart({ kind, data, count, expanded, onToggle, previewing, setPrevie
             <div style={{ display: "flex", alignItems: "flex-start" }}>
               <div style={{ flex: 1 }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>HỌC VIÊN · CỘNG DỒN</span>
-                <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{data.length} {labels[0].includes("h") ? "giờ" : labels[0].split("/").length === 2 && labels[0].length === 5 ? "ngày" : "tháng"} gần nhất</h3>
+                <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{heading}</h3>
               </div>
             </div>
             <ToggleLegend items={series} hidden={hidden} onToggle={toggle}/>
