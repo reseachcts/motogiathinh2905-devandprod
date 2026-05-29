@@ -15,7 +15,7 @@ import {
   db, logActivity, nowDdMmYyyy, nowDdMmYyyyHHMMSS,
   nextMaHV, nextBienLaiId, genId, coerceBools,
 } from '../db.js';
-import { requireAuth, requireAdmin, hashPassword, publicAccount } from '../auth.js';
+import { requireAuth, requireAdmin, hashPassword, publicAccount, passwordPolicy } from '../auth.js';
 import { recomputeAfterWrite } from '../notifications.js';
 import { validators as V, check, bad as badV } from '../validation.js';
 
@@ -257,6 +257,31 @@ function makeAdminCreator(table, prefix, fields, opts = {}) {
   };
 }
 
+// Branches — admin-only CRUD with FK-aware DELETE.
+router.post('/branches', requireAdmin, makeAdminCreator('branches', 'br',
+  ['name', 'address', 'manager_id'], { required: ['name'] }));
+
+router.delete('/branches/:id', requireAdmin, (req, res) => {
+  const id = req.params.id;
+  const existing = db.prepare('SELECT * FROM branches WHERE id = ?').get(id);
+  if (!existing) return bad(res, 404, 'not_found');
+  // Refuse if any class / student / payment / teacher / vehicle / account
+  // references this branch — preserves FK integrity even though SQLite-side
+  // FKs aren't declared on these tables.
+  const refs = {
+    classes:  db.prepare('SELECT COUNT(*) AS n FROM classes  WHERE branchId = ?').get(id).n,
+    students: db.prepare('SELECT COUNT(*) AS n FROM students WHERE branchId = ?').get(id).n,
+    accounts: db.prepare('SELECT COUNT(*) AS n FROM accounts WHERE branchId = ?').get(id).n,
+    teachers: db.prepare('SELECT COUNT(*) AS n FROM teachers WHERE branchId = ?').get(id).n,
+    vehicles: db.prepare('SELECT COUNT(*) AS n FROM vehicles WHERE branchId = ?').get(id).n,
+  };
+  const total = Object.values(refs).reduce((a, b) => a + b, 0);
+  if (total > 0) return bad(res, 409, 'branch_in_use', { references: refs });
+  db.prepare('DELETE FROM branches WHERE id = ?').run(id);
+  logActivity(req.user.id, 'branch.delete', `${id} (${existing.name})`);
+  res.json({ ok: true, id });
+});
+
 router.post('/accounts', requireAdmin, makeAdminCreator('accounts', 'u',
   ['name', 'role', 'branchId', 'phone', 'email'], {
     required: ['name', 'email', 'role'],
@@ -292,11 +317,27 @@ router.post('/teachers', requireAdmin, makeAdminCreator('teachers', 't',
 router.post('/vehicles', requireAdmin, makeAdminCreator('vehicles', 'v',
   ['name', 'licence', 'plate', 'year', 'branchId', 'status'], { required: ['name'] }));
 
+// Branch-scope guard for notifications: system-wide rows (no studentId) are
+// editable by anyone; per-student rows are limited to the student's branch.
+// Returns null when allowed, or a {status, error} object to bail with.
+function notificationBranchGuard(req, existing) {
+  if (req.user.role === 'admin') return null;
+  if (!existing.studentId) return null;       // system-wide notification
+  const student = db.prepare('SELECT branchId FROM students WHERE id = ?').get(existing.studentId);
+  // If the student vanished, treat as cross-branch (safer than allowing).
+  if (!student || student.branchId !== req.user.branchId) {
+    return { status: 403, error: 'wrong_branch' };
+  }
+  return null;
+}
+
 // PATCH /api/notifications/:id { read: true }
 router.patch('/notifications/:id', (req, res) => {
   const id = req.params.id;
   const existing = db.prepare('SELECT * FROM notifications WHERE id = ?').get(id);
   if (!existing) return bad(res, 404, 'not_found');
+  const guard = notificationBranchGuard(req, existing);
+  if (guard) return bad(res, guard.status, guard.error);
   if (!('read' in (req.body || {}))) return bad(res, 400, 'missing_read');
   db.prepare('UPDATE notifications SET read = ? WHERE id = ?').run(req.body.read ? 1 : 0, id);
   res.json(coerceBools('notifications', db.prepare('SELECT * FROM notifications WHERE id = ?').get(id)));
@@ -307,6 +348,8 @@ router.delete('/notifications/:id', (req, res) => {
   const id = req.params.id;
   const existing = db.prepare('SELECT * FROM notifications WHERE id = ?').get(id);
   if (!existing) return bad(res, 404, 'not_found');
+  const guard = notificationBranchGuard(req, existing);
+  if (guard) return bad(res, guard.status, guard.error);
   db.prepare('DELETE FROM notifications WHERE id = ?').run(id);
   logActivity(req.user.id, 'notification.delete', id);
   res.json({ ok: true, id });
@@ -323,6 +366,7 @@ const PATCHABLE = {
   promotions: ['name', 'appliesTo', 'discount'],
   teachers:   ['name', 'phone', 'yearsExp', 'branchId', 'active'],
   vehicles:   ['name', 'licence', 'plate', 'year', 'branchId', 'status'],
+  branches:   ['name', 'address', 'manager_id'],
 };
 
 const BOOL_PATCH_FIELDS = { accounts: ['active'], teachers: ['active'] };
@@ -367,6 +411,7 @@ router.patch('/fee-plans/:id',  requireAdmin, makeAdminPatcher('fee_plans'));
 router.patch('/promotions/:id', requireAdmin, makeAdminPatcher('promotions'));
 router.patch('/teachers/:id',   requireAdmin, makeAdminPatcher('teachers'));
 router.patch('/vehicles/:id',   requireAdmin, makeAdminPatcher('vehicles'));
+router.patch('/branches/:id',   requireAdmin, makeAdminPatcher('branches'));
 
 // Admin password reset for any account (separate from /auth/password which
 // requires the caller's current password).
@@ -375,7 +420,8 @@ router.post('/accounts/:id/reset-password', requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   if (!existing) return bad(res, 404, 'not_found');
   const { newPassword } = req.body || {};
-  if (!newPassword || newPassword.length < 8) return bad(res, 400, 'password_too_short');
+  const pol = passwordPolicy(newPassword);
+  if (!pol.ok) return bad(res, 400, pol.code, { message: pol.message });
   db.prepare('UPDATE accounts SET passwordHash = ? WHERE id = ?').run(hashPassword(newPassword), id);
   logActivity(req.user.id, 'accounts.reset_password', id);
   res.json({ ok: true });
