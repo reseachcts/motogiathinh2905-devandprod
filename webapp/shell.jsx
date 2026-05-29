@@ -379,6 +379,15 @@ function CarGlyph({ size = 14 }) {
 // the layering system simple: modals are always at the top, period.
 // --------------------------------------------------------------------
 function Modal({ open, onClose, title, subtitle, children, primaryAction, primaryLabel = "Lưu", primaryIcon = "check", width = 560, primaryDisabled, secondary, footerStart }) {
+  // Esc-to-dismiss: only attach while open. Inputs/textareas/selects
+  // don't natively consume Escape in HTML (it's not a typing key), so
+  // we close unconditionally — matches OS-level dialog behaviour.
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); onClose && onClose(); } };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
   if (!open) return null;
   const node = (
     <div onClick={onClose} style={{
