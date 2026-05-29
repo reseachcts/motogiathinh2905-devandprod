@@ -96,8 +96,18 @@ app.use('/api', (err, req, res, _next) => {
 });
 
 // Static webapp — serve the same folder GitHub Pages serves.
+// Cache headers: in dev, no-store on JS/JSX so iterations are picked up
+// immediately. In production, 1h is fine (and nginx adds its own).
 if (existsSync(WEBAPP_DIR)) {
-  app.use(express.static(WEBAPP_DIR, { extensions: ['html'], maxAge: '1h' }));
+  app.use(express.static(WEBAPP_DIR, {
+    extensions: ['html'],
+    maxAge: NODE_ENV === 'production' ? '1h' : 0,
+    setHeaders(res, path) {
+      if (NODE_ENV !== 'production' && /\.(jsx?|css|html)$/i.test(path)) {
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
+      }
+    },
+  }));
   // SPA fallback: any non-API route falls back to index.html so deep links
   // (e.g. /students/HV0123) load. Currently the frontend doesn't use the
   // URL for routing, but leave the door open.
