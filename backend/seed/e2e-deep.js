@@ -334,9 +334,11 @@ async function run() {
     if (r2.status !== 201) { FAIL('upload v2 (replace) failed', `status=${r2.status}`); return; }
     PASS('docslot upload v2 (replaced)', `url=${b2.url}`);
     if (b1.url === b2.url) WARN('v1.url === v2.url — replace did not change URL', `${b2.url}`);
-    // Note: replace DOES NOT delete the v1 file from disk in current code — known gap.
+    // Orphan-cleanup contract (commit 0898152): on overwrite, the prior file
+    // on disk must be unlinked. Promoted from WARN to a hard FAIL now that
+    // the fix is loaded — a regression here would leak orphan blobs.
     const v1Probe = await fetch(BASE + v1Url, { headers: { cookie: cookieStr } });
-    v1Probe.ok ? WARN('v1 file STILL exists after replace (orphan on disk)', `v1=${v1Url}`)
+    v1Probe.ok ? FAIL('v1 file STILL exists after replace (orphan-cleanup regressed)', `v1=${v1Url} status=${v1Probe.status}`)
                : PASS('v1 file cleaned up on replace', `${v1Probe.status}`);
     // DELETE v2
     const dRes = await fetch(`${BASE}/api/students/${stu.id}/docs/cccd`, { method: 'DELETE', headers: { cookie: cookieStr } });
