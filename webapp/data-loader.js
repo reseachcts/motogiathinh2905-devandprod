@@ -18,10 +18,11 @@
            first section (Tổng) gets a clean page-1 to itself. */
         .mgt-print-hide { display: none !important; }
         .mgt-print-section + .mgt-print-section { break-before: page; page-break-before: always; }
-        /* So sánh's stacked charts are ~970px native — too tall for one
-           A4 landscape page. zoom shrinks the box model AND we cap chart
-           SVG heights so even the heaviest section fits. */
-        .mgt-print-section { break-inside: avoid-page; zoom: 0.78; }
+        /* Live screen uses display:contents on these wrappers so they're
+           invisible to layout. In print we override to block so the
+           page-break-before rule has a box to break against. zoom + svg
+           cap shrink So sánh's stacked charts to fit one A4 landscape. */
+        .mgt-print-section { display: block !important; break-inside: avoid-page; zoom: 0.78; }
         .mgt-print-section svg { max-height: 200px !important; }
         /* Kill breathing/glow animations so the render is deterministic. */
         *, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition: none !important; }

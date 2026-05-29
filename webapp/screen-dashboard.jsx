@@ -698,12 +698,17 @@ function DashboardScreen() {
         <KpiBig index={3} label="Học viên active" value={activeStudents}                  hint={`A: ${licenceCount.A} · A1: ${licenceCount.A1}`} color="violet" icon="users"/>
       </div>
 
-      {/* Each section wrapped so the print stylesheet can put one per
-          PDF page (.mgt-print-section + .mgt-print-section { break-before: page }). */}
-      <div className="mgt-print-section"><SectionTong/></div>
-      <div className="mgt-print-section"><SectionBienDong/></div>
-      <div className="mgt-print-section"><SectionSoSanh/></div>
-      <div className="mgt-print-section"><SectionHieuSuat/></div>
+      {/* Wrappers exist ONLY so the print stylesheet can break-before-
+          page on each section. `display: contents` makes them invisible
+          to the live flex layout (so the parent's 16px gap still spaces
+          the section internals the way the original screen did);
+          the print-mode CSS flips display to block with !important so
+          page breaks actually break. Net effect: live dashboard is
+          identical to the pre-PDF layout. */}
+      <div className="mgt-print-section" style={{ display: "contents" }}><SectionTong/></div>
+      <div className="mgt-print-section" style={{ display: "contents" }}><SectionBienDong/></div>
+      <div className="mgt-print-section" style={{ display: "contents" }}><SectionSoSanh/></div>
+      <div className="mgt-print-section" style={{ display: "contents" }}><SectionHieuSuat/></div>
     </div>
   );
 }
