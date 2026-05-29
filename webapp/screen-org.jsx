@@ -235,13 +235,14 @@ function AccountsTab() {
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
         title="Tạo tài khoản mới"
-        onCreate={(d) => window.MGT_DATA.api.createAccount(d).catch(e => alert("Lỗi: " + e.message))}
+        onCreate={(d) => window.MGT_DATA.api.createAccount(d)}
         fields={[
           { id: "name",     label: "Họ tên",        type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
           { id: "phone",    label: "Số điện thoại", type: "text",   placeholder: "090 123 4567" },
           { id: "email",    label: "Email",         type: "text",   placeholder: "you@motogiathinh.vn" },
           { id: "role",     label: "Vai trò",       type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }] },
           { id: "branchId", label: "Chi nhánh",     type: "select", options: branchOpts },
+          { id: "password", label: "Mật khẩu tạm thời", type: "text", placeholder: "≥10 ký tự, có chữ + số", fullWidth: true },
         ]}/>
       <div style={{
         display: "grid", gridTemplateColumns: "1.6fr 110px 1.4fr 1fr 140px 100px",
@@ -294,7 +295,7 @@ function FeesTab() {
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
         title="Tạo gói học phí"
-        onCreate={(d) => window.MGT_DATA.api.createFeePlan(d).catch(e => alert("Lỗi: " + e.message))}
+        onCreate={(d) => window.MGT_DATA.api.createFeePlan(d)}
         fields={[
           { id: "name",     label: "Tên gói",  type: "text",   placeholder: "A — Trọn gói" },
           { id: "licence",  label: "Bằng",     type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
@@ -336,8 +337,7 @@ function PromosTab() {
           const licences = Array.from(new Set(
             (d.appliesTo || []).map(id => D.getFeePlan(id)?.licence).filter(Boolean)
           ));
-          window.MGT_DATA.api.createPromotion({ ...d, appliesTo: licences })
-            .catch(e => alert("Lỗi: " + e.message));
+          return window.MGT_DATA.api.createPromotion({ ...d, appliesTo: licences });
         }}
         fields={[
           { id: "name",      label: "Tên chương trình",  type: "text",      placeholder: "Hè Vui — Giảm 200K", fullWidth: true },
@@ -383,7 +383,7 @@ function TeachersTab() {
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
         title="Thêm giáo viên"
-        onCreate={(d) => window.MGT_DATA.api.createTeacher(d).catch(e => alert("Lỗi: " + e.message))}
+        onCreate={(d) => window.MGT_DATA.api.createTeacher(d)}
         fields={[
           { id: "name",     label: "Họ tên",        type: "text",   placeholder: "Trần Văn B" },
           { id: "phone",    label: "Số điện thoại", type: "text",   placeholder: "09…" },
@@ -440,7 +440,7 @@ function VehiclesTab() {
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
         title="Thêm phương tiện"
-        onCreate={(d) => window.MGT_DATA.api.createVehicle(d).catch(e => alert("Lỗi: " + e.message))}
+        onCreate={(d) => window.MGT_DATA.api.createVehicle(d)}
         fields={[
           { id: "name",     label: "Tên xe",   type: "text",   placeholder: "Honda Wave Alpha" },
           { id: "licence",  label: "Bằng",     type: "select", options: [{ id: "A", label: "A" }, { id: "A1", label: "A1" }] },
@@ -557,10 +557,24 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
     return seed;
   };
   const [draft, setDraft] = React.useState(buildSeed);
-  React.useEffect(() => { if (open) setDraft(buildSeed()); }, [open]);  // eslint-disable-line
+  const [busy, setBusy]   = React.useState(false);
+  const [err, setErr]     = React.useState(null);
+  React.useEffect(() => { if (open) { setDraft(buildSeed()); setBusy(false); setErr(null); } }, [open]);  // eslint-disable-line
 
   const set = (id, v) => setDraft(prev => ({ ...prev, [id]: v }));
-  const submit = () => { onCreate && onCreate(draft); onClose(); };
+  // Await the onCreate promise; only close on success so failure alerts
+  // surface inline rather than after the dialog has already vanished.
+  const submit = async () => {
+    try {
+      setBusy(true); setErr(null);
+      await onCreate?.(draft);
+      onClose();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Pair text fields into a 2-col grid when there are 4+ fields, so the
   // dialog visually matches the sectioned grids in AddStudent/AddClass.
@@ -571,8 +585,14 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
            title={title}
            subtitle={subtitle}
            primaryAction={submit}
-           primaryLabel="Tạo mới"
+           primaryLabel={busy ? "Đang tạo…" : "Tạo mới"}
            primaryIcon="plus"
+           primaryDisabled={busy}
+           footerStart={err ? (
+             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>
+               Lỗi: {err}
+             </span>
+           ) : null}
            width={560}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <h4 style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>
