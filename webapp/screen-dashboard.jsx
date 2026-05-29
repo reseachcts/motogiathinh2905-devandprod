@@ -688,18 +688,22 @@ function DashboardScreen() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Today KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+      {/* Today KPIs — hidden in print so each PDF page is exactly one
+          section (the section-level mini-KPIs and charts already
+          summarize the same headline numbers). */}
+      <div className="mgt-print-hide" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
         <KpiBig index={0} label="Đã thu hôm nay" value={window.fmtVND(todayRevenue)}    hint={`${todayReceipts} biên lai`}     color="lime"   icon="trending-up"/>
         <KpiBig index={1} label="HV mới hôm nay"  value={newToday}                       hint="đăng ký 30/05/2026"            color="cyan"   icon="user-plus"/>
         <KpiBig index={2} label="TỔNG NỢ"        value={window.fmtVND(outstandingTotal)} hint={`${outstandingCount} học viên chờ thanh toán`} color="pink"   icon="minus"/>
         <KpiBig index={3} label="Học viên active" value={activeStudents}                  hint={`A: ${licenceCount.A} · A1: ${licenceCount.A1}`} color="violet" icon="users"/>
       </div>
 
-      <SectionTong/>
-      <SectionBienDong/>
-      <SectionSoSanh/>
-      <SectionHieuSuat/>
+      {/* Each section wrapped so the print stylesheet can put one per
+          PDF page (.mgt-print-section + .mgt-print-section { break-before: page }). */}
+      <div className="mgt-print-section"><SectionTong/></div>
+      <div className="mgt-print-section"><SectionBienDong/></div>
+      <div className="mgt-print-section"><SectionSoSanh/></div>
+      <div className="mgt-print-section"><SectionHieuSuat/></div>
     </div>
   );
 }

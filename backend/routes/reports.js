@@ -47,14 +47,16 @@ router.get('/reports/dashboard.pdf', async (req, res) => {
   const t0 = Date.now();
   try {
     const browser = await getChromium();
-    context = await browser.newContext({ viewport: { width: 1440, height: 1800 } });
+    // 1280×900 keeps charts un-cropped at the A4-landscape page-print
+    // ratio used by the @page rule in the injected print stylesheet.
+    context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addCookies([{
       name: COOKIE_NAME, value: token,
       url: SELF_BASE, httpOnly: true, sameSite: 'Lax',
     }]);
     page = await context.newPage();
-    // Navigate with ?print=dashboard so the frontend can render a
-    // print-friendly layout (hide sidebar, show all sections expanded).
+    // ?print=dashboard tells the frontend to force light theme, hide
+    // the sidebar, inject @page A4 landscape + break-before-page rules.
     await page.goto(`${SELF_BASE}/?print=dashboard`, { waitUntil: 'domcontentloaded' });
     // Wait for data + the dashboard render. We poll for an h3 or KPI
     // marker to appear (max 20s).
@@ -62,11 +64,19 @@ router.get('/reports/dashboard.pdf', async (req, res) => {
       () => window.MGT_DATA && /TỔNG NỢ|Tổng quan|cộng dồn/i.test(document.body.innerText),
       null, { timeout: 20_000 }
     );
-    // Small settle delay so chart animations complete.
+    // Wait for the 4 page-section wrappers + a settle delay so chart
+    // animations complete and SVGs finish laying out.
+    await page.waitForFunction(
+      () => document.querySelectorAll('.mgt-print-section').length >= 4,
+      null, { timeout: 10_000 }
+    );
     await page.waitForTimeout(900);
+    // Sizing handled by `zoom: 0.78` on .mgt-print-section in the
+    // injected print stylesheet (playwright's `scale` option turns out
+    // to be a no-op when the page renders into a known-format viewport).
     const pdf = await page.pdf({
       format: 'A4', landscape: true, printBackground: true,
-      margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+      margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' },
     });
     const fname = `tongquan-${new Date().toISOString().slice(0,10)}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');

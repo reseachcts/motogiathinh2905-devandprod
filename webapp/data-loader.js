@@ -5,6 +5,37 @@
 
 (function () {
   const API = (window.MGT_API_BASE || '') + '/api';
+
+  // Print mode (?print=dashboard) — inject stylesheet that paginates one
+  // section per PDF page and kills the breathing-card animations so
+  // playwright doesn't capture a mid-frame. Light theme is forced by
+  // ThemeProvider; this stylesheet is layout / animation only.
+  try {
+    if (new URLSearchParams(window.location.search).get('print') === 'dashboard') {
+      const css = document.createElement('style');
+      css.textContent = `
+        /* Exactly one section per page. KPI strip is hidden so the
+           first section (Tổng) gets a clean page-1 to itself. */
+        .mgt-print-hide { display: none !important; }
+        .mgt-print-section + .mgt-print-section { break-before: page; page-break-before: always; }
+        /* So sánh's stacked charts are ~970px native — too tall for one
+           A4 landscape page. zoom shrinks the box model AND we cap chart
+           SVG heights so even the heaviest section fits. */
+        .mgt-print-section { break-inside: avoid-page; zoom: 0.78; }
+        .mgt-print-section svg { max-height: 200px !important; }
+        /* Kill breathing/glow animations so the render is deterministic. */
+        *, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition: none !important; }
+        /* Drop the page outer padding so each section fills the A4 page. */
+        body, .mgt-canvas { background: #ffffff !important; }
+        .mgt-canvas { padding: 12px !important; gap: 0 !important; }
+        /* Suppress backdrop blur in print to avoid heavy raster output. */
+        * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+        /* @page is owned by playwright's page.pdf() — don't set it here
+           or it conflicts with the scale: option. */
+      `;
+      document.head.appendChild(css);
+    }
+  } catch {}
   const p2  = (n) => String(n).padStart(2, '0');
 
   async function api(path, opts = {}) {

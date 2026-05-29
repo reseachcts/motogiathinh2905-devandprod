@@ -190,11 +190,19 @@ function TopBar({ title, right }) {
 const ThemeContext = React.createContext(null);
 
 function ThemeProvider({ children }) {
+  // ?print=dashboard forces light + skips localStorage persistence so the
+  // PDF renders consistently regardless of the user's saved preference.
+  const isPrintMode = () => {
+    try { return new URLSearchParams(window.location.search).get("print") === "dashboard"; }
+    catch { return false; }
+  };
   const [theme, setTheme] = React.useState(() => {
+    if (isPrintMode()) return "light";
     try { return localStorage.getItem("mgt-theme") || "dark"; } catch { return "dark"; }
   });
   React.useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    if (isPrintMode()) return;       // don't pollute the user's saved theme
     try { localStorage.setItem("mgt-theme", theme); } catch {}
   }, [theme]);
   const value = React.useMemo(() => [theme, setTheme], [theme]);
