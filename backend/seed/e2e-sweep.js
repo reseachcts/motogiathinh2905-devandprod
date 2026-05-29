@@ -547,8 +547,10 @@ async function run() {
     disabled ? PASS('Đặt lại disabled for <10ch') : FAIL('Đặt lại enabled for 5ch — validation gap');
   });
 
-  // ============ 26. MODAL backdrop dismisses ============
-  await safe(page, 'modal-backdrop-dismiss', async () => {
+  // ============ 26. MODAL backdrop does NOT dismiss (was changed N1) ============
+  // Backdrop click intentionally does NOT close create dialogs — would
+  // discard user-typed form data. Close affordances: X icon, Hủy, Esc.
+  await safe(page, 'modal-backdrop-no-dismiss', async () => {
     await gotoTab(page, 'Tổ chức');
     await page.locator('button:has-text("Giáo viên")').first().click({ force: true });
     await page.waitForTimeout(200);
@@ -558,7 +560,9 @@ async function run() {
     await page.waitForTimeout(250);
     const open = await page.evaluate(() => Array.from(document.body.children).some(el =>
       el.tagName === 'DIV' && /z-index:\s*1000/i.test(el.getAttribute('style') || '')));
-    open ? FAIL('backdrop click did NOT dismiss') : PASS('modal backdrop click dismisses');
+    open ? PASS('modal backdrop click does NOT dismiss (correct)') : FAIL('backdrop click dismissed — should not');
+    // Tidy up via the intended affordance.
+    if (open) await page.locator('button:has-text("Hủy")').first().click({ force: true });
   });
 
   // ============ 27. MODAL Esc dismisses ============

@@ -18,28 +18,45 @@ function AddStudentModal({ open, onClose, onSave }) {
   // Captured File objects (per doc key). Uploaded after the student is
   // created — we need the student id before POSTing to /students/:id/docs/:key.
   const [docFiles, setDocFiles] = React.useState({});
-  const [ocrToast, setOcrToast] = React.useState(false);
+  const [ocrToast, setOcrToast] = React.useState(null);    // null | {msg, kind}
+  const [ocrBusy,  setOcrBusy]  = React.useState(false);
 
-  // when CCCD slot is filled, OCR auto-fills basic info
-  const handleDocDrop = (key, file) => {
+  // Drop a doc → mark filled, stash the File, and for CCCD specifically
+  // run real OCR via tesseract.js (POST /api/ocr/cccd). Returned fields
+  // populate the form, skipping any field the user already typed.
+  const handleDocDrop = async (key, file) => {
     setDocs(prev => ({ ...prev, [key]: true }));
     if (file) setDocFiles(prev => ({ ...prev, [key]: file }));
-    if (key === "cccd" && !form.idNumber) {
-      // simulate OCR: populate name + gender + dob + idNumber + address +
-      // queQuan + ngày cấp + nơi cấp
-      setForm(prev => ({
-        ...prev,
-        name:        prev.name        || "Trần Thị Mai",
-        gender:      prev.gender      || "Nữ",
-        dob:         prev.dob         || "12/08/2002",
-        idNumber:    prev.idNumber    || "079202155678",
-        address:     prev.address     || "47 Nguyễn Đình Chiểu, Q.3, TP.HCM",
-        queQuan:     prev.queQuan     || "Bến Tre",
-        ngayCapCCCD: prev.ngayCapCCCD || "15/03/2021",
-        noiCapCCCD:  prev.noiCapCCCD  || "Cục Cảnh sát QLHC về TTXH",
-      }));
-      setOcrToast(true);
-      setTimeout(() => setOcrToast(false), 3000);
+    if (key !== "cccd" || !file) return;
+    setOcrBusy(true);
+    setOcrToast({ kind: "info", msg: "Đang quét CCCD bằng OCR (vie+eng)…" });
+    try {
+      const out = await D.api.ocrCccd(file);
+      const f = out.fields || {};
+      const applied = [];
+      setForm(prev => {
+        const next = { ...prev };
+        const set = (k, v) => { if (v && !prev[k]) { next[k] = v; applied.push(k); } };
+        set("idNumber",    f.idNumber);
+        set("name",        f.name);
+        set("dob",         f.dob);
+        set("gender",      f.gender);
+        set("queQuan",     f.queQuan);
+        set("address",     f.address);
+        set("ngayCapCCCD", f.ngayCapCCCD);
+        return next;
+      });
+      setOcrToast({
+        kind: applied.length ? "ok" : "warn",
+        msg: applied.length
+          ? `OCR đã điền ${applied.length} trường (${out.confidence ?? "?"}% confidence)`
+          : "Không trích xuất được trường nào — kiểm tra lại ảnh hoặc nhập thủ công.",
+      });
+    } catch (e) {
+      setOcrToast({ kind: "err", msg: "OCR thất bại: " + (e.message || e) });
+    } finally {
+      setOcrBusy(false);
+      setTimeout(() => setOcrToast(null), 4500);
     }
   };
 
@@ -99,21 +116,32 @@ function AddStudentModal({ open, onClose, onSave }) {
              ) : null
            }>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {/* OCR toast — pinned at top */}
-        {ocrToast && (
-          <div style={{
-            padding: "8px 12px", borderRadius: 10,
-            background: "color-mix(in oklab, var(--neon-cyan) 14%, transparent)",
-            border: "1px solid color-mix(in oklab, var(--neon-cyan) 36%, transparent)",
-            display: "flex", alignItems: "center", gap: 8,
-            animation: "fadeIn 220ms ease-out",
-          }}>
-            <Icon name="check" size={14} color="var(--neon-cyan)"/>
-            <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-1)" }}>
-              OCR đã điền 8 trường từ ảnh CCCD
-            </span>
-          </div>
-        )}
+        {/* OCR status — pinned at top. info/ok/warn/err tones map to
+            cyan / lime / amber / pink. */}
+        {ocrToast && (() => {
+          const tone = ocrToast.kind === "ok"   ? "var(--neon-lime)"
+                     : ocrToast.kind === "warn" ? "var(--neon-amber)"
+                     : ocrToast.kind === "err"  ? "var(--neon-pink)"
+                     : "var(--neon-cyan)";
+          const icon = ocrToast.kind === "ok" ? "check"
+                     : ocrToast.kind === "err" || ocrToast.kind === "warn" ? "x"
+                     : "clock";
+          return (
+            <div style={{
+              padding: "8px 12px", borderRadius: 10,
+              background: `color-mix(in oklab, ${tone} 14%, transparent)`,
+              border: `1px solid color-mix(in oklab, ${tone} 36%, transparent)`,
+              display: "flex", alignItems: "center", gap: 8,
+              animation: "fadeIn 220ms ease-out",
+            }}>
+              <Icon name={icon} size={14} color={tone}/>
+              <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-1)", flex: 1 }}>
+                {ocrToast.msg}
+              </span>
+              {ocrBusy && <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: tone, letterSpacing: "0.1em" }}>…</span>}
+            </div>
+          );
+        })()}
 
         {/* Top row — Thông tin cá nhân  |  Đăng ký & Lớp học. */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>

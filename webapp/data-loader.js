@@ -449,6 +449,17 @@
           if (p) { p.bienLaiPhoto = true; p.bienLaiPhoto_url = out.url; }
           this._bump(); return out;
         },
+        // POST a CCCD image to /api/ocr/cccd and return { fields, raw, ms,
+        // confidence }. fields = { idNumber, name, dob, gender, queQuan,
+        // address, ngayCapCCCD } (any subset may be null). Caller decides
+        // which to apply. Does NOT persist the image — caller still needs
+        // to POST /api/students/:id/docs/cccd after the student exists.
+        async ocrCccd(file) {
+          const fd = new FormData(); fd.append('file', file);
+          const res = await fetch(API + '/ocr/cccd', { method: 'POST', credentials: 'include', body: fd });
+          if (!res.ok) throw new Error('ocr_failed: ' + res.status);
+          return res.json();
+        },
         async updateStudent(id, patch) {
           const raw = await api('/students/' + encodeURIComponent(id), { method: 'PATCH', body: patch });
           const ex = studentsById.get(id);

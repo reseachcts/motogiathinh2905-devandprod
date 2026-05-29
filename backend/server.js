@@ -17,6 +17,7 @@ import authRoutes from './routes/auth.js';
 import entityRoutes from './routes/entities.js';
 import writeRoutes from './routes/writes.js';
 import uploadRoutes from './routes/uploads.js';
+import ocrRoutes from './routes/ocr.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -90,6 +91,7 @@ app.use('/api', authRoutes);     // /api/auth/* + /api/me
 app.use('/api', entityRoutes);   // /api/branches, /api/students, …
 app.use('/api', writeRoutes);    // POST/PATCH
 app.use('/api', uploadRoutes);   // multipart uploads + GET /api/files/*
+app.use('/api', ocrRoutes);      // POST /api/ocr/cccd (tesseract.js vie+eng)
 
 // Catch unhandled API errors as JSON (not HTML). Includes a short request
 // id so server-side log and client error correlate. In production, the raw

@@ -389,14 +389,17 @@ function Modal({ open, onClose, title, subtitle, children, primaryAction, primar
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
   if (!open) return null;
+  // Backdrop click is intentionally NOT a close trigger — the user reported
+  // accidental dismissals losing typed form data. Close affordances are:
+  // the X icon, the Hủy button, and the Escape key.
   const node = (
-    <div onClick={onClose} style={{
+    <div style={{
       position: "fixed", inset: 0, zIndex: 1000,
       background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)",
       display: "flex", alignItems: "center", justifyContent: "center",
       padding: 20,
     }}>
-      <div onClick={e => e.stopPropagation()} style={{
+      <div style={{
         width, maxHeight: "92vh", overflow: "auto",
         background: "var(--glass-3)",
         backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
