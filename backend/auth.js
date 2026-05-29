@@ -65,16 +65,22 @@ export function hashPassword(plain) {
 }
 
 // -- password complexity ----------------------------------------------------
-// 10+ chars, at least one letter, one digit. Tweak via env if needed.
-const MIN_PW_LEN = Math.max(8, Number(process.env.MIN_PASSWORD_LENGTH) || 10);
+// 8+ chars · ≥1 lowercase · ≥1 uppercase · ≥1 digit · ≥1 special.
+// The frontend "Tạo tài khoản mới" dialog shows the same 5 checks live.
+const MIN_PW_LEN = Math.max(8, Number(process.env.MIN_PASSWORD_LENGTH) || 8);
+const SPECIAL_RE = /[!@#$%^&*()_+\-={}\[\]|\\:;"'<>,.?/~`]/;
 export function passwordPolicy(pw) {
   if (typeof pw !== 'string') return { ok: false, code: 'password_required', message: 'Mật khẩu là bắt buộc.' };
   if (pw.length < MIN_PW_LEN) return { ok: false, code: 'password_too_short',
     message: `Mật khẩu phải có ít nhất ${MIN_PW_LEN} ký tự.` };
-  if (!/[A-Za-z]/.test(pw)) return { ok: false, code: 'password_needs_letter',
-    message: 'Mật khẩu phải có ít nhất một chữ cái.' };
+  if (!/[a-z]/.test(pw)) return { ok: false, code: 'password_needs_lowercase',
+    message: 'Mật khẩu phải có ít nhất một chữ thường (a–z).' };
+  if (!/[A-Z]/.test(pw)) return { ok: false, code: 'password_needs_uppercase',
+    message: 'Mật khẩu phải có ít nhất một chữ HOA (A–Z).' };
   if (!/\d/.test(pw)) return { ok: false, code: 'password_needs_digit',
     message: 'Mật khẩu phải có ít nhất một chữ số.' };
+  if (!SPECIAL_RE.test(pw)) return { ok: false, code: 'password_needs_special',
+    message: 'Mật khẩu phải có ít nhất một ký tự đặc biệt.' };
   return { ok: true };
 }
 

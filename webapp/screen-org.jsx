@@ -3,6 +3,43 @@
 //             giáo viên / phương tiện / nhật ký
 // ====================================================================
 
+// Password complexity checklist — mirrors backend/auth.js passwordPolicy.
+// Used by both the "Tạo tài khoản mới" dialog and PasswordResetModal so
+// the rules shown match what the server will accept on submit.
+const PASSWORD_CHECKS = [
+  { label: "≥ 8 ký tự",         test: (v) => (v || "").length >= 8 },
+  { label: "≥ 1 chữ thường (a–z)",  test: (v) => /[a-z]/.test(v || "") },
+  { label: "≥ 1 chữ HOA (A–Z)",     test: (v) => /[A-Z]/.test(v || "") },
+  { label: "≥ 1 chữ số",        test: (v) => /\d/.test(v || "") },
+  { label: "≥ 1 ký tự đặc biệt", test: (v) => /[!@#$%^&*()_+\-={}\[\]|\\:;"'<>,.?/~`]/.test(v || "") },
+];
+function pwOk(v) { return PASSWORD_CHECKS.every(c => c.test(v)); }
+
+function PasswordChecks({ value, checks = PASSWORD_CHECKS }) {
+  return (
+    <div style={{
+      display: "grid", gridTemplateColumns: "1fr 1fr",
+      gap: "4px 16px", marginTop: 6,
+    }}>
+      {checks.map((c, i) => {
+        const pass = c.test(value || "");
+        return (
+          <div key={i} style={{
+            display: "flex", alignItems: "center", gap: 6,
+            fontFamily: "var(--font-mono)", fontSize: 10,
+            letterSpacing: "0.06em",
+            color: pass ? "var(--neon-lime)" : "var(--fg-4)",
+            transition: "color 160ms var(--ease-out)",
+          }}>
+            <Icon name={pass ? "check" : "minus"} size={11}/>
+            <span>{c.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function OrganizationScreen({ onOpenClass }) {
   const D = window.MGT_DATA;
   const [tab, setTab] = React.useState("branches");
@@ -266,12 +303,13 @@ function AccountsTab() {
   // the first real branch is the default.
   const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
   const accountCreateFields = [
-    { id: "name",     label: "Họ tên",        type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
-    { id: "phone",    label: "Số điện thoại", type: "phone",  placeholder: "090 123 4567" },
-    { id: "email",    label: "Email",         type: "text",   placeholder: "you@motogiathinh.vn" },
-    { id: "role",     label: "Vai trò",       type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }] },
-    { id: "branchId", label: "Chi nhánh",     type: "select", options: branchOpts },
-    { id: "password", label: "Mật khẩu tạm thời", type: "password", placeholder: "≥10 ký tự, có chữ + số", fullWidth: true },
+    { id: "name",     label: "Họ tên",                  type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
+    { id: "phone",    label: "Số điện thoại",           type: "phone",  placeholder: "090 123 4567" },
+    { id: "email",    label: "Tên đăng nhập (Email)",   type: "text",   placeholder: "you@motogiathinh.vn" },
+    { id: "role",     label: "Vai trò",                 type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }] },
+    { id: "branchId", label: "Chi nhánh",               type: "select", options: branchOpts },
+    { id: "password", label: "Mật khẩu tạm thời",       type: "password", placeholder: "Mật khẩu mới",
+      fullWidth: true, checks: PASSWORD_CHECKS },
   ];
   // PATCH doesn't accept `password` — keep the edit form without it
   // (use Đặt lại mật khẩu instead).
@@ -937,15 +975,16 @@ function PasswordResetModal({ open, onClose, account, onSubmit }) {
            primaryAction={submit}
            primaryLabel={busy ? "Đang đặt lại…" : "Đặt lại"}
            primaryIcon="check" width={420}
-           primaryDisabled={busy || (pw || "").length < 10}
+           primaryDisabled={busy || !pwOk(pw)}
            footerStart={err ? (
              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>
                Lỗi: {err}
              </span>
            ) : null}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <Input label="Mật khẩu mới (≥ 10 ký tự)" value={pw} onChange={setPw}
-               type="password" placeholder="••••••••••"/>
+        <Input label="Mật khẩu mới" value={pw} onChange={setPw}
+               type="password" placeholder="Mật khẩu mới"/>
+        <PasswordChecks value={pw}/>
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
           Người dùng sẽ phải đăng nhập lại bằng mật khẩu này.
         </span>
@@ -969,7 +1008,7 @@ function reportWriteError(e, fallback = "Lỗi") {
   let friendly = fallback;
   if (/branch_in_use/.test(msg)) friendly = "Không thể xóa: chi nhánh đang có lớp, học viên hoặc nhân viên.";
   else if (/in_use|in use|FK|FOREIGN/i.test(msg)) friendly = "Không thể xóa: bản ghi đang được tham chiếu.";
-  else if (/password_too_short|password_too|password_weak/.test(msg)) friendly = "Mật khẩu chưa đạt yêu cầu (≥ 10 ký tự, có chữ và số).";
+  else if (/password_(too_short|too|weak|needs_)/.test(msg)) friendly = "Mật khẩu chưa đạt yêu cầu (≥ 8 ký tự · chữ thường · chữ HOA · số · ký tự đặc biệt).";
   else if (/forbidden|admin_only|requireAdmin/i.test(msg)) friendly = "Chỉ admin mới thực hiện được thao tác này.";
   else friendly = fallback + ": " + msg;
   if (window.MGT_TOAST) window.MGT_TOAST(friendly);
@@ -1078,6 +1117,7 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
             return (
               <div key={f.id} style={{ gridColumn: useGrid && span === 2 ? "span 2" : "auto" }}>
                 {node}
+                {f.checks && <PasswordChecks value={draft[f.id]} checks={f.checks}/>}
               </div>
             );
           })}

@@ -9,19 +9,24 @@ import {
 } from '../auth.js';
 
 test('passwordPolicy — rejects too short', () => {
-  const r = passwordPolicy('abc');
+  const r = passwordPolicy('Ab1!');
   assert.equal(r.ok, false);
   assert.equal(r.code, 'password_too_short');
 });
 
-test('passwordPolicy — rejects missing letter / digit', () => {
-  assert.equal(passwordPolicy('1234567890').code, 'password_needs_letter');
-  assert.equal(passwordPolicy('abcdefghij').code, 'password_needs_digit');
+test('passwordPolicy — rejects missing complexity classes', () => {
+  // 8+ chars but missing each class in turn. Checks are ordered
+  // length → lower → upper → digit → special, so each input below trips
+  // exactly the predicted code.
+  assert.equal(passwordPolicy('ABCDEFG1!').code,   'password_needs_lowercase');
+  assert.equal(passwordPolicy('abcdefg1!').code,   'password_needs_uppercase');
+  assert.equal(passwordPolicy('Abcdefgh!').code,   'password_needs_digit');
+  assert.equal(passwordPolicy('Abcdefg1').code,    'password_needs_special');
 });
 
 test('passwordPolicy — accepts conforming password', () => {
-  assert.equal(passwordPolicy('Strong1Pass').ok, true);
-  assert.equal(passwordPolicy('Mật khẩu123').ok, true);  // unicode letter
+  assert.equal(passwordPolicy('Strong1Pass!').ok, true);
+  assert.equal(passwordPolicy('MậtKhẩu1@').ok,    true);  // unicode letters + digit + special
 });
 
 test('rate limit — N attempts allowed, N+1 blocked', () => {

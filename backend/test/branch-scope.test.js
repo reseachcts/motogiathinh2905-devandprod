@@ -117,14 +117,14 @@ test('POST /accounts/:id/reset-password — short password rejected by policy', 
   if (!alive) { t.skip('backend not running / setup failed'); return; }
   // Too short: violates MIN_PW_LEN.
   const r1 = await api(`/api/accounts/${encodeURIComponent(staffBr1.id)}/reset-password`,
-    { method: 'POST', body: { newPassword: 'short1' }, cookie: adminCookie });
+    { method: 'POST', body: { newPassword: 'Ab1!' }, cookie: adminCookie });
   assert.equal(r1.status, 400);
   assert.equal(r1.body.error, 'password_too_short');
-  // No digit: violates the digit rule.
+  // Long enough but missing uppercase: trips the lowercase→uppercase→… chain.
   const r2 = await api(`/api/accounts/${encodeURIComponent(staffBr1.id)}/reset-password`,
-    { method: 'POST', body: { newPassword: 'allletters' }, cookie: adminCookie });
+    { method: 'POST', body: { newPassword: 'allletters1!' }, cookie: adminCookie });
   assert.equal(r2.status, 400);
-  assert.equal(r2.body.error, 'password_needs_digit');
+  assert.equal(r2.body.error, 'password_needs_uppercase');
 });
 
 test('POST /auth/logout — double-logout is idempotent (200 both times)', async (t) => {
