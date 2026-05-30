@@ -235,11 +235,11 @@ function BulletDot() {
 
 // One labelled cell in the ClassCard meta grid. Fixed-position values
 // so 2x2 layout doesn't reflow when the viewport / zoom changes.
-function MetaCell({ label, value }) {
+function MetaCell({ label, value, mono = false }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--fg-3)" }}>{label}</span>
-      <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{value}</span>
+      <span style={{ fontFamily: mono ? "var(--font-mono)" : "var(--font-ui)", fontSize: 13, fontWeight: 600, color: "var(--fg-2)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
     </div>
   );
 }
@@ -395,7 +395,7 @@ function ClassDetail({ classId, onBack, onOpenStudent, isAdmin }) {
   );
 }
 
-Object.assign(window, { ClassesScreen, ClassDetail, ClassCard });
+Object.assign(window, { ClassesScreen, ClassDetail, ClassCard, MetaCell });
 
 // --------------------------------------------------------------------
 // ClassEditModal — admin edits class info (status, ngày mở, ngày thi).

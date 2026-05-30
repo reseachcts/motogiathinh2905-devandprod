@@ -409,10 +409,97 @@ function FormSelect({ value, onChange, options }) {
   );
 }
 
+// --------------------------------------------------------------------
+// SortMenu — matches the ListToolbar advanced-filter sort treatment:
+// pill-shaped active label (cyan border + text glow) with an attached
+// asc/desc arrow chip and a dropdown for switching the sort field.
+//
+// API: sortField + sortDir as separate values, mirroring ListToolbar so
+// callers can wire up sort logic identically.
+// --------------------------------------------------------------------
+function SortMenu({ sortField, sortDir, onSortField, onSortDir, options }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const active = options.find(o => o.id === sortField) || options[0];
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-flex", alignItems: "stretch", gap: 0 }}>
+      {/* Active sort label — pill left half, neon-cyan border + text glow. */}
+      <button onClick={() => setOpen(v => !v)} style={{
+        display: "inline-flex", alignItems: "center", gap: 8,
+        height: 36, padding: "0 14px",
+        borderRadius: "999px 0 0 999px", cursor: "pointer",
+        background: "var(--ink-2)",
+        border: "1px solid var(--neon-cyan)",
+        borderRight: "none",
+        color: "var(--neon-cyan)",
+        fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600,
+        boxShadow: open ? "0 0 14px var(--neon-cyan-haze)" : "none",
+        transition: "all 140ms var(--ease-out)",
+        textShadow: "0 0 8px var(--neon-cyan-glow)",
+      }}>{active.label}</button>
+
+      {/* Direction arrow — pill right half. */}
+      <button onClick={() => onSortDir(sortDir === "asc" ? "desc" : "asc")}
+              title={sortDir === "asc" ? "Tăng dần" : "Giảm dần"}
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 38, height: 36, padding: 0,
+                borderRadius: "0 999px 999px 0", cursor: "pointer",
+                background: "var(--ink-2)",
+                border: "1px solid var(--neon-cyan)",
+                color: "var(--neon-cyan)",
+                transition: "all 140ms var(--ease-out)",
+              }}>
+        <Icon name={sortDir === "asc" ? "arrow-up" : "arrow-down"} size={14}
+              color="var(--neon-cyan)"
+              style={{ filter: "drop-shadow(0 0 4px var(--neon-cyan-glow))" }}/>
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 40,
+          minWidth: 200,
+          background: "var(--glass-3)",
+          backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
+          border: "1px solid var(--glass-stroke-strong)", borderRadius: 12,
+          padding: 6, boxShadow: "var(--shadow-3)",
+        }}>
+          {options.map(o => {
+            const isActive = o.id === sortField;
+            return (
+              <button key={o.id} onClick={() => { onSortField(o.id); setOpen(false); }} style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "8px 10px", borderRadius: 8, cursor: "pointer",
+                background: isActive ? "var(--ink-3)" : "transparent",
+                border: "none", color: isActive ? "var(--fg-1)" : "var(--fg-2)",
+                fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: isActive ? 600 : 500,
+                textAlign: "left",
+                transition: "background 120ms var(--ease-out)",
+              }}
+              onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--ink-2)"; }}
+              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}>
+                {isActive && <Icon name="check" size={12} color="var(--neon-cyan)"/>}
+                <span style={{ marginLeft: isActive ? 0 : 18 }}>{o.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 Object.assign(window, {
   ListToolbar, Paginator, useListView, AdvancedFilterModal,
   FormRow, FormField, FormText, FormSelect,
   FloatingFilterPanel, FilterColumn, MultiPillField, DateRangeField, ChipButton,
+  SortMenu,
 });
 
 // ====================================================================

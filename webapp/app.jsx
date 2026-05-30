@@ -116,7 +116,7 @@ function AppRoot() {
     const f = detail?.from;
     if (f?.type === "vehicle") {
       setOrgTab("vehicles");
-      setOrgVehSel(f.vehicleId);
+      setOrgVehSel(f.id);
       setTab("organization");
       setDetail(null);
       return;
