@@ -150,15 +150,19 @@ export function rentalsInPeriod(period) {
 // ---------------------------------------------------------------------------
 export function newStudentsInPeriod(period) {
   const all = studentsWithDerived(null);
+  // Pre-fetch once — avoids N+1 queries inside the map loop.
+  const classMap   = new Map(db.prepare('SELECT id, code FROM classes').all().map(r => [r.id, r.code]));
+  const branchMap  = new Map(db.prepare('SELECT id, name FROM branches').all().map(r => [r.id, r.name]));
+  const feePlanMap = new Map(db.prepare('SELECT id, name FROM fee_plans').all().map(r => [r.id, r.name]));
   return all.filter(s => {
     const t = parseDT(s.createdAt);
     return t >= period.sinceMs && t <= period.untilMs;
-  }).map(s => {
-    const cls = db.prepare('SELECT code FROM classes WHERE id = ?').get(s.classId);
-    const br  = db.prepare('SELECT name FROM branches WHERE id = ?').get(s.branchId);
-    const fee = db.prepare('SELECT name FROM fee_plans WHERE id = ?').get(s.feePlanId);
-    return { ...s, classCode: cls?.code || '', branchName: br?.name || '', feePlanName: fee?.name || '' };
-  });
+  }).map(s => ({
+    ...s,
+    classCode:   classMap.get(s.classId)   || '',
+    branchName:  branchMap.get(s.branchId) || '',
+    feePlanName: feePlanMap.get(s.feePlanId) || '',
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -184,11 +188,14 @@ export function activeClasses() {
 // ---------------------------------------------------------------------------
 export function outstandingStudents() {
   const all = studentsWithDerived(null);
-  return all.filter(s => s.balance > 0).map(s => {
-    const cls = db.prepare('SELECT code FROM classes WHERE id = ?').get(s.classId);
-    const br  = db.prepare('SELECT name FROM branches WHERE id = ?').get(s.branchId);
-    return { ...s, classCode: cls?.code || '', branchName: br?.name || '' };
-  }).sort((a, b) => b.balance - a.balance);
+  // Pre-fetch once — avoids N+1 queries inside the map loop.
+  const classMap  = new Map(db.prepare('SELECT id, code FROM classes').all().map(r => [r.id, r.code]));
+  const branchMap = new Map(db.prepare('SELECT id, name FROM branches').all().map(r => [r.id, r.name]));
+  return all.filter(s => s.balance > 0).map(s => ({
+    ...s,
+    classCode:  classMap.get(s.classId)   || '',
+    branchName: branchMap.get(s.branchId) || '',
+  })).sort((a, b) => b.balance - a.balance);
 }
 
 // ---------------------------------------------------------------------------

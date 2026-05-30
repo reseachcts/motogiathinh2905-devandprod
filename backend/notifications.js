@@ -55,6 +55,8 @@ export function buildDesired() {
   for (const c of classes) classStatusById.set(c.id, classStatus(c, nowMs));
 
   const students = db.prepare('SELECT * FROM students').all();
+  // Rental payments (kind='rental') are pay-on-the-spot and don't affect
+  // a student's tuition balance — notification rules only apply to tuition.
   const paidById = new Map(
     db.prepare('SELECT studentId, SUM(amount) AS paid FROM payments GROUP BY studentId')
       .all().map(r => [r.studentId, r.paid || 0])

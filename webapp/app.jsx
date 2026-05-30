@@ -2,6 +2,8 @@
 // App — routing between screens + modals + detail views
 // ====================================================================
 
+const TAB_BY_DETAIL = { student: "students", class: "classes", payment: "payments" };
+
 // ScreenErrorBoundary — isolates a single screen's render failure so a
 // crash in one tab doesn't take down the whole shell (sidebar, topbar,
 // other screens). Renders a minimal Vietnamese error card with a
@@ -111,7 +113,6 @@ function AppRoot() {
   //   Học viên detail → class detail (tab=classes) → class list page.
   // Without the tab switch below, the back-restored class detail would
   // render under tab=students with the wrong sidebar highlight.
-  const TAB_BY_DETAIL = { student: "students", class: "classes", payment: "payments" };
   const goBack = () => {
     const f = detail?.from;
     if (f?.type === "vehicle") {

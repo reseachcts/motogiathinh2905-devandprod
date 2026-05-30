@@ -92,20 +92,19 @@ const WINDOW_MS   = (Number(process.env.LOGIN_WINDOW_MIN) || 15) * 60_000;
 const LOCKOUT_MS  = (Number(process.env.LOGIN_LOCKOUT_MIN) || 60) * 60_000;
 const _failures = new Map();    // email → { attempts: number[], lockUntil: number }
 
-function _now() { return Date.now(); }
 function _key(email) { return String(email || '').toLowerCase().trim(); }
 
 export function checkLoginAttempt(email) {
   const k = _key(email);
   const rec = _failures.get(k);
   if (!rec) return { allowed: true };
-  if (rec.lockUntil && rec.lockUntil > _now()) {
+  if (rec.lockUntil && rec.lockUntil > Date.now()) {
     return { allowed: false, code: 'account_locked',
-      message: `Tài khoản tạm khóa. Thử lại sau ${Math.ceil((rec.lockUntil - _now())/60000)} phút.`,
-      retryAfter: rec.lockUntil - _now() };
+      message: `Tài khoản tạm khóa. Thử lại sau ${Math.ceil((rec.lockUntil - Date.now())/60000)} phút.`,
+      retryAfter: rec.lockUntil - Date.now() };
   }
   // Drop attempts outside the window.
-  rec.attempts = rec.attempts.filter(t => _now() - t < WINDOW_MS);
+  rec.attempts = rec.attempts.filter(t => Date.now() - t < WINDOW_MS);
   if (rec.attempts.length >= LIMIT) {
     return { allowed: false, code: 'too_many_attempts',
       message: `Quá ${LIMIT} lần thử trong ${Math.round(WINDOW_MS/60000)} phút. Vui lòng đợi.` };
@@ -116,11 +115,11 @@ export function checkLoginAttempt(email) {
 export function recordLoginFailure(email) {
   const k = _key(email);
   const rec = _failures.get(k) || { attempts: [], lockUntil: 0 };
-  rec.attempts.push(_now());
-  rec.attempts = rec.attempts.filter(t => _now() - t < WINDOW_MS);
+  rec.attempts.push(Date.now());
+  rec.attempts = rec.attempts.filter(t => Date.now() - t < WINDOW_MS);
   // Hard lockout after double the per-window limit.
   if (rec.attempts.length >= LIMIT * 2) {
-    rec.lockUntil = _now() + LOCKOUT_MS;
+    rec.lockUntil = Date.now() + LOCKOUT_MS;
     rec.attempts = [];
   }
   _failures.set(k, rec);
@@ -137,7 +136,7 @@ export function clearLoginFailures(email) {
 // shutdown. Tests don't need this so we only start it under non-test envs
 // (NODE_ENV !== 'test') to keep `node --test` deterministic.
 function _evictStaleFailures() {
-  const now = _now();
+  const now = Date.now();
   for (const [k, rec] of _failures) {
     const liveAttempts = rec.attempts.filter(t => now - t < WINDOW_MS);
     const stillLocked = rec.lockUntil && rec.lockUntil > now;

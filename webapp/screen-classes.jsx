@@ -354,7 +354,7 @@ function ClassDetail({ classId, onBack, onOpenStudent, isAdmin }) {
       <GlassCard padding={0}>
         <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)", display: "flex", alignItems: "center", gap: 10 }}>
           <h3 style={{ margin: 0, flex: 1, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>Danh sách học viên</h3>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>{list.length} học viên</span>
+          <span style={LABEL_STYLE}>{list.length} học viên</span>
         </div>
 
         <div style={{

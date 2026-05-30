@@ -356,6 +356,8 @@
       getFeePlan:   (id) => feePlansById.get(id),
       getPromotion: (id) => promotionsById.get(id),
       getVehicle:   (id) => vehiclesById.get(id),
+      // Returns branch options array for select dropdowns — avoids duplicating D.branches.map(...) in every tab.
+      getBranchOpts() { return this.branches.map(b => ({ id: b.id, label: b.name })); },
       paymentsForStudent: (id) => paymentsByStudentId.get(id) || [],
       rentalsForStudent:  (id) => rentalsByStudentId.get(id)  || [],
       rentalsForVehicle:  (id) => rentalsByVehicleId.get(id)  || [],
@@ -592,3 +594,7 @@
 
   window.MGT_DATA_READY = boot().catch(err => { console.error('[data-loader] boot failed:', err); throw err; });
 })();
+
+// toggleInArray — shared immutable toggle helper used across filter chips.
+// Returns arr with item removed if present, or [...arr, item] if not.
+window.toggleInArray = (arr, item) => arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item];

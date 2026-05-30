@@ -9,6 +9,8 @@
 //                   "1,100.95 triệu" format with dimmed decimal.
 // ====================================================================
 
+const MONTH_NAMES = ["Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6","Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"];
+
 // --------------------------------------------------------------------
 // Branch color palette — each branch owns a hue family, 3 tones.
 // Exposed globally so all screens (dashboard, org, classes) can light
@@ -440,7 +442,6 @@ function MiniCalendar({ value, onPick }) {
 
   const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   const today = new Date();
-  const MONTH_NAMES = ["Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6","Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"];
 
   return (
     <div onMouseDown={e => e.preventDefault()} style={{
@@ -669,16 +670,15 @@ function DashboardScreen() {
   const D = window.MGT_DATA;
 
   // Top KPIs use today/recent data — single pass over students.
-  const TODAY = "30/05";
   const ACTIVE_STATUSES = new Set(["đang mở", "đang diễn ra"]);
   let todayRevenue = 0, todayReceipts = 0, newToday = 0;
   let outstandingTotal = 0, outstandingCount = 0, activeStudents = 0;
   const licenceCount = { A: 0, A1: 0 };
   for (const p of D.payments) {
-    if (p.createdAt.startsWith(TODAY)) { todayRevenue += p.amount; todayReceipts++; }
+    if (p.createdAt.startsWith(D.TODAY)) { todayRevenue += p.amount; todayReceipts++; }
   }
   for (const s of D.students) {
-    if (s.createdAt.startsWith(TODAY)) newToday++;
+    if (s.createdAt.startsWith(D.TODAY)) newToday++;
     outstandingTotal += s.balance;
     if (s.balance > 0) outstandingCount++;
     const c = D.getClass(s.classId);
@@ -693,7 +693,7 @@ function DashboardScreen() {
           summarize the same headline numbers). */}
       <div className="mgt-print-hide" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
         <KpiBig index={0} label="Đã thu hôm nay" value={window.fmtVND(todayRevenue)}    hint={`${todayReceipts} biên lai`}     color="lime"   icon="trending-up"/>
-        <KpiBig index={1} label="HV mới hôm nay"  value={newToday}                       hint="đăng ký 30/05/2026"            color="cyan"   icon="user-plus"/>
+        <KpiBig index={1} label="HV mới hôm nay"  value={newToday}                       hint={`đăng ký ${D.TODAY}`}          color="cyan"   icon="user-plus"/>
         <KpiBig index={2} label="TỔNG NỢ"        value={window.fmtVND(outstandingTotal)} hint={`${outstandingCount} học viên chờ thanh toán`} color="pink"   icon="minus"/>
         <KpiBig index={3} label="Học viên active" value={activeStudents}                  hint={`A: ${licenceCount.A} · A1: ${licenceCount.A1}`} color="violet" icon="users"/>
       </div>

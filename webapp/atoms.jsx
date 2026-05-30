@@ -36,6 +36,11 @@ const ICONS = {
   "bike":       <g><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M5.5 17.5L9 10l4.5 3 3-6h2M12 10h2.5l2 7.5M9 10l2-4h3"/></g>,
 };
 
+// Shared inline style constants — reduces ~300 lines of duplicated props across screens.
+const LABEL_STYLE = { fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" };
+const MONO_VAL    = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
+const MONO_VAL_SM = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 11 };
+
 function Icon({ name, size = 18, color = "currentColor", className = "", style = {} }) {
   const path = ICONS[name];
   if (!path) return null;
@@ -670,4 +675,5 @@ function Select({ label, value, onChange, options, placeholder = "Chọn…", no
 Object.assign(window, {
   Icon, Button, GlassCard, StatusChip, Chip, Avatar, Input, Progress, Sparkline, CountUp, STATUS_MAP,
   PillTabs, FilterChip, DocSlot, PaymentPill, ProfilePill, ClassStatusPill, Select,
+  LABEL_STYLE, MONO_VAL, MONO_VAL_SM,
 });

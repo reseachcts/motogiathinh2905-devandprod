@@ -4,8 +4,6 @@
 // ====================================================================
 
 // Password complexity checklist — mirrors backend/auth.js passwordPolicy.
-// Used by both the "Tạo tài khoản mới" dialog and PasswordResetModal so
-// the rules shown match what the server will accept on submit.
 const PASSWORD_CHECKS = [
   { label: "≥ 8 ký tự",                       test: (v) => (v || "").length >= 8 },
   { label: "≥ 1 chữ cái thường (a–z)",        test: (v) => /[a-z]/.test(v || "") },
@@ -95,7 +93,7 @@ function BranchesTab({ onOpenClass }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {isAdmin && (
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>
+          <span style={{ ...LABEL_STYLE, flex: 1 }}>
             {D.branches.length} chi nhánh
           </span>
           <Button variant="primary" size="sm" icon="plus" onClick={() => setCreateOpen(true)}>Thêm chi nhánh</Button>
@@ -150,10 +148,7 @@ function BranchesTab({ onOpenClass }) {
                     <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.02em" }}>{b.name}</h3>
                     <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-3)" }}>{b.address}</span>
                   </div>
-                  {/* Per spec: branches do not expose Sửa/Xóa actions.
-                      Creation stays available via the "Thêm chi nhánh"
-                      button above for setup, but lifecycle changes happen
-                      via Lịch sử audit + DB ops, not user UI. */}
+                  {/* Branches have no Sửa/Xóa in UI — lifecycle changes go through DB ops. */}
                 </div>
 
                 <Divider/>
@@ -318,7 +313,7 @@ function AccountsTab() {
   // No placeholder entry — "" is not an accepted value server-side, and
   // EditRecordModal/RecordCreatorModal seed selects from options[0].id so
   // the first real branch is the default.
-  const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
+  const branchOpts = D.getBranchOpts();
   const accountCreateFields = [
     { id: "name",     label: "Họ tên",                  type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
     { id: "role",     label: "Vai trò",                 type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }] },
@@ -336,7 +331,7 @@ function AccountsTab() {
   return (
     <GlassCard padding={0}>
       <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)", display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>{D.accounts.length} tài khoản</span>
+        <span style={LABEL_STYLE}>{D.accounts.length} tài khoản</span>
         <div style={{ flex: 1 }}></div>
         <Button variant="primary" size="sm" icon="plus" onClick={() => setOpen(true)}>Tạo tài khoản</Button>
       </div>
@@ -412,7 +407,7 @@ function FeesTab() {
   return (
     <GlassCard padding={0}>
       <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)", display: "flex", alignItems: "center" }}>
-        <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>{D.feePlans.length} gói học phí</span>
+        <span style={{ ...LABEL_STYLE, flex: 1 }}>{D.feePlans.length} gói học phí</span>
         <Button variant="primary" size="sm" icon="plus" onClick={() => setOpen(true)}>Tạo gói</Button>
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
@@ -470,7 +465,7 @@ function PromosTab() {
   return (
     <GlassCard padding={0}>
       <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)", display: "flex", alignItems: "center" }}>
-        <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>{D.promotions.length} khuyến mãi</span>
+        <span style={{ ...LABEL_STYLE, flex: 1 }}>{D.promotions.length} khuyến mãi</span>
         <Button variant="primary" size="sm" icon="plus" onClick={() => setOpen(true)}>Tạo khuyến mãi</Button>
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
@@ -526,7 +521,7 @@ function TeachersTab() {
   // No placeholder entry — "" is not an accepted value server-side, and
   // EditRecordModal/RecordCreatorModal seed selects from options[0].id so
   // the first real branch is the default.
-  const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
+  const branchOpts = D.getBranchOpts();
   const teacherFields = [
     { id: "name",     label: "Họ tên",        type: "text",   placeholder: "Trần Văn B" },
     { id: "phone",    label: "Số điện thoại", type: "phone",  placeholder: "09…" },
@@ -536,7 +531,7 @@ function TeachersTab() {
   return (
     <GlassCard padding={0}>
       <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)", display: "flex", alignItems: "center" }}>
-        <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase" }}>{D.teachers.length} giáo viên</span>
+        <span style={{ ...LABEL_STYLE, flex: 1 }}>{D.teachers.length} giáo viên</span>
         <Button variant="primary" size="sm" icon="plus" onClick={() => setOpen(true)}>Thêm giáo viên</Button>
       </div>
       <RecordCreatorModal open={open} onClose={() => setOpen(false)}
@@ -594,7 +589,6 @@ function TeachersTab() {
 // screen-org-vehicles.jsx (loaded after this file in index.html).
 
 // classifyAction — derive (category, severity, tone) from an action string
-// classifyAction — derive (category, severity, tone) from an action string
 // such as "student.create" / "payment.create" / "branches.update" /
 // "auth.login_fail". Categories drive filter chips; severities drive the
 // per-row tone (info=cyan for system, warn=amber for edits, danger=pink
@@ -613,8 +607,7 @@ function classifyAction(action) {
 
 function ActivityTab() {
   const D = window.MGT_DATA;
-  // Per spec: "no warnings upon creation either" — `create` events are
-  // off by default in Lịch sử. Edits / deletes / money are the focus.
+  // `create` events are off by default — edits / deletes / money are the focus.
   const [filters, setFilters] = React.useState({
     money: true, edit: true, delete: true, create: false, system: false, other: false,
   });
@@ -651,7 +644,7 @@ function ActivityTab() {
     <GlassCard padding={0}>
       <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--ink-4)",
                     display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.16em", textTransform: "uppercase", marginRight: 4 }}>
+        <span style={{ ...LABEL_STYLE, marginRight: 4 }}>
           Nhật ký · {rows.length}/{D.activityLog.length}
         </span>
         <FilterPill k="money"  label="Thanh toán" color="var(--neon-lime)"/>
@@ -801,12 +794,7 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
   const [draft, setDraft] = React.useState(buildSeed);
   const [busy, setBusy]   = React.useState(false);
   const [err, setErr]     = React.useState(null);
-  // Synchronous double-submit guard — React state updates are async so a
-  // burst of clicks (e2e fires .click() 3× in a row) can slip past the
-  // `busy` flag before the re-render disables the button. The ref check
-  // is synchronous and wins that race; the React state still drives the
-  // visual disabled/label.
-  const busyRef = React.useRef(false);
+  const busyRef = React.useRef(false); // sync guard — React state batch means busyRef wins the race
   React.useEffect(() => { if (open) { setDraft(buildSeed()); setBusy(false); setErr(null); busyRef.current = false; } }, [open, initialValues]);  // eslint-disable-line
   const set = (id, v) => setDraft(prev => ({ ...prev, [id]: v }));
   // Await onSave; only close on success so failures stay visible inline
@@ -893,8 +881,7 @@ function PasswordResetModal({ open, onClose, account, onSubmit }) {
   const [pw, setPw]     = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [err, setErr]   = React.useState(null);
-  // Synchronous double-submit guard — see RecordCreatorModal for rationale.
-  const busyRef = React.useRef(false);
+  const busyRef = React.useRef(false); // sync guard — React state batch means busyRef wins the race
   React.useEffect(() => { if (open) { setPw(""); setBusy(false); setErr(null); busyRef.current = false; } }, [open]);
   const submit = async () => {
     if (busyRef.current) return;
@@ -986,8 +973,7 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
   const [draft, setDraft] = React.useState(buildSeed);
   const [busy, setBusy]   = React.useState(false);
   const [err, setErr]     = React.useState(null);
-  // Synchronous double-submit guard — see EditRecordModal for rationale.
-  const busyRef = React.useRef(false);
+  const busyRef = React.useRef(false); // sync guard — React state batch means busyRef wins the race
   React.useEffect(() => { if (open) { setDraft(buildSeed()); setBusy(false); setErr(null); busyRef.current = false; } }, [open]);  // eslint-disable-line
 
   const set = (id, v) => setDraft(prev => ({ ...prev, [id]: v }));
@@ -1080,7 +1066,7 @@ function MultiPillFieldInline({ label, values = [], options, onChange, color = "
   const toggle = (id) => onChange(isOn(id) ? values.filter(v => v !== id) : [...values, id]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>{label}</span>
+      <span style={LABEL_STYLE}>{label}</span>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {(options || []).map(o => {
           const active = isOn(o.id);

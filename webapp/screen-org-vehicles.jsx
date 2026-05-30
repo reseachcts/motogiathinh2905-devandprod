@@ -1,7 +1,6 @@
 // ====================================================================
 // Phương tiện tab — VehiclesTab, VehicleCard, VehicleExpanded,
-// RentVehicleModal. Loaded after screen-org.jsx so it can use
-// RecordCreatorModal, reportWriteError, MicroStat by bare name.
+// RentVehicleModal. Loaded after screen-org.jsx in index.html.
 // ====================================================================
 
 function VehiclesTab({ onOpenStudent, selectedId: selectedIdProp, onSelectedIdChange }) {
@@ -13,7 +12,7 @@ function VehiclesTab({ onOpenStudent, selectedId: selectedIdProp, onSelectedIdCh
   const selectedId    = selectedIdProp !== undefined ? selectedIdProp : localSelectedId;
   const setSelectedId = onSelectedIdChange       || setLocalSelectedId;
   const isAdmin = D.currentUser?.role === "admin";
-  const branchOpts = D.branches.map(b => ({ id: b.id, label: b.name }));
+  const branchOpts = D.getBranchOpts();
   // Vehicle reg code is the internal "Xe số N" identifier. Admin picks an
   // unused number from a dropdown; taken numbers are excluded.
   const MAX_VEHICLE_NUMBER = 50;
@@ -87,7 +86,7 @@ function VehiclesTab({ onOpenStudent, selectedId: selectedIdProp, onSelectedIdCh
 // mirroring ClassCard (title · sub · meta-label · meta-value · bare-big).
 // "N" is the internal Xe số number from v.plate (sequential 1..N integers).
 // --------------------------------------------------------------------
-// Placeholder revenue shown until real rental history exists (task #53 — seed rehaul).
+// Placeholder revenue shown until real rental history exists.
 function sampleRevenueFor(v) {
   const n = parseInt((String(v.id).match(/\d+/) || [1])[0], 10) || 1;
   return (n * 7 + 13) * 137000;

@@ -32,7 +32,7 @@ function StudentsScreen({ onOpenStudent, onAddStudent }) {
   let pool = D.students.slice();
   if (filters.incomplete) pool = pool.filter(s => !s.profileComplete);
   if (filters.owing)      pool = pool.filter(s => s.balance > 0);
-  if (filters.today)      pool = pool.filter(s => s.createdAt.startsWith("30/05"));
+  if (filters.today)      pool = pool.filter(s => s.createdAt.startsWith(D.TODAY));
   if (adv.search) {
     const q = adv.search.toLowerCase();
     pool = pool.filter(s => (s.name + " " + s.phone + " " + s.maHV).toLowerCase().includes(q));

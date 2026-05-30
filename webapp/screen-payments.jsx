@@ -10,10 +10,9 @@ function PaymentsScreen({ onOpenStudent, onAddPayment }) {
   const D = window.MGT_DATA;
 
   // KPIs in a single pass — was 3 separate D.students.filter calls.
-  const TODAY = "30/05";
   let todayCollected = 0, todayReceiptCount = 0;
   for (const p of D.payments) {
-    if (p.createdAt.startsWith(TODAY)) { todayCollected += p.amount; todayReceiptCount++; }
+    if (p.createdAt.startsWith(D.TODAY)) { todayCollected += p.amount; todayReceiptCount++; }
   }
   let partialCount = 0, partialOwedTotal = 0, overdueCount = 0;
   for (const s of D.students) {
@@ -50,11 +49,11 @@ function PaymentsScreen({ onOpenStudent, onAddPayment }) {
   const advStartMs = adv.dateRange?.start ? adv.dateRange.start.getTime() : null;
   const advEndMs   = adv.dateRange?.end   ? new Date(adv.dateRange.end.getFullYear(), adv.dateRange.end.getMonth(), adv.dateRange.end.getDate(), 23, 59, 59).getTime() : null;
 
-  // "Today" = 30/05/2026; use rolling windows ending at end-of-today.
-  const todayDate = new Date(2026, 4, 30, 23, 59, 59);
-  const startOfToday = new Date(2026, 4, 30, 0, 0, 0).getTime();
+  // Use rolling windows ending at end-of-today derived from D._NOW.
+  const todayDate = new Date(D._NOW.getFullYear(), D._NOW.getMonth(), D._NOW.getDate(), 23, 59, 59);
+  const startOfToday = new Date(D._NOW.getFullYear(), D._NOW.getMonth(), D._NOW.getDate(), 0, 0, 0).getTime();
   const startOfWeek  = todayDate.getTime() - 6 * 86400000;  // last 7 days incl. today
-  const startOfMonth = new Date(2026, 4, 1, 0, 0, 0).getTime();
+  const startOfMonth = new Date(D._NOW.getFullYear(), D._NOW.getMonth(), 1, 0, 0, 0).getTime();
 
   let pool = D.payments.map(p => {
     const s = D.getStudent(p.studentId);
