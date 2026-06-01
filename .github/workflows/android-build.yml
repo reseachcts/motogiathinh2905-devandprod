@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write       # required for the gh-release step
 
 jobs:
   build:
@@ -22,11 +22,13 @@ jobs:
           cache: 'npm'
           cache-dependency-path: guest-app/package-lock.json
 
-      - name: Setup JDK 17
+      - name: Setup JDK 21
+        # Capacitor 8 / AGP 8.7+ requires JDK 21 — compileDebugJavaWithJavac
+        # fails with `invalid source release: 21` on JDK 17.
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Install dependencies
         working-directory: guest-app
@@ -36,98 +38,21 @@ jobs:
         working-directory: guest-app
         run: npm run build:dev
 
-      - name: Diagnose pre-sync state
+      - name: Sync Capacitor android
         working-directory: guest-app
-        if: always()
-        run: |
-          echo "=== pwd ==="
-          pwd
-          echo "=== dist/ exists? ==="
-          ls -la dist/ | head -20 || echo "NO DIST"
-          echo "=== capacitor.config.json ==="
-          cat capacitor.config.json
-          echo "=== android/ top level ==="
-          ls -la android/ | head -20
-          echo "=== node_modules/@capacitor ==="
-          ls node_modules/@capacitor/ || true
-          echo "=== npx cap --version ==="
-          npx cap --version || true
-
-      - name: Sync Capacitor android (verbose + captured)
-        working-directory: guest-app
-        run: |
-          set +e
-          npx cap sync android --verbose 2>&1 | tee /tmp/cap-sync.log
-          STATUS=$?
-          echo "===== exit status: $STATUS ====="
-          if [ $STATUS -ne 0 ]; then
-            echo "::error::cap sync failed with status $STATUS"
-            cat /tmp/cap-sync.log
-            exit $STATUS
-          fi
-
-      - name: Upload cap-sync log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cap-sync-log
-          path: /tmp/cap-sync.log
-          if-no-files-found: warn
+        run: npx cap sync android
 
       - name: Make gradlew executable
         working-directory: guest-app/android
         run: chmod +x gradlew
 
-      - name: Build debug APK (verbose + captured)
+      - name: Build debug APK
         working-directory: guest-app/android
+        # pipefail so a gradle failure isn't masked by tee's exit code
+        shell: bash
         run: |
-          set +e
-          ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee /tmp/gradle.log
-          STATUS=$?
-          echo "===== gradle exit: $STATUS ====="
-          if [ $STATUS -ne 0 ]; then
-            echo "::error::gradle assembleDebug failed"
-            echo "--- tail of gradle.log ---"
-            tail -200 /tmp/gradle.log
-            exit $STATUS
-          fi
-
-      - name: Upload gradle log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-log
-          path: /tmp/gradle.log
-          if-no-files-found: warn
-
-      - name: Locate APK + dump diagnostic
-        if: always()
-        working-directory: guest-app/android
-        run: |
-          {
-            echo "=== outputs tree ==="
-            find app/build/outputs -type f 2>&1 | head -80 || echo "no outputs dir"
-            echo "=== any *.apk anywhere ==="
-            find .. -name '*.apk' 2>&1 | head -20 || echo "no APK"
-            echo "=== app/build top ==="
-            ls -la app/build/ 2>&1 | head -20 || echo "no app/build"
-            echo "=== app/build.gradle ==="
-            cat app/build.gradle
-          } | tee /tmp/diag.log
-
-      - name: Publish diagnostic Release (so we can fetch logs anonymously)
-        if: always()
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ci-debug
-          name: "CI debug ${{ github.sha }}"
-          body: "Build failure diagnostic. Replaced on each run."
-          files: |
-            /tmp/diag.log
-            /tmp/cap-sync.log
-            /tmp/gradle.log
-          fail_on_unmatched_files: false
-          prerelease: true
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -141,18 +66,33 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "MOTOGIATHINH Cộng tác viên · latest build"
+          name: "MOTOGIATHINH Cộng tác viên · latest debug build"
           body: |
             Automated debug APK from commit `${{ github.sha }}`.
 
-            **Install:**
-            1. Tap the `.apk` file below on your phone.
+            ## Install
+            1. **Tap the .apk file below** on your phone to download.
             2. Allow your browser to install unknown apps (one-time per browser).
-            3. Tap Install → Open.
+               Settings → Apps → Special access → Install unknown apps.
+            3. Tap **Install** → **Open**.
 
-            **First-run checklist:**
-            - Backend reachable on the phone's Wi-Fi: open `http://192.168.1.6:3001/api/health` in your phone's browser first.
-            - Login: `viet@motogiathinh.centersai` / `viet` (also: tuan / thaianh / tannhan).
-          files: guest-app/android/app/build/outputs/apk/debug/app-debug.apk
+            ## First-run checklist
+            - This build calls the **LAN dev backend** at `http://192.168.1.6:3001`.
+              The backend must be running, Windows Firewall must allow TCP 3001
+              inbound, and the phone must be on the same Wi-Fi.
+            - Verify by opening `http://192.168.1.6:3001/api/health` in your
+              phone's browser first — should return `{"ok":true,...}`.
+
+            ## Login
+            - `viet@motogiathinh.centersai` / `viet`
+            - (also seeded: `tuan` / `thaianh` / `tannhan`)
+
+            ## Smoke test (~2 min)
+            1. Login screen appears with SF Pro fonts.
+            2. Tap **Thêm học viên** → modal opens.
+            3. Tap **CCCD mặt trước** → native OS sheet appears with
+               "Chụp ảnh mới" / "Chọn từ thư viện" / "Hủy".
+            4. Fill Họ tên + SĐT → tap **Lưu học viên** → student created.
+          files: guest-app/android/app/build/outputs/apk/debug/*.apk
           fail_on_unmatched_files: true
           prerelease: true
