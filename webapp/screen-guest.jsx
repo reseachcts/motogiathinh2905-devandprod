@@ -17,7 +17,11 @@ function GuestApp() {
     return () => window.removeEventListener("mgt:datachanged", fn);
   }, []);
 
-  const [addOpen, setAddOpen] = React.useState(false);
+  const [addOpen, _setAddOpen] = React.useState(false);
+  const setAddOpen = (v) => {
+    if (v) D.api.refreshMe?.().catch(() => {});  // fresh assignedClassId
+    _setAddOpen(v);
+  };
   const [viewingId, setViewingId] = React.useState(null);
   const myStudents = D.students;  // server already scopes to guest's own
   const viewing = viewingId ? D.getStudent(viewingId) : null;
