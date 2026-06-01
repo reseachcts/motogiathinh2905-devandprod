@@ -395,7 +395,7 @@ router.post('/accounts', requireAdmin, (req, res, next) => {
   if (!pol.ok) return bad(res, 400, pol.code, { message: pol.message });
   next();
 }, makeAdminCreator('accounts', 'u',
-  ['name', 'role', 'branchId', 'phone', 'email', 'assignedClassId'], {
+  ['name', 'role', 'branchId', 'phone', 'email'], {
     required: ['name', 'email', 'role'],
     preInsert: (row, req) => {
       row.passwordHash = hashPassword(req.body.password);
@@ -479,7 +479,7 @@ router.delete('/notifications/:id', (req, res) => {
 // ---------------------------------------------------------------------------
 
 const PATCHABLE = {
-  accounts:   ['name', 'role', 'branchId', 'phone', 'email', 'active', 'assignedClassId'],
+  accounts:   ['name', 'role', 'branchId', 'phone', 'email', 'active'],
   fee_plans:  ['name', 'licence', 'amount'],
   promotions: ['name', 'appliesTo', 'discount'],
   teachers:   ['name', 'phone', 'yearsExp', 'branchId', 'active'],
