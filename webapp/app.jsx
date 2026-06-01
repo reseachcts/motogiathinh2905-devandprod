@@ -48,9 +48,12 @@ class ScreenErrorBoundary extends React.Component {
 function App() {
   // ThemeProvider wraps the whole app so theme toggles instantly
   // propagate to any component reading `useTheme()` / `useBranchTones()`.
+  // Guest accounts get the simplified mobile-style shell; admin/staff
+  // get the full desktop CRM.
+  const role = window.MGT_DATA?.currentUser?.role;
   return (
     <ThemeProvider>
-      <AppRoot/>
+      {role === 'guest' ? <GuestApp/> : <AppRoot/>}
     </ThemeProvider>
   );
 }

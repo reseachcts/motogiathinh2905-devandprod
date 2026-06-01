@@ -28,6 +28,21 @@ const BRANCH_SCOPED = new Set(['students', 'payments', 'classes']);
 function dump(table, mapRow) {
   return (req, res) => {
     let rows;
+    // Guests: only their own students; everything else is empty (kiosk role).
+    if (req.user.role === 'guest') {
+      if (table === 'students') {
+        rows = db.prepare(`SELECT * FROM students WHERE responsibleStaffId = ?`).all(req.user.id);
+      } else if (table === 'branches' || table === 'accounts') {
+        // Guests still need to resolve their own account row for currentUser.
+        rows = table === 'accounts'
+          ? db.prepare(`SELECT * FROM accounts WHERE id = ?`).all(req.user.id)
+          : [];
+      } else {
+        rows = [];
+      }
+      coerceBoolsAll(table, rows);
+      return res.json(mapRow ? rows.map(mapRow) : rows);
+    }
     if (BRANCH_SCOPED.has(table) && req.user.role !== 'admin') {
       rows = db.prepare(`SELECT * FROM ${table} WHERE branchId = ?`).all(req.user.branchId);
     } else if (table === 'notifications' && req.user.role !== 'admin') {

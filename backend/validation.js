@@ -17,7 +17,7 @@ const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const LOCKED_CLASS_STATUS = new Set(['đang mở', 'đang diễn ra', 'đã kết thúc']);
 const LOCKED_LICENCE      = new Set(['A', 'A1']);
 const LOCKED_METHOD       = new Set(['Tiền mặt', 'Chuyển khoản']);
-const LOCKED_ROLE         = new Set(['admin', 'staff']);
+const LOCKED_ROLE         = new Set(['admin', 'staff', 'guest']);
 const LOCKED_PAYMENT_KIND = new Set(['tuition', 'rental']);
 
 function err(field, code, message) { return { field, code, message }; }
@@ -100,7 +100,7 @@ export const validators = {
     if (v == null) return null;
     return LOCKED_ROLE.has(v)
       ? null
-      : err('role', 'bad_role', 'Vai trò phải là admin hoặc staff.');
+      : err('role', 'bad_role', 'Vai trò phải là admin, staff hoặc guest.');
   },
   paymentKind(v) {
     if (v == null) return null;

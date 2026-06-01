@@ -228,7 +228,7 @@
 
     const students = studentsRaw.map(s => ({
       ...s, createdAtMs: parseDT(s.createdAt),
-      docs: { cccd: !!s.docs_cccd, gksk: !!s.docs_gksk, donDeNghi: !!s.docs_donDeNghi, the3x4: !!s.docs_the3x4 },
+      docs: { cccd: !!s.docs_cccd, cccd_back: !!s.docs_cccd_back, gksk: !!s.docs_gksk, donDeNghi: !!s.docs_donDeNghi, the3x4: !!s.docs_the3x4 },
     }));
     // Split the wire payload by kind. Existing rows that pre-date the
     // schema migration come back as kind=undefined → coerce to 'tuition'
@@ -310,7 +310,7 @@
 
     function patchStudentIn(raw) {
       const s = { ...raw, createdAtMs: parseDT(raw.createdAt),
-        docs: { cccd: !!raw.docs_cccd, gksk: !!raw.docs_gksk, donDeNghi: !!raw.docs_donDeNghi, the3x4: !!raw.docs_the3x4 } };
+        docs: { cccd: !!raw.docs_cccd, cccd_back: !!raw.docs_cccd_back, gksk: !!raw.docs_gksk, donDeNghi: !!raw.docs_donDeNghi, the3x4: !!raw.docs_the3x4 } };
       students.push(s); studentsById.set(s.id, s);
       pushTo(studentsByClassId, s.classId, s); pushTo(studentsByBranchId, s.branchId, s);
       recomputeDerived(s);
@@ -557,7 +557,7 @@
           if (ex) {
             Object.assign(ex, raw, {
               createdAtMs: parseDT(raw.createdAt),
-              docs: { cccd: !!raw.docs_cccd, gksk: !!raw.docs_gksk, donDeNghi: !!raw.docs_donDeNghi, the3x4: !!raw.docs_the3x4 },
+              docs: { cccd: !!raw.docs_cccd, cccd_back: !!raw.docs_cccd_back, gksk: !!raw.docs_gksk, donDeNghi: !!raw.docs_donDeNghi, the3x4: !!raw.docs_the3x4 },
             });
             recomputeDerived(ex);
           }

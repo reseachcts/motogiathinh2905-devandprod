@@ -316,12 +316,14 @@ function AccountsTab() {
   const branchOpts = D.getBranchOpts();
   const accountCreateFields = [
     { id: "name",     label: "Họ tên",                  type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
-    { id: "role",     label: "Vai trò",                 type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }] },
+    { id: "role",     label: "Vai trò",                 type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }, { id: "guest", label: "Khách (kiosk)" }] },
     { id: "branchId", label: "Chi nhánh",               type: "select", options: branchOpts },
     { id: "email",    label: "Tên đăng nhập (Email)",   type: "text",   placeholder: "you@motogiathinh.vn" },
     { id: "phone",    label: "Số điện thoại",           type: "phone",  placeholder: "090 123 4567" },
+    // Guest accounts skip the complexity checklist — server uses the
+    // simple "non-empty" policy for them.
     { id: "password", label: "Mật khẩu tạm thời",       type: "password", placeholder: "Mật khẩu mới",
-      fullWidth: true, checks: PASSWORD_CHECKS },
+      fullWidth: true, checks: (draft) => draft.role === 'guest' ? null : PASSWORD_CHECKS },
   ];
   // PATCH doesn't accept `password` — keep the edit form without it
   // (use Đặt lại mật khẩu instead).
@@ -1022,6 +1024,7 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
           {(fields || []).map((f) => {
             // multipill rows always span the full width — pills wrap naturally.
             const span = f.fullWidth || f.type === "multipill" ? 2 : 1;
+            const checks = typeof f.checks === 'function' ? f.checks(draft) : f.checks;
             const node = f.type === "select"
               ? <Select label={f.label} value={draft[f.id]}
                         onChange={(v) => set(f.id, v)}
@@ -1047,7 +1050,7 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
             return (
               <div key={f.id} style={{ gridColumn: useGrid && span === 2 ? "span 2" : "auto" }}>
                 {node}
-                {f.checks && <PasswordChecks value={draft[f.id]} checks={f.checks}/>}
+                {checks && <PasswordChecks value={draft[f.id]} checks={checks}/>}
               </div>
             );
           })}

@@ -28,9 +28,12 @@ const VALID_METHOD  = ['Tiền mặt', 'Chuyển khoản'];
 function bad(res, code, error, extra) { return res.status(code).json({ error, ...extra }); }
 
 // Validate a student form payload (POST + PATCH share most rules).
-function validateStudentForm(form, { isCreate }) {
+// Guest creates only require `name` — they don't pick a class or staff;
+// the server fills classId=null, responsibleStaffId=guest's own user id.
+function validateStudentForm(form, { isCreate, role }) {
   if (isCreate) {
-    const req = check(V.required(form, ['name', 'classId', 'responsibleStaffId']));
+    const required = role === 'guest' ? ['name'] : ['name', 'classId', 'responsibleStaffId'];
+    const req = check(V.required(form, required));
     if (req) return req;
   }
   return check(
@@ -50,29 +53,36 @@ function validateStudentForm(form, { isCreate }) {
 router.post('/students', (req, res) => {
   const { form, docs, profileComplete } = req.body || {};
   if (!form) return bad(res, 400, 'missing_form');
-  const vErr = validateStudentForm(form, { isCreate: true });
+  const isGuest = req.user.role === 'guest';
+  const vErr = validateStudentForm(form, { isCreate: true, role: req.user.role });
   if (vErr) return badV(res, vErr);
 
-  const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(form.classId);
-  if (!cls) return bad(res, 400, 'invalid_classId');
+  // Guests don't pick a class, fee plan, or promotion. The student is
+  // unassigned until staff/admin later edits — branchId stays null too.
+  let cls = null;
+  if (!isGuest) {
+    cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(form.classId);
+    if (!cls) return bad(res, 400, 'invalid_classId');
+  }
 
-  const feePlan = form.feePlanId
+  const feePlan = !isGuest && form.feePlanId
     ? db.prepare('SELECT * FROM fee_plans WHERE id = ?').get(form.feePlanId)
     : null;
-  if (form.feePlanId && !feePlan) return bad(res, 400, 'invalid_feePlanId');
+  if (!isGuest && form.feePlanId && !feePlan) return bad(res, 400, 'invalid_feePlanId');
 
-  const promo = form.promotionId && form.promotionId !== 'promo-none'
+  const promo = !isGuest && form.promotionId && form.promotionId !== 'promo-none'
     ? db.prepare('SELECT * FROM promotions WHERE id = ?').get(form.promotionId)
     : null;
-  if (form.promotionId && form.promotionId !== 'promo-none' && !promo) {
+  if (!isGuest && form.promotionId && form.promotionId !== 'promo-none' && !promo) {
     return bad(res, 400, 'invalid_promotionId');
   }
 
-  const licence = feePlan?.licence || (VALID_LICENCE.includes(form.licence) ? form.licence : 'A');
+  const licence = feePlan?.licence || (VALID_LICENCE.includes(form.licence) ? form.licence : null);
   const totalFee = feePlan ? feePlan.amount - (promo?.discount || 0) : 0;
 
   // Branch-scoping: staff users can only enroll into their own branch.
-  if (req.user.role !== 'admin' && cls.branchId !== req.user.branchId) {
+  // Guests are unscoped — server fills branchId = null.
+  if (req.user.role === 'staff' && cls.branchId !== req.user.branchId) {
     return bad(res, 403, 'wrong_branch');
   }
 
@@ -80,6 +90,10 @@ router.post('/students', (req, res) => {
   const maHV = nextMaHV();
   const createdAt = nowDdMmYyyyHHMMSS();
   const d = docs || {};
+  // Guests always own the records they create — no class, no branch.
+  const responsibleStaffId = isGuest ? req.user.id : form.responsibleStaffId;
+  const branchId           = isGuest ? null       : cls.branchId;
+  const classId            = isGuest ? null       : form.classId;
 
   try {
     db.prepare(`
@@ -87,15 +101,15 @@ router.post('/students', (req, res) => {
         id, maHV, name, phone, dob, gender, idNumber, address, queQuan,
         ngayCapCCCD, noiCapCCCD, classId, licence, feePlanId, promotionId,
         totalFee, profileComplete, responsibleStaffId, branchId, createdAt,
-        docs_cccd, docs_gksk, docs_donDeNghi, docs_the3x4, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        docs_cccd, docs_cccd_back, docs_gksk, docs_donDeNghi, docs_the3x4, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, maHV, form.name, form.phone || null, form.dob || null, form.gender || null,
       form.idNumber || null, form.address || null, form.queQuan || null,
       form.ngayCapCCCD || null, form.noiCapCCCD || null,
-      form.classId, licence, form.feePlanId || null, form.promotionId || null,
-      totalFee, profileComplete ? 1 : 0, form.responsibleStaffId, cls.branchId, createdAt,
-      d.cccd ? 1 : 0, d.gksk ? 1 : 0, d.donDeNghi ? 1 : 0, d.the3x4 ? 1 : 0,
+      classId, licence, form.feePlanId || null, form.promotionId || null,
+      totalFee, profileComplete ? 1 : 0, responsibleStaffId, branchId, createdAt,
+      d.cccd ? 1 : 0, d.cccd_back ? 1 : 0, d.gksk ? 1 : 0, d.donDeNghi ? 1 : 0, d.the3x4 ? 1 : 0,
       form.notes || null,
     );
   } catch (e) {
@@ -364,9 +378,10 @@ router.post('/accounts', requireAdmin, (req, res, next) => {
     const branchOk = db.prepare('SELECT 1 FROM branches WHERE id = ?').get(branchId);
     if (!branchOk) return bad(res, 400, 'invalid_branchId');
   }
-  // Password is required at creation time — without it the account can never
-  // log in. passwordPolicy enforces length + char-class rules.
-  const pol = passwordPolicy(password);
+  // Password required at creation. Guest accounts use the simple policy
+  // (any non-empty string) — they're lowest-tier kiosk users; staff/admin
+  // still need the full complexity rules.
+  const pol = passwordPolicy(password, { simple: role === 'guest' });
   if (!pol.ok) return bad(res, 400, pol.code, { message: pol.message });
   next();
 }, makeAdminCreator('accounts', 'u',

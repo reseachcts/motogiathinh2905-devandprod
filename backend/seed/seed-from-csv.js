@@ -173,6 +173,14 @@ function seedAdminIfMissing() {
   if (password === 'admin' || password === 'changeme') {
     console.log(`  ⚠ default password is "${password}" — change immediately after first login`);
   }
+
+  // Guest kiosk account — gets the same one-word default password.
+  const guest = db.prepare("SELECT * FROM accounts WHERE role = 'guest' LIMIT 1").get();
+  if (guest) {
+    const guestHash = bcrypt.hashSync('guest', 10);
+    db.prepare('UPDATE accounts SET passwordHash = ?, active = 1 WHERE id = ?').run(guestHash, guest.id);
+    console.log(`  ✓ password set on guest (id=${guest.id}, email=${guest.email}, pw="guest")`);
+  }
 }
 
 function main() {

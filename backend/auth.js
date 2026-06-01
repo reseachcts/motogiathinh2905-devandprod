@@ -69,8 +69,10 @@ export function hashPassword(plain) {
 // The frontend "Tạo tài khoản mới" dialog shows the same 5 checks live.
 const MIN_PW_LEN = Math.max(8, Number(process.env.MIN_PASSWORD_LENGTH) || 8);
 const SPECIAL_RE = /[!@#$%^&*()_+\-={}\[\]|\\:;"'<>,.?/~`]/;
-export function passwordPolicy(pw) {
-  if (typeof pw !== 'string') return { ok: false, code: 'password_required', message: 'Mật khẩu là bắt buộc.' };
+// simple=true: guest accounts only need a non-empty password, no complexity.
+export function passwordPolicy(pw, { simple = false } = {}) {
+  if (typeof pw !== 'string' || !pw) return { ok: false, code: 'password_required', message: 'Mật khẩu là bắt buộc.' };
+  if (simple) return { ok: true };
   if (pw.length < MIN_PW_LEN) return { ok: false, code: 'password_too_short',
     message: `Mật khẩu phải có ít nhất ${MIN_PW_LEN} ký tự.` };
   if (!/[a-z]/.test(pw)) return { ok: false, code: 'password_needs_lowercase',
