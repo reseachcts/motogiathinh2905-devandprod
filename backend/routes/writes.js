@@ -133,7 +133,11 @@ router.patch('/students/:id', (req, res) => {
   const id = req.params.id;
   const existing = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
   if (!existing) return bad(res, 404, 'not_found');
-  if (req.user.role !== 'admin' && existing.branchId !== req.user.branchId) {
+  // Guests scope by responsibleStaffId (their own records only).
+  // Staff scope by branchId. Admin sees everything.
+  if (req.user.role === 'guest') {
+    if (existing.responsibleStaffId !== req.user.id) return bad(res, 403, 'not_owner');
+  } else if (req.user.role === 'staff' && existing.branchId !== req.user.branchId) {
     return bad(res, 403, 'wrong_branch');
   }
   const body = req.body || {};
@@ -169,7 +173,7 @@ router.patch('/students/:id', (req, res) => {
   const allowed = ['name', 'phone', 'dob', 'gender', 'idNumber', 'address', 'queQuan',
     'ngayCapCCCD', 'noiCapCCCD', 'classId', 'licence', 'feePlanId', 'promotionId',
     'profileComplete', 'responsibleStaffId', 'notes',
-    'docs_cccd', 'docs_gksk', 'docs_donDeNghi', 'docs_the3x4'];
+    'docs_cccd', 'docs_cccd_back', 'docs_gksk', 'docs_donDeNghi', 'docs_the3x4'];
   const sets = [], vals = [];
   for (const k of allowed) {
     if (k in body) {

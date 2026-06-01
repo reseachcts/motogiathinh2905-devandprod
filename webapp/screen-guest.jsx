@@ -20,7 +20,9 @@ function GuestApp() {
 
   const [tab, setTab]       = React.useState("home");
   const [addOpen, setAddOpen] = React.useState(false);
+  const [viewingId, setViewingId] = React.useState(null);
   const myStudents = D.students;  // server already scopes to guest's own
+  const viewing = viewingId ? D.getStudent(viewingId) : null;
 
   return (
     <div style={{
@@ -57,10 +59,13 @@ function GuestApp() {
 
         {/* Body */}
         <main style={{ flex: 1, overflowY: "auto", padding: "16px 18px 80px" }}>
-          {tab === "home" && (
+          {viewing ? (
+            <GuestStudentDetail student={viewing} onBack={() => setViewingId(null)}/>
+          ) : tab === "home" ? (
             <GuestHome onAdd={() => setAddOpen(true)} onOpenList={() => setTab("list")} count={myStudents.length}/>
+          ) : (
+            <GuestStudentList students={myStudents} onOpen={(id) => setViewingId(id)}/>
           )}
-          {tab === "list" && <GuestStudentList students={myStudents}/>}
         </main>
 
         {/* Bottom nav */}
@@ -105,15 +110,7 @@ function GuestNavButton({ active, onClick, icon, label, badge }) {
 
 function GuestHome({ onAdd, onOpenList, count }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 12 }}>
-      <div style={{ textAlign: "center", padding: "24px 12px 18px" }}>
-        <h1 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 600,
-                     color: "var(--fg-1)", letterSpacing: "-0.02em" }}>Chào bạn 👋</h1>
-        <p style={{ margin: "8px 0 0", fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-3)" }}>
-          Thêm học viên mới hoặc xem danh sách của bạn.
-        </p>
-      </div>
-
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 36 }}>
       <button onClick={onAdd} style={{
         padding: "22px 18px", borderRadius: 16, border: "none", cursor: "pointer",
         background: "var(--neon-cyan)", color: "var(--ink-0)",
@@ -125,10 +122,7 @@ function GuestHome({ onAdd, onOpenList, count }) {
                       display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon name="user-plus" size={22} color="var(--ink-0)"/>
         </div>
-        <div style={{ flex: 1, textAlign: "left" }}>
-          <div>Thêm học viên</div>
-          <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.75, marginTop: 2 }}>Tên + CCCD + ảnh là đủ</div>
-        </div>
+        <span style={{ flex: 1, textAlign: "left" }}>Thêm học viên</span>
       </button>
 
       <button onClick={onOpenList} style={{
@@ -143,7 +137,7 @@ function GuestHome({ onAdd, onOpenList, count }) {
         </div>
         <div style={{ flex: 1, textAlign: "left" }}>
           <div>Học viên của tôi</div>
-          <div style={{ ...LABEL_STYLE, marginTop: 4 }}>{count} hồ sơ đã đăng ký</div>
+          <div style={{ ...LABEL_STYLE, marginTop: 4 }}>{count}</div>
         </div>
         <Icon name="arrow-right" size={18} color="var(--fg-3)"/>
       </button>
@@ -151,26 +145,27 @@ function GuestHome({ onAdd, onOpenList, count }) {
   );
 }
 
-function GuestStudentList({ students }) {
+function GuestStudentList({ students, onOpen }) {
   if (students.length === 0) {
     return (
       <div style={{ padding: "48px 16px", textAlign: "center", color: "var(--fg-3)" }}>
         <div style={{ fontSize: 36, marginBottom: 8 }}>👤</div>
         <div style={{ fontFamily: "var(--font-ui)", fontSize: 14 }}>Chưa có học viên nào</div>
-        <div style={{ ...LABEL_STYLE, marginTop: 10 }}>Bấm "Thêm học viên" ở trang chủ</div>
       </div>
     );
   }
   const sorted = [...students].sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ ...LABEL_STYLE, padding: "4px 4px 8px" }}>{students.length} học viên</div>
       {sorted.map(s => (
-        <div key={s.id} style={{
-          padding: "14px 14px", borderRadius: 14,
+        <button key={s.id} onClick={() => onOpen(s.id)} style={{
+          padding: "14px 14px", borderRadius: 14, cursor: "pointer", textAlign: "left",
           background: "var(--glass-2)", border: "1px solid var(--glass-stroke)",
-          display: "flex", alignItems: "center", gap: 12,
-        }}>
+          display: "flex", alignItems: "center", gap: 12, fontFamily: "inherit",
+          transition: "background 140ms var(--ease-out), border-color 140ms var(--ease-out)",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--neon-cyan)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--glass-stroke)"; }}>
           <Avatar name={s.name} size={40}/>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "var(--font-ui)", fontSize: 14, fontWeight: 600, color: "var(--fg-1)",
@@ -182,8 +177,120 @@ function GuestStudentList({ students }) {
               CCCD<br/>{s.idNumber.slice(-4)}
             </div>
           )}
-        </div>
+          <Icon name="arrow-right" size={14} color="var(--fg-3)"/>
+        </button>
       ))}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------
+// GuestStudentDetail — view + edit a single student's basic fields.
+// All inputs save via PATCH /api/students/:id on tap of the Save button.
+// --------------------------------------------------------------------
+function GuestStudentDetail({ student, onBack }) {
+  const D = window.MGT_DATA;
+  const [draft, setDraft] = React.useState({
+    name:        student.name        || "",
+    idNumber:    student.idNumber    || "",
+    phone:       student.phone       || "",
+    dob:         student.dob         || "",
+    gender:      student.gender      || "",
+    queQuan:     student.queQuan     || "",
+    address:     student.address     || "",
+    ngayCapCCCD: student.ngayCapCCCD || "",
+    noiCapCCCD:  student.noiCapCCCD  || "",
+    notes:       student.notes       || "",
+  });
+  const set = (k, v) => setDraft(prev => ({ ...prev, [k]: v }));
+  const [busy, setBusy] = React.useState(false);
+  const [err,  setErr]  = React.useState(null);
+  const busyRef = React.useRef(false);
+  // dirty flag — only Save what changed.
+  const isDirty = Object.keys(draft).some(k => (draft[k] || "") !== (student[k] || ""));
+
+  const submit = async () => {
+    if (busyRef.current || !isDirty) return;
+    busyRef.current = true;
+    try {
+      setBusy(true); setErr(null);
+      const patch = {};
+      Object.keys(draft).forEach(k => {
+        const before = student[k] || "";
+        const after  = draft[k] || "";
+        if (before !== after) patch[k] = after || null;
+      });
+      await D.api.updateStudent(student.id, patch);
+      if (window.MGT_TOAST) window.MGT_TOAST("Đã lưu thay đổi.");
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      busyRef.current = false; setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <button onClick={onBack} style={{
+        background: "transparent", border: "none", color: "var(--fg-3)",
+        fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 500, cursor: "pointer",
+        display: "inline-flex", alignItems: "center", gap: 6, padding: 0, alignSelf: "flex-start",
+      }}>
+        <Icon name="arrow-up" size={14} style={{ transform: "rotate(-90deg)" }}/>
+        Danh sách
+      </button>
+
+      {/* Hero */}
+      <div style={{
+        padding: "18px 16px", borderRadius: 16,
+        background: "var(--glass-2)", border: "1px solid var(--glass-stroke)",
+        display: "flex", alignItems: "center", gap: 14,
+      }}>
+        <Avatar name={student.name} size={56} glow/>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600, color: "var(--fg-1)",
+                        letterSpacing: "-0.02em",
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{student.name}</div>
+          <div style={{ ...LABEL_STYLE, marginTop: 4 }}>{student.maHV} · {student.licence || "—"}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Input label="Họ tên"  value={draft.name}     onChange={(v) => set("name", v)}/>
+        <Input label="CCCD"    value={draft.idNumber} onChange={(v) => set("idNumber", v)}
+               digits maxDigits={12} mono format={window.fmtCCCD}/>
+        <Input label="Số điện thoại" value={draft.phone} onChange={(v) => set("phone", v)}
+               digits maxDigits={10} format={window.fmtPhone}/>
+        <Input label="Ngày sinh (dd/mm/yyyy)" value={draft.dob} onChange={(v) => set("dob", v)}
+               digits maxDigits={8} format={window.fmtDateInput} storeFormatted/>
+        <Select label="Giới tính" value={draft.gender || ""} onChange={(v) => set("gender", v)}
+                options={[{ value: "", label: "—" }, { value: "Nam", label: "Nam" }, { value: "Nữ", label: "Nữ" }]}/>
+        <Input label="Quê quán" value={draft.queQuan} onChange={(v) => set("queQuan", v)}/>
+        <Input label="Địa chỉ"  value={draft.address} onChange={(v) => set("address", v)}/>
+        <Input label="Ngày cấp CCCD (dd/mm/yyyy)" value={draft.ngayCapCCCD}
+               onChange={(v) => set("ngayCapCCCD", v)}
+               digits maxDigits={8} format={window.fmtDateInput} storeFormatted/>
+        <Input label="Nơi cấp CCCD" value={draft.noiCapCCCD} onChange={(v) => set("noiCapCCCD", v)}/>
+        <Input label="Ghi chú"  value={draft.notes}   onChange={(v) => set("notes", v)}/>
+      </div>
+
+      {err && (
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>Lỗi: {err}</span>
+      )}
+
+      <button onClick={submit} disabled={!isDirty || busy} style={{
+        padding: "14px 16px", borderRadius: 14, border: "none",
+        cursor: (!isDirty || busy) ? "not-allowed" : "pointer",
+        background: isDirty ? "var(--neon-cyan)" : "var(--glass-2)",
+        color: isDirty ? "var(--ink-0)" : "var(--fg-3)",
+        boxShadow: isDirty ? "0 0 0 1px var(--neon-cyan), 0 0 18px var(--neon-cyan-haze)" : "none",
+        fontFamily: "var(--font-ui)", fontSize: 14, fontWeight: 600,
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+        opacity: busy ? 0.6 : 1,
+      }}>
+        <Icon name="check" size={16}/>
+        {busy ? "Đang lưu…" : isDirty ? "Lưu thay đổi" : "Không có thay đổi"}
+      </button>
     </div>
   );
 }
