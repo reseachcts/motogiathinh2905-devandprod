@@ -90,12 +90,17 @@ router.get('/activity-log',  dump('activity_log'));
 // PROFILE_DOCS constant — bundled here so the frontend can fetch it once
 // rather than hard-coding (and so we can extend slot definitions later).
 router.get('/constants/profile-docs', (_req, res) => {
+  // === GUEST-QR-PACK begin — adds CCCD mặt sau + CCCD QR slots in
+  // the order requested. Revert by restoring the original 4-entry list.
   res.json([
-    { key: 'cccd',      label: 'CCCD',                 hint: 'Hình mặt trước · OCR sẽ tự điền thông tin' },
+    { key: 'cccd',      label: 'CCCD mặt trước',      hint: 'Hình mặt trước · OCR sẽ tự điền thông tin' },
+    { key: 'cccd_back', label: 'CCCD mặt sau',        hint: 'Hình mặt sau' },
+    { key: 'cccd_qr',   label: 'CCCD QR',             hint: 'Mã QR trên CCCD (do kiosk khách quét)' },
     { key: 'gksk',      label: 'Giấy khám sức khỏe',   hint: 'Bản scan / chụp' },
     { key: 'donDeNghi', label: 'Đơn đề nghị học',      hint: 'Đơn đề nghị học sát hạch' },
-    { key: 'the3x4',    label: 'Thẻ 3×4',              hint: 'Ảnh chân dung' },
+    { key: 'the3x4',    label: 'Ảnh thẻ 3×4',          hint: 'Ảnh chân dung' },
   ]);
+  // === GUEST-QR-PACK end
 });
 
 // Server time — so the frontend's mock-clock can be retired without baking

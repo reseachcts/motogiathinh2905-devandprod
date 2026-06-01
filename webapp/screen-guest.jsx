@@ -331,9 +331,9 @@ function GuestAddStudentModal({ open, onClose }) {
         ...(qrInfo.address     && { address: qrInfo.address }),
         ...(qrInfo.ngayCapCCCD && { ngayCapCCCD: qrInfo.ngayCapCCCD }),
       };
-      // Persist the QR image into the the3x4 slot (reuse existing schema).
-      const uploadMap = { cccd: docFiles.cccd, cccd_back: docFiles.cccd_back, the3x4: docFiles.cccd_qr };
-      const docs = { cccd: !!uploadMap.cccd, cccd_back: !!uploadMap.cccd_back, the3x4: !!uploadMap.the3x4 };
+      // QR photo lands in its own docs_cccd_qr slot (added by GUEST-QR-PACK).
+      const uploadMap = { cccd: docFiles.cccd, cccd_back: docFiles.cccd_back, cccd_qr: docFiles.cccd_qr };
+      const docs = { cccd: !!uploadMap.cccd, cccd_back: !!uploadMap.cccd_back, cccd_qr: !!uploadMap.cccd_qr };
       const created = await D.api.createStudent({ form, docs, profileComplete: false });
       await Promise.all(Object.entries(uploadMap).map(
         ([key, file]) => file ? D.api.uploadStudentDoc(created.id, key, file).catch((e) => {

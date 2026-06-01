@@ -418,13 +418,18 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
       </div>
 
       {/* Bottom — Tài liệu (full width) */}
+      {/* === GUEST-QR-PACK begin — 6-slot grid (3 cols × 2 rows) with
+          CCCD mặt trước / sau / QR on row 1 and GKSK / Đơn / Thẻ 3×4
+          on row 2. Revert: change repeat(3,1fr)→repeat(4,1fr) and
+          drop the count denominator from 6→4. The slot list itself is
+          driven by /api/constants/profile-docs in entities.js. === */}
       <GlassCard padding={24}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <h3 style={{ margin: 0, flex: 1, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.015em" }}>Tài liệu</h3>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.08em" }}>{docsFilledCount}/4 · kéo & thả vào ô</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.08em" }}>{docsFilledCount}/6 · kéo & thả vào ô</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
             {D.PROFILE_DOCS.map(doc => (
               <DocSlot key={doc.key} doc={doc} filled={docs[doc.key]}
                        previewUrl={s['docs_' + doc.key + '_url']}
@@ -455,6 +460,7 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
           </div>
         </div>
       </GlassCard>
+      {/* === GUEST-QR-PACK end === */}
     </div>
   );
 }

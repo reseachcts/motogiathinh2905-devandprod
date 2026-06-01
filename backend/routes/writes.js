@@ -101,15 +101,15 @@ router.post('/students', (req, res) => {
         id, maHV, name, phone, dob, gender, idNumber, address, queQuan,
         ngayCapCCCD, noiCapCCCD, classId, licence, feePlanId, promotionId,
         totalFee, profileComplete, responsibleStaffId, branchId, createdAt,
-        docs_cccd, docs_cccd_back, docs_gksk, docs_donDeNghi, docs_the3x4, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        docs_cccd, docs_cccd_back, docs_cccd_qr, docs_gksk, docs_donDeNghi, docs_the3x4, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, maHV, form.name, form.phone || null, form.dob || null, form.gender || null,
       form.idNumber || null, form.address || null, form.queQuan || null,
       form.ngayCapCCCD || null, form.noiCapCCCD || null,
       classId, licence, form.feePlanId || null, form.promotionId || null,
       totalFee, profileComplete ? 1 : 0, responsibleStaffId, branchId, createdAt,
-      d.cccd ? 1 : 0, d.cccd_back ? 1 : 0, d.gksk ? 1 : 0, d.donDeNghi ? 1 : 0, d.the3x4 ? 1 : 0,
+      d.cccd ? 1 : 0, d.cccd_back ? 1 : 0, d.cccd_qr ? 1 : 0, d.gksk ? 1 : 0, d.donDeNghi ? 1 : 0, d.the3x4 ? 1 : 0,
       form.notes || null,
     );
   } catch (e) {
@@ -173,7 +173,7 @@ router.patch('/students/:id', (req, res) => {
   const allowed = ['name', 'phone', 'dob', 'gender', 'idNumber', 'address', 'queQuan',
     'ngayCapCCCD', 'noiCapCCCD', 'classId', 'licence', 'feePlanId', 'promotionId',
     'profileComplete', 'responsibleStaffId', 'notes',
-    'docs_cccd', 'docs_cccd_back', 'docs_gksk', 'docs_donDeNghi', 'docs_the3x4'];
+    'docs_cccd', 'docs_cccd_back', 'docs_cccd_qr', 'docs_gksk', 'docs_donDeNghi', 'docs_the3x4'];
   const sets = [], vals = [];
   for (const k of allowed) {
     if (k in body) {

@@ -19,7 +19,7 @@ const UPLOAD_ROOT = process.env.UPLOAD_DIR
   : resolve(HERE, '..', 'data', 'uploads');
 mkdirSync(UPLOAD_ROOT, { recursive: true });
 
-const DOC_KEYS = ['cccd', 'cccd_back', 'gksk', 'donDeNghi', 'the3x4'];
+const DOC_KEYS = ['cccd', 'cccd_back', 'cccd_qr', 'gksk', 'donDeNghi', 'the3x4'];
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 const MAX_BYTES = 8 * 1024 * 1024;  // 8MB
 
