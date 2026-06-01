@@ -155,8 +155,9 @@ function GuestStudentList({ students, onOpen }) {
 // --------------------------------------------------------------------
 function GuestStudentDetail({ student, onBack }) {
   const D = window.MGT_DATA;
-  const [name,  setName]  = React.useState(student.name  || "");
-  const [phone, setPhone] = React.useState(student.phone || "");
+  const [name,    setName]    = React.useState(student.name    || "");
+  const [phone,   setPhone]   = React.useState(student.phone   || "");
+  const [licence, setLicence] = React.useState(student.licence || "A1");
   // newFiles tracks photos the user picked this session; existing photo
   // status comes from student.docs.{cccd,cccd_back,cccd_qr}.
   const [newFiles, setNewFiles] = React.useState({});
@@ -171,7 +172,9 @@ function GuestStudentDetail({ student, onBack }) {
   const [err,  setErr]  = React.useState(null);
   const busyRef = React.useRef(false);
 
-  const fieldsDirty = (name  !== (student.name  || "")) || (phone !== (student.phone || ""));
+  const fieldsDirty = (name    !== (student.name    || ""))
+                   || (phone   !== (student.phone   || ""))
+                   || (licence !== (student.licence || ""));
   // Non-QR photos are unrestricted; the QR slot is gated below.
   const otherPhotosDirty = !!(newFiles.cccd || newFiles.cccd_back);
   const qrReplaced       = !!newFiles.cccd_qr;
@@ -210,9 +213,10 @@ function GuestStudentDetail({ student, onBack }) {
       // 1) PATCH text fields + (if QR was re-scanned) the new idNumber
       //    pulled from the QR payload.
       const patch = {};
-      if (name  !== (student.name  || "")) patch.name  = name  || null;
-      if (phone !== (student.phone || "")) patch.phone = phone || null;
-      if (qrReplaced && qrInfo?.idNumber)  patch.idNumber = qrInfo.idNumber;
+      if (name    !== (student.name    || "")) patch.name    = name    || null;
+      if (phone   !== (student.phone   || "")) patch.phone   = phone   || null;
+      if (licence !== (student.licence || "")) patch.licence = licence || null;
+      if (qrReplaced && qrInfo?.idNumber)      patch.idNumber = qrInfo.idNumber;
       if (Object.keys(patch).length) await D.api.updateStudent(student.id, patch);
       // 2) Upload any new photos.
       const uploads = Object.entries(newFiles).filter(([, f]) => !!f);
@@ -258,8 +262,12 @@ function GuestStudentDetail({ student, onBack }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Input label="Họ tên" value={name} onChange={setName}/>
-        <Input label="Số điện thoại" value={phone} onChange={setPhone}
-               digits maxDigits={10} format={window.fmtPhone}/>
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
+          <Input label="Số điện thoại" value={phone} onChange={setPhone}
+                 digits maxDigits={10} format={window.fmtPhone}/>
+          <Select label="Hạng bằng" value={licence} onChange={setLicence}
+                  options={[{ value: "A1", label: "A1" }, { value: "A", label: "A" }]}/>
+        </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <PhotoSlot label="CCCD mặt trước"
@@ -317,6 +325,7 @@ function GuestAddStudentModal({ open, onClose }) {
   const D = window.MGT_DATA;
   const [name,     setName]     = React.useState("");
   const [phone,    setPhone]    = React.useState("");
+  const [licence,  setLicence]  = React.useState("A1");    // hạng bằng — A or A1
   const [docFiles, setDocFiles] = React.useState({});      // { cccd, cccd_back, cccd_qr }
   const [qrInfo,   setQrInfo]   = React.useState(null);    // { idNumber, name, ... } after a successful scan
   const [qrErr,    setQrErr]    = React.useState(null);    // "QR chưa rõ. Hãy chụp rõ hơn." etc
@@ -327,7 +336,7 @@ function GuestAddStudentModal({ open, onClose }) {
 
   React.useEffect(() => {
     if (!open) return;
-    setName(""); setPhone(""); setDocFiles({});
+    setName(""); setPhone(""); setLicence("A1"); setDocFiles({});
     setQrInfo(null); setQrErr(null); setQrBusy(false);
     setBusy(false); setErr(null);
     busyRef.current = false;
@@ -366,6 +375,7 @@ function GuestAddStudentModal({ open, onClose }) {
       const form = {
         name: name.trim(),
         phone: phone.trim() || null,
+        licence,
         idNumber: qrInfo.idNumber,
         ...(qrInfo.dob         && { dob: qrInfo.dob }),
         ...(qrInfo.gender      && { gender: qrInfo.gender }),
@@ -402,8 +412,12 @@ function GuestAddStudentModal({ open, onClose }) {
            ) : null}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Input label="Họ tên" value={name} onChange={setName} placeholder="Nguyễn Văn A"/>
-        <Input label="Số điện thoại" value={phone} onChange={setPhone} placeholder="090 123 4567"
-               digits maxDigits={10} format={window.fmtPhone}/>
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
+          <Input label="Số điện thoại" value={phone} onChange={setPhone} placeholder="090 123 4567"
+                 digits maxDigits={10} format={window.fmtPhone}/>
+          <Select label="Hạng bằng" value={licence} onChange={setLicence}
+                  options={[{ value: "A1", label: "A1" }, { value: "A", label: "A" }]}/>
+        </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <PhotoSlot label="CCCD mặt trước" file={docFiles.cccd}
