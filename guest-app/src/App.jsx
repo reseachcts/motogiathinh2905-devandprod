@@ -23,6 +23,7 @@ import React from 'react';
 import { Icon, Avatar, Input, Select, Button, LABEL_STYLE, MONO_VAL, Modal, ThemeProvider, useTheme, ThemeToggle } from './components';
 import { D } from './store';
 import { fmtPhone, fmtCCCD, fmtDateInput, digitsOnly } from './formatters';
+import { pickPhoto } from './pickPhoto';
 
 const GUEST_MAX_WIDTH = 420;
 
@@ -431,15 +432,22 @@ function GuestAddStudentModal({ open, onClose }) {
   );
 }
 
+// Tap to pick → asks pickPhoto() for a File. On native this surfaces the
+// OS action sheet (Chụp ảnh / Chọn từ thư viện); on web it falls back to
+// a hidden <input type="file">.
 function QrSlot({ file, busy, ok, idNumber, onPick }) {
-  const inputRef = React.useRef(null);
   const color = busy ? "var(--neon-cyan)" : ok ? "var(--neon-lime)" : "var(--fg-2)";
   const bg    = busy ? "color-mix(in oklab, var(--neon-cyan) 10%, transparent)"
               : ok   ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)"
               :       "var(--ink-2)";
   const border = busy ? "var(--neon-cyan)" : ok ? "var(--neon-lime)" : "var(--glass-stroke-strong)";
+  const open = async () => {
+    if (busy) return;
+    const f = await pickPhoto({ source: 'prompt' });
+    if (f) onPick(f);
+  };
   return (
-    <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} style={{
+    <button type="button" onClick={open} disabled={busy} style={{
       width: "100%",
       padding: "16px 12px", borderRadius: 12, cursor: busy ? "wait" : "pointer", textAlign: "center",
       background: bg, border: `1px dashed ${border}`, color,
@@ -457,18 +465,18 @@ function QrSlot({ file, busy, ok, idNumber, onPick }) {
           CCCD {idNumber}
         </span>
       )}
-      <input ref={inputRef} type="file" accept="image/*" capture="environment"
-             onChange={(e) => onPick(e.target.files?.[0])}
-             style={{ display: "none" }}/>
     </button>
   );
 }
 
 function PhotoSlot({ label, file, existing, onPick }) {
-  const inputRef = React.useRef(null);
   const has = !!file || !!existing;
+  const open = async () => {
+    const f = await pickPhoto({ source: 'prompt' });
+    if (f) onPick(f);
+  };
   return (
-    <button type="button" onClick={() => inputRef.current?.click()} style={{
+    <button type="button" onClick={open} style={{
       width: "100%",
       padding: "16px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
       background: has ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)" : "var(--ink-2)",
@@ -481,9 +489,6 @@ function PhotoSlot({ label, file, existing, onPick }) {
       <span>{label}</span>
       <Icon name={has ? "check" : "plus"} size={36}
             color={has ? "var(--neon-lime)" : "var(--fg-3)"}/>
-      <input ref={inputRef} type="file" accept="image/*" capture="environment"
-             onChange={(e) => onPick(e.target.files?.[0])}
-             style={{ display: "none" }}/>
     </button>
   );
 }
@@ -500,8 +505,9 @@ function GuestUserChip({ me, count }) {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
   const logout = async () => {
-    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
-    window.location.reload();
+    try { await D.api.logout(); } catch {}
+    // store.api.logout dispatches `mgt:auth` — LoginGate listens and
+    // re-renders the login form. No reload needed.
   };
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 10,

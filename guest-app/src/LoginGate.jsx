@@ -33,6 +33,14 @@ export default function LoginGate({ children }) {
 
   React.useEffect(() => { boot(); }, [boot]);
 
+  // Listen for logout (or any other auth-state reset) and re-run boot.
+  // Saves a full page reload after sign-out.
+  React.useEffect(() => {
+    const onAuth = () => boot();
+    window.addEventListener('mgt:auth', onAuth);
+    return () => window.removeEventListener('mgt:auth', onAuth);
+  }, [boot]);
+
   if (stage === STAGES.ready) return children;
   if (stage === STAGES.login) return <LoginForm onLoggedIn={boot}/>;
   if (stage === STAGES.error) return <ErrorView message={errorMsg} onRetry={boot}/>;

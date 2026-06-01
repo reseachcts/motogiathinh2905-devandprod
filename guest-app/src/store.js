@@ -129,6 +129,13 @@ export const D = {
     uploadStudentDoc: api.uploadStudentDoc,
     cccdQr:           api.cccdQr,
     refreshMe,
-    logout: api.logout,
+    async logout() {
+      await api.logout();
+      state.currentUser = null;
+      state.students = [];
+      state.classes = [];
+      accountsById.clear(); classesById.clear(); studentsById.clear();
+      try { window.dispatchEvent(new Event('mgt:auth')); } catch {}
+    },
   },
 };
