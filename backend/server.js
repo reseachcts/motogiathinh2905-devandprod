@@ -71,10 +71,16 @@ app.use((req, res, next) => {
 });
 
 // CORS: same-origin in production (no header needed). Dev / cross-origin
-// front-ends can set CORS_ORIGINS=https://app.example.com,...
+// front-ends can set CORS_ORIGINS=https://app.example.com,... When unset
+// and NODE_ENV is not production, reflect the request Origin — covers
+// the LAN guest-kiosk webview (https://localhost via Capacitor), the
+// Vite dev server on the dev box, and the same Vite served to a phone
+// on the Wi-Fi (http://192.168.x.y:5173). Never enabled in production.
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 if (corsOrigins.length) {
   app.use(cors({ origin: corsOrigins, credentials: true }));
+} else if (NODE_ENV !== 'production') {
+  app.use(cors({ origin: true, credentials: true }));
 }
 
 // Health probe — used by nginx + monitoring. Returns 200 once DB is open.
