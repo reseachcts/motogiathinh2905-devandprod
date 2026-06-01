@@ -138,7 +138,16 @@ router.post('/students/:id/docs/:key', upload.single('file'), (req, res) => {
     try { unlinkSync(req.file.path); } catch {}
     return res.status(404).json({ error: 'not_found' });
   }
-  if (req.user.role !== 'admin' && student.branchId !== req.user.branchId) {
+  // Scope: guests own-records only (responsibleStaffId match); staff are
+  // branch-pinned. NB: a naive `student.branchId !== req.user.branchId` would
+  // let one guest write docs onto another guest's student (both branchIds
+  // null → equality holds), so guests get a dedicated owner check.
+  if (req.user.role === 'guest') {
+    if (student.responsibleStaffId !== req.user.id) {
+      try { unlinkSync(req.file.path); } catch {}
+      return res.status(403).json({ error: 'not_owner' });
+    }
+  } else if (req.user.role !== 'admin' && student.branchId !== req.user.branchId) {
     try { unlinkSync(req.file.path); } catch {}
     return res.status(403).json({ error: 'wrong_branch' });
   }
@@ -167,7 +176,12 @@ router.delete('/students/:id/docs/:key', (req, res) => {
 
   const student = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
   if (!student) return res.status(404).json({ error: 'not_found' });
-  if (req.user.role !== 'admin' && student.branchId !== req.user.branchId) {
+  // Same guest-owner / staff-branch / admin split as the POST handler above.
+  if (req.user.role === 'guest') {
+    if (student.responsibleStaffId !== req.user.id) {
+      return res.status(403).json({ error: 'not_owner' });
+    }
+  } else if (req.user.role !== 'admin' && student.branchId !== req.user.branchId) {
     return res.status(403).json({ error: 'wrong_branch' });
   }
 
@@ -245,13 +259,23 @@ router.get('/files/*', (req, res) => {
   if (!abs.startsWith(UPLOAD_ROOT)) return res.status(400).json({ error: 'bad_path' });
   if (!existsSync(abs) || !statSync(abs).isFile()) return res.status(404).json({ error: 'not_found' });
 
-  // Branch-scope check (staff users can only download files attached to
-  // records in their branch).
+  // Scope check (staff: branch-pinned; guest: own records only; admin: all).
+  // Guests can only own student docs, never payment files (they don't write
+  // payments) — so a guest hitting /api/files/payments/... is always a 403.
   if (req.user.role !== 'admin') {
     const [kind, recId] = parts;
     const table = kind === 'students' ? 'students' : 'payments';
-    const row = db.prepare(`SELECT branchId FROM ${table} WHERE id = ?`).get(recId);
-    if (!row || row.branchId !== req.user.branchId) {
+    const row = db.prepare(
+      table === 'students'
+        ? 'SELECT branchId, responsibleStaffId FROM students WHERE id = ?'
+        : 'SELECT branchId FROM payments WHERE id = ?'
+    ).get(recId);
+    if (!row) return res.status(403).json({ error: 'wrong_branch' });
+    if (req.user.role === 'guest') {
+      if (table !== 'students' || row.responsibleStaffId !== req.user.id) {
+        return res.status(403).json({ error: 'not_owner' });
+      }
+    } else if (row.branchId !== req.user.branchId) {
       return res.status(403).json({ error: 'wrong_branch' });
     }
   }

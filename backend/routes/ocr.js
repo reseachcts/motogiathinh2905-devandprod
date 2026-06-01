@@ -6,6 +6,17 @@
 //   → text is regex-parsed into structured fields
 //   → returns { fields: {...}, raw: '<full text>' }
 //
+// MOBILE-APP CONTRACT — error responses are `{ error: '<code>', message: '<vi>' }`.
+// Native clients MUST branch on `error` (stable machine code), never on
+// `message` (Vietnamese copy may change). Current codes for /api/ocr/cccd-qr:
+//   missing_file       — multipart had no "file" field
+//   not_an_image       — magic-byte sniff rejected the upload
+//   qr_unreadable      — no QR detected in the image (422)
+//   qr_unrecognized    — QR found but payload isn't a Vietnamese CCCD (422)
+//   qr_failed          — internal exception (500)
+//   upload_failed      — multer rejected the upload (size/etc., 400)
+//   unsupported_mime   — mime not in {jpeg,png,webp} (415)
+//
 // The image is NOT persisted here — the caller is expected to keep the File
 // object and POST it to /api/students/:id/docs/cccd after the student row
 // is created. Keeps the OCR endpoint stateless + side-effect free.

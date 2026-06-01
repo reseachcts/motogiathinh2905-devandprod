@@ -22,8 +22,8 @@ import { validators as V, check, bad as badV } from '../validation.js';
 const router = Router();
 router.use(requireAuth);
 
-const VALID_LICENCE = ['A', 'A1'];
-const VALID_METHOD  = ['Tiền mặt', 'Chuyển khoản'];
+// Licence + payment-method enums live in validation.js (single source of
+// truth — see LOCKED_LICENCE / LOCKED_METHOD). Don't duplicate them here.
 
 function bad(res, code, error, extra) { return res.status(code).json({ error, ...extra }); }
 
@@ -83,7 +83,9 @@ router.post('/students', (req, res) => {
     return bad(res, 400, 'invalid_promotionId');
   }
 
-  const licence = feePlan?.licence || (VALID_LICENCE.includes(form.licence) ? form.licence : null);
+  // Form-supplied licence is gated by V.licence (locked enum in validation.js)
+  // so we re-trust it here without a second local allow-list.
+  const licence = feePlan?.licence || (form.licence && !V.licence(form.licence) ? form.licence : null);
   const totalFee = feePlan ? feePlan.amount - (promo?.discount || 0) : 0;
 
   // Branch-scoping: staff users can only enroll into their own branch.

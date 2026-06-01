@@ -3,6 +3,17 @@
 // JWT is mounted as a same-site HttpOnly cookie so the frozen frontend
 // (no localStorage / no Authorization header wiring) authenticates
 // transparently. Login endpoint sets the cookie; logout clears it.
+//
+// MOBILE-APP NOTE (guest kiosk extraction):
+//   The cookie is HttpOnly + SameSite=Lax, which a mobile webview/native
+//   client typically cannot forward across origins. requireAuth() therefore
+//   ALSO accepts the same JWT via `Authorization: Bearer <token>` header.
+//   The POST /api/auth/login response body returns `{ token }` so a native
+//   client can stash it and replay it on every call. Native clients SHOULD
+//   ignore Set-Cookie entirely and rely on the bearer token.
+//   - Guest tokens never expire (50y) so no refresh flow is required.
+//   - Logout for native clients is local-only (drop the stored token);
+//     POST /api/auth/logout only clears the cookie.
 
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -169,7 +180,15 @@ export function bumpLastActive(accountId) {
 // -- middleware --------------------------------------------------------------
 
 export function requireAuth(req, res, next) {
-  const token = req.cookies?.[COOKIE_NAME];
+  // Cookie first (browser frontend), then Authorization: Bearer <token>
+  // header fallback (mobile / native clients that cannot forward HttpOnly
+  // cookies). Same JWT either way — verifyToken doesn't care about source.
+  let token = req.cookies?.[COOKIE_NAME];
+  if (!token) {
+    const h = req.headers?.authorization || '';
+    const m = /^Bearer\s+(.+)$/i.exec(h);
+    if (m) token = m[1].trim();
+  }
   const claims = token ? verifyToken(token) : null;
   if (!claims) return res.status(401).json({ error: 'auth_required' });
 
