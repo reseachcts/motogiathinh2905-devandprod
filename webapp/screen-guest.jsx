@@ -224,7 +224,6 @@ function GuestStudentDetail({ student, onBack }) {
           <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600, color: "var(--fg-1)",
                         letterSpacing: "-0.02em",
                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{student.name}</div>
-          <div style={{ ...LABEL_STYLE, marginTop: 4 }}>{student.maHV}</div>
         </div>
       </div>
 
