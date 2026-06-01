@@ -429,7 +429,19 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
             <h3 style={{ margin: 0, flex: 1, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.015em" }}>Tài liệu</h3>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.08em" }}>{docsFilledCount}/6 · kéo & thả vào ô</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+          <div style={{
+                 display: "grid",
+                 // minmax(0, 1fr) is critical: without the 0-min, a wide
+                 // child (long uppercase label with letterSpacing) can
+                 // expand a column past its equal share, breaking the
+                 // 3×2 layout into something like 2+4 or a horizontal
+                 // scroll. Explicit grid-auto-flow:row keeps the slot
+                 // order matching the spec (row1: cccd · cccd_back ·
+                 // cccd_qr / row2: gksk · donDeNghi · the3x4).
+                 gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                 gridAutoFlow: "row",
+                 gap: 12,
+               }}>
             {D.PROFILE_DOCS.map(doc => (
               <DocSlot key={doc.key} doc={doc} filled={docs[doc.key]}
                        previewUrl={s['docs_' + doc.key + '_url']}
