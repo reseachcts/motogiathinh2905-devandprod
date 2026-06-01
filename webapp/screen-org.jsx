@@ -314,12 +314,24 @@ function AccountsTab() {
   // EditRecordModal/RecordCreatorModal seed selects from options[0].id so
   // the first real branch is the default.
   const branchOpts = D.getBranchOpts();
+  // Class options for the "Lớp được giao" field. Scoped to the draft's
+  // currently-picked branch so admin doesn't accidentally assign a
+  // cross-branch class. Returned as a function so the field re-evaluates
+  // when branchId changes mid-dialog.
+  const classOptsForBranch = (draft) => D.classes
+    .filter(c => !draft.branchId || c.branchId === draft.branchId)
+    .map(c => ({ id: c.id, label: c.code }));
   const accountCreateFields = [
     { id: "name",     label: "Họ tên",                  type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
     { id: "role",     label: "Vai trò",                 type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }, { id: "guest", label: "Cộng tác viên" }] },
     { id: "branchId", label: "Chi nhánh",               type: "select", options: branchOpts },
     { id: "email",    label: "Tên đăng nhập (Email)",   type: "text",   placeholder: "you@motogiathinh.vn" },
     { id: "phone",    label: "Số điện thoại",           type: "phone",  placeholder: "090 123 4567" },
+    // Guest-only — admin picks which class the kiosk drops new students
+    // into. Hidden for staff/admin via the `when` predicate.
+    { id: "assignedClassId", label: "Lớp được giao", type: "select",
+      options: classOptsForBranch, placeholder: "Chọn lớp…",
+      when: (draft) => draft.role === 'guest', fullWidth: true },
     // Guest accounts skip the complexity checklist — server uses the
     // simple "non-empty" policy for them.
     { id: "password", label: "Mật khẩu tạm thời",       type: "password", placeholder: "Mật khẩu mới",
@@ -786,8 +798,11 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
     const seed = {};
     for (const f of fields || []) {
       const v = initialValues?.[f.id];
+      // Static options[0].id is fine; function-options can't seed (they
+      // depend on draft which doesn't exist yet) — fall back to "".
+      const seedOpt = Array.isArray(f.options) ? f.options?.[0]?.id : null;
       seed[f.id] = v != null ? v
-                 : f.type === "select"   ? (f.options?.[0]?.id ?? "")
+                 : f.type === "select"   ? (seedOpt ?? "")
                  : f.type === "multipill" ? []
                  : "";
     }
@@ -799,6 +814,17 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
   const busyRef = React.useRef(false); // sync guard — React state batch means busyRef wins the race
   React.useEffect(() => { if (open) { setDraft(buildSeed()); setBusy(false); setErr(null); busyRef.current = false; } }, [open, initialValues]);  // eslint-disable-line
   const set = (id, v) => setDraft(prev => ({ ...prev, [id]: v }));
+  // Build the submit body from only the visible fields. Lets the caller
+  // declare conditional fields (via `when`) without leaking hidden draft
+  // values to the server.
+  const visibleBody = () => {
+    const out = {};
+    for (const f of fields || []) {
+      if (typeof f.when === 'function' && !f.when(draft)) continue;
+      out[f.id] = draft[f.id] === "" ? null : draft[f.id];
+    }
+    return out;
+  };
   // Await onSave; only close on success so failures stay visible inline
   // instead of vanishing with the dialog.
   const submit = async () => {
@@ -806,7 +832,7 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
     busyRef.current = true;
     try {
       setBusy(true); setErr(null);
-      await onSave?.(draft);
+      await onSave?.(visibleBody());
       onClose();
     } catch (e) {
       setErr(e?.message || String(e));
@@ -837,15 +863,17 @@ function EditRecordModal({ open, onClose, title, subtitle, fields, initialValues
           gap: 12,
         }}>
           {(fields || []).map((f) => {
+            if (typeof f.when === 'function' && !f.when(draft)) return null;
             const span = f.fullWidth || f.type === "multipill" ? 2 : 1;
+            const opts = typeof f.options === 'function' ? f.options(draft) : f.options;
             const node = f.type === "select"
               ? <Select label={f.label} value={draft[f.id]}
                         onChange={(v) => set(f.id, v)}
                         placeholder={f.placeholder || "Chọn…"}
-                        options={(f.options || []).map(o => ({ value: o.id, label: o.label }))}/>
+                        options={(opts || []).map(o => ({ value: o.id, label: o.label }))}/>
               : f.type === "multipill"
               ? <MultiPillFieldInline label={f.label} values={draft[f.id]}
-                                       options={f.options}
+                                       options={opts}
                                        onChange={(v) => set(f.id, v)}
                                        color={f.color || "cyan"}/>
               : <Input  label={f.label} value={draft[f.id]}
@@ -966,7 +994,10 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
   const buildSeed = () => {
     const seed = {};
     for (const f of fields || []) {
-      seed[f.id] = f.type === "select"   ? (f.options?.[0]?.id ?? "")
+      // Static options[0].id is fine; function-options depend on draft
+      // (which doesn't exist yet) — seed with "" instead.
+      const seedOpt = Array.isArray(f.options) ? f.options?.[0]?.id : null;
+      seed[f.id] = f.type === "select"   ? (seedOpt ?? "")
                 : f.type === "multipill" ? []
                 : "";
     }
@@ -979,6 +1010,17 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
   React.useEffect(() => { if (open) { setDraft(buildSeed()); setBusy(false); setErr(null); busyRef.current = false; } }, [open]);  // eslint-disable-line
 
   const set = (id, v) => setDraft(prev => ({ ...prev, [id]: v }));
+  // Build the submit body from only the visible fields. Lets the caller
+  // declare conditional fields (via `when`) without leaking hidden draft
+  // values to the server.
+  const visibleBody = () => {
+    const out = {};
+    for (const f of fields || []) {
+      if (typeof f.when === 'function' && !f.when(draft)) continue;
+      out[f.id] = draft[f.id] === "" ? null : draft[f.id];
+    }
+    return out;
+  };
   // Await the onCreate promise; only close on success so failure alerts
   // surface inline rather than after the dialog has already vanished.
   const submit = async () => {
@@ -986,7 +1028,7 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
     busyRef.current = true;
     try {
       setBusy(true); setErr(null);
-      await onCreate?.(draft);
+      await onCreate?.(visibleBody());
       onClose();
     } catch (e) {
       setErr(e?.message || String(e));
@@ -1022,17 +1064,19 @@ function RecordCreatorModal({ open, onClose, title, subtitle, fields, onCreate }
           gap: 12,
         }}>
           {(fields || []).map((f) => {
+            if (typeof f.when === 'function' && !f.when(draft)) return null;
             // multipill rows always span the full width — pills wrap naturally.
             const span = f.fullWidth || f.type === "multipill" ? 2 : 1;
             const checks = typeof f.checks === 'function' ? f.checks(draft) : f.checks;
+            const opts = typeof f.options === 'function' ? f.options(draft) : f.options;
             const node = f.type === "select"
               ? <Select label={f.label} value={draft[f.id]}
                         onChange={(v) => set(f.id, v)}
                         placeholder={f.placeholder || "Chọn…"}
-                        options={(f.options || []).map(o => ({ value: o.id, label: o.label }))}/>
+                        options={(opts || []).map(o => ({ value: o.id, label: o.label }))}/>
               : f.type === "multipill"
               ? <MultiPillFieldInline label={f.label} values={draft[f.id]}
-                                       options={f.options}
+                                       options={opts}
                                        onChange={(v) => set(f.id, v)}
                                        color={f.color || "cyan"}/>
               : <Input  label={f.label} value={draft[f.id]}
