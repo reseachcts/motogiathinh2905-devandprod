@@ -3,9 +3,32 @@
 //
 // One page: a big "Thêm học viên" card at the top, then the operator's
 // student list below. Tap a row to open the detail/edit view.
+//
+// MOBILE-PORT NOTE: this file uses several browser-only APIs that a
+// native shell will need to substitute:
+//   - window.MGT_DATA / window.MGT_TOAST / window.useTheme / window.fmtPhone
+//     (global injection points from the web shell — pass via props or
+//      a context provider in RN)
+//   - window.addEventListener("mgt:datachanged") for cross-screen
+//     refresh (replace with the store's subscribe API)
+//   - document.addEventListener("mousedown") for click-outside on the
+//     user-chip menu (use a touch-outside / Pressable backdrop)
+//   - window.location.reload() on logout (clear auth state + navigate)
+//   - <input type="file" capture="environment"> for photo capture
+//     (use expo-image-picker or react-native-image-picker)
+//   - fetch('/api/auth/logout') — keep, just point at absolute URL
 // ====================================================================
 
 const GUEST_MAX_WIDTH = 420;
+
+// Shared inline-error banner style (the pink QR error chip). Used in
+// both the create modal and the detail screen.
+const ERROR_BANNER_STYLE = {
+  marginTop: 8, padding: "8px 12px", borderRadius: 10,
+  fontFamily: "var(--font-mono)", fontSize: 12,
+  background: "color-mix(in oklab, var(--neon-pink) 12%, transparent)",
+  color: "var(--neon-pink)", border: "1px solid var(--neon-pink)",
+};
 
 function GuestApp() {
   const D = window.MGT_DATA;
@@ -25,7 +48,6 @@ function GuestApp() {
   const [viewingId, setViewingId] = React.useState(null);
   const myStudents = D.students;  // server already scopes to guest's own
   const viewing = viewingId ? D.getStudent(viewingId) : null;
-
 
   return (
     <div style={{
@@ -78,43 +100,6 @@ function GuestApp() {
       </div>
 
       <GuestAddStudentModal open={addOpen} onClose={() => setAddOpen(false)}/>
-    </div>
-  );
-}
-
-function GuestHome({ onAdd, onOpenList, count }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingTop: 36 }}>
-      <button onClick={onAdd} style={{
-        padding: "22px 18px", borderRadius: 16, border: "none", cursor: "pointer",
-        background: "var(--neon-cyan)", color: "var(--ink-0)",
-        boxShadow: "0 0 28px var(--neon-cyan-haze), 0 0 0 1px var(--neon-cyan)",
-        display: "flex", alignItems: "center", gap: 14,
-        fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600,
-      }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(0,0,0,0.18)",
-                      display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon name="user-plus" size={22} color="var(--ink-0)"/>
-        </div>
-        <span style={{ flex: 1, textAlign: "left" }}>Thêm học viên</span>
-      </button>
-
-      <button onClick={onOpenList} style={{
-        padding: "20px 18px", borderRadius: 16, cursor: "pointer",
-        background: "var(--glass-2)", border: "1px solid var(--glass-stroke-strong)",
-        color: "var(--fg-1)", display: "flex", alignItems: "center", gap: 14,
-        fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 600,
-      }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--ink-2)",
-                      display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon name="users" size={20}/>
-        </div>
-        <div style={{ flex: 1, textAlign: "left" }}>
-          <div>Học viên của tôi</div>
-          <div style={{ ...LABEL_STYLE, marginTop: 4 }}>{count}</div>
-        </div>
-        <Icon name="arrow-right" size={18} color="var(--fg-3)"/>
-      </button>
     </div>
   );
 }
@@ -288,14 +273,7 @@ function GuestStudentDetail({ student, onBack }) {
                     ok={qrReplaced ? !!qrInfo?.idNumber : !!student.docs?.cccd_qr}
                     idNumber={qrInfo?.idNumber || (qrReplaced ? null : student.idNumber)}
                     onPick={scanQr}/>
-            {qrErr && (
-              <div style={{
-                marginTop: 8, padding: "8px 12px", borderRadius: 10,
-                fontFamily: "var(--font-mono)", fontSize: 12,
-                background: "color-mix(in oklab, var(--neon-pink) 12%, transparent)",
-                color: "var(--neon-pink)", border: "1px solid var(--neon-pink)",
-              }}>{qrErr}</div>
-            )}
+            {qrErr && <div style={ERROR_BANNER_STYLE}>{qrErr}</div>}
           </div>
         </div>
       </div>
@@ -388,7 +366,6 @@ function GuestAddStudentModal({ open, onClose }) {
         ...(qrInfo.address     && { address: qrInfo.address }),
         ...(qrInfo.ngayCapCCCD && { ngayCapCCCD: qrInfo.ngayCapCCCD }),
       };
-      // QR photo lands in its own docs_cccd_qr slot (added by GUEST-QR-PACK).
       const uploadMap = { cccd: docFiles.cccd, cccd_back: docFiles.cccd_back, cccd_qr: docFiles.cccd_qr };
       const docs = { cccd: !!uploadMap.cccd, cccd_back: !!uploadMap.cccd_back, cccd_qr: !!uploadMap.cccd_qr };
       const created = await D.api.createStudent({ form, docs, profileComplete: false });
@@ -438,14 +415,7 @@ function GuestAddStudentModal({ open, onClose }) {
           <div style={{ gridColumn: "1 / -1" }}>
             <QrSlot file={docFiles.cccd_qr} busy={qrBusy} ok={!!qrInfo?.idNumber}
                     idNumber={qrInfo?.idNumber} onPick={scanQr}/>
-            {qrErr && (
-              <div style={{
-                marginTop: 8, padding: "8px 12px", borderRadius: 10,
-                fontFamily: "var(--font-mono)", fontSize: 12,
-                background: "color-mix(in oklab, var(--neon-pink) 12%, transparent)",
-                color: "var(--neon-pink)", border: "1px solid var(--neon-pink)",
-              }}>{qrErr}</div>
-            )}
+            {qrErr && <div style={ERROR_BANNER_STYLE}>{qrErr}</div>}
           </div>
         </div>
       </div>
@@ -455,7 +425,6 @@ function GuestAddStudentModal({ open, onClose }) {
 
 function QrSlot({ file, busy, ok, idNumber, onPick }) {
   const inputRef = React.useRef(null);
-  const has = ok || !!file;
   const color = busy ? "var(--neon-cyan)" : ok ? "var(--neon-lime)" : "var(--fg-2)";
   const bg    = busy ? "color-mix(in oklab, var(--neon-cyan) 10%, transparent)"
               : ok   ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)"
@@ -489,8 +458,7 @@ function QrSlot({ file, busy, ok, idNumber, onPick }) {
 
 function PhotoSlot({ label, file, existing, onPick }) {
   const inputRef = React.useRef(null);
-  const justPicked = !!file;
-  const has = justPicked || !!existing;
+  const has = !!file || !!existing;
   return (
     <button type="button" onClick={() => inputRef.current?.click()} style={{
       width: "100%",
