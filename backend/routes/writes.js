@@ -57,12 +57,18 @@ router.post('/students', (req, res) => {
   const vErr = validateStudentForm(form, { isCreate: true, role: req.user.role });
   if (vErr) return badV(res, vErr);
 
-  // Guests don't pick a class, fee plan, or promotion. The student is
-  // unassigned until staff/admin later edits — branchId stays null too.
+  // Guests don't pick a class — the server pulls accounts.assignedClassId
+  // from their own row. If admin hasn't assigned one, the student creates
+  // unscoped (classId=null, branchId=null) and admin can route it later.
   let cls = null;
   if (!isGuest) {
     cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(form.classId);
     if (!cls) return bad(res, 400, 'invalid_classId');
+  } else {
+    const me = db.prepare('SELECT assignedClassId FROM accounts WHERE id = ?').get(req.user.id);
+    if (me?.assignedClassId) {
+      cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(me.assignedClassId);
+    }
   }
 
   const feePlan = !isGuest && form.feePlanId
@@ -91,9 +97,9 @@ router.post('/students', (req, res) => {
   const createdAt = nowDdMmYyyyHHMMSS();
   const d = docs || {};
   // Guests always own the records they create — no class, no branch.
-  const responsibleStaffId = isGuest ? req.user.id : form.responsibleStaffId;
-  const branchId           = isGuest ? null       : cls.branchId;
-  const classId            = isGuest ? null       : form.classId;
+  const responsibleStaffId = isGuest ? req.user.id          : form.responsibleStaffId;
+  const branchId           = isGuest ? (cls?.branchId || null) : cls.branchId;
+  const classId            = isGuest ? (cls?.id || null)        : form.classId;
 
   try {
     db.prepare(`
@@ -389,7 +395,7 @@ router.post('/accounts', requireAdmin, (req, res, next) => {
   if (!pol.ok) return bad(res, 400, pol.code, { message: pol.message });
   next();
 }, makeAdminCreator('accounts', 'u',
-  ['name', 'role', 'branchId', 'phone', 'email'], {
+  ['name', 'role', 'branchId', 'phone', 'email', 'assignedClassId'], {
     required: ['name', 'email', 'role'],
     preInsert: (row, req) => {
       row.passwordHash = hashPassword(req.body.password);
@@ -473,7 +479,7 @@ router.delete('/notifications/:id', (req, res) => {
 // ---------------------------------------------------------------------------
 
 const PATCHABLE = {
-  accounts:   ['name', 'role', 'branchId', 'phone', 'email', 'active'],
+  accounts:   ['name', 'role', 'branchId', 'phone', 'email', 'active', 'assignedClassId'],
   fee_plans:  ['name', 'licence', 'amount'],
   promotions: ['name', 'appliesTo', 'discount'],
   teachers:   ['name', 'phone', 'yearsExp', 'branchId', 'active'],

@@ -28,14 +28,18 @@ const BRANCH_SCOPED = new Set(['students', 'payments', 'classes']);
 function dump(table, mapRow) {
   return (req, res) => {
     let rows;
-    // Guests: only their own students; everything else is empty (kiosk role).
+    // Guests: only their own students; their account row (for currentUser
+    // resolution); and the one class they've been assigned to (for the
+    // "current class" eyebrow on the kiosk). Everything else empty.
     if (req.user.role === 'guest') {
       if (table === 'students') {
         rows = db.prepare(`SELECT * FROM students WHERE responsibleStaffId = ?`).all(req.user.id);
-      } else if (table === 'branches' || table === 'accounts') {
-        // Guests still need to resolve their own account row for currentUser.
-        rows = table === 'accounts'
-          ? db.prepare(`SELECT * FROM accounts WHERE id = ?`).all(req.user.id)
+      } else if (table === 'accounts') {
+        rows = db.prepare(`SELECT * FROM accounts WHERE id = ?`).all(req.user.id);
+      } else if (table === 'classes') {
+        const me = db.prepare('SELECT assignedClassId FROM accounts WHERE id = ?').get(req.user.id);
+        rows = me?.assignedClassId
+          ? db.prepare(`SELECT * FROM classes WHERE id = ?`).all(me.assignedClassId)
           : [];
       } else {
         rows = [];
