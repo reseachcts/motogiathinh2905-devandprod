@@ -100,14 +100,34 @@ jobs:
           path: /tmp/gradle.log
           if-no-files-found: warn
 
-      - name: Locate APK
+      - name: Locate APK + dump diagnostic
         if: always()
         working-directory: guest-app/android
         run: |
-          echo "=== outputs tree ==="
-          find app/build/outputs -type f 2>&1 | head -40 || echo "no outputs dir"
-          echo "=== any *.apk anywhere ==="
-          find . -name '*.apk' 2>&1 | head -10 || echo "no APK"
+          {
+            echo "=== outputs tree ==="
+            find app/build/outputs -type f 2>&1 | head -80 || echo "no outputs dir"
+            echo "=== any *.apk anywhere ==="
+            find .. -name '*.apk' 2>&1 | head -20 || echo "no APK"
+            echo "=== app/build top ==="
+            ls -la app/build/ 2>&1 | head -20 || echo "no app/build"
+            echo "=== app/build.gradle ==="
+            cat app/build.gradle
+          } | tee /tmp/diag.log
+
+      - name: Publish diagnostic Release (so we can fetch logs anonymously)
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ci-debug
+          name: "CI debug ${{ github.sha }}"
+          body: "Build failure diagnostic. Replaced on each run."
+          files: |
+            /tmp/diag.log
+            /tmp/cap-sync.log
+            /tmp/gradle.log
+          fail_on_unmatched_files: false
+          prerelease: true
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
