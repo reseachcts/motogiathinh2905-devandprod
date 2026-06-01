@@ -276,30 +276,66 @@ function GuestAddStudentModal({ open, onClose }) {
   const D = window.MGT_DATA;
   const [name,     setName]     = React.useState("");
   const [phone,    setPhone]    = React.useState("");
-  const [docFiles, setDocFiles] = React.useState({});  // { cccd, cccd_back, the3x4 }
+  const [docFiles, setDocFiles] = React.useState({});      // { cccd, cccd_back, cccd_qr }
+  const [qrInfo,   setQrInfo]   = React.useState(null);    // { idNumber, name, ... } after a successful scan
+  const [qrErr,    setQrErr]    = React.useState(null);    // "QR chưa rõ. Hãy chụp rõ hơn." etc
+  const [qrBusy,   setQrBusy]   = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [err,  setErr]  = React.useState(null);
   const busyRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!open) return;
-    setName(""); setPhone(""); setDocFiles({}); setBusy(false); setErr(null);
+    setName(""); setPhone(""); setDocFiles({});
+    setQrInfo(null); setQrErr(null); setQrBusy(false);
+    setBusy(false); setErr(null);
     busyRef.current = false;
   }, [open]);
 
   const pickPhoto = (key, file) => { if (file) setDocFiles(prev => ({ ...prev, [key]: file })); };
 
-  const canSubmit = !busy && name.trim();
+  // QR-scan slot: when the operator picks a photo, ship it to the server
+  // for QR decode. Only "approved" (idNumber returned) photos are kept.
+  const scanQr = async (file) => {
+    if (!file) return;
+    setQrBusy(true); setQrErr(null);
+    try {
+      const out = await D.api.cccdQr(file);
+      setQrInfo(out.fields);
+      setDocFiles(prev => ({ ...prev, cccd_qr: file }));
+    } catch (e) {
+      setQrInfo(null);
+      setDocFiles(prev => { const { cccd_qr, ...rest } = prev; return rest; });
+      setQrErr(e.code === 'qr_unreadable' || e.code === 'qr_failed'
+        ? "QR chưa rõ. Hãy chụp rõ hơn."
+        : (e.message || "QR chưa rõ. Hãy chụp rõ hơn."));
+    } finally {
+      setQrBusy(false);
+    }
+  };
+
+  // Submit blocked until the QR returns a CCCD number.
+  const canSubmit = !busy && name.trim() && !!qrInfo?.idNumber;
   const submit = async () => {
     if (busyRef.current || !canSubmit) return;
     busyRef.current = true;
     try {
       setBusy(true); setErr(null);
-      const form = { name: name.trim(), phone: phone.trim() || null };
-      const docs = { cccd: !!docFiles.cccd, cccd_back: !!docFiles.cccd_back, the3x4: !!docFiles.the3x4 };
+      // Backfill form from QR payload (idNumber + any extras QR provided).
+      const form = {
+        name: name.trim(),
+        phone: phone.trim() || null,
+        idNumber: qrInfo.idNumber,
+        ...(qrInfo.dob         && { dob: qrInfo.dob }),
+        ...(qrInfo.gender      && { gender: qrInfo.gender }),
+        ...(qrInfo.address     && { address: qrInfo.address }),
+        ...(qrInfo.ngayCapCCCD && { ngayCapCCCD: qrInfo.ngayCapCCCD }),
+      };
+      // Persist the QR image into the the3x4 slot (reuse existing schema).
+      const uploadMap = { cccd: docFiles.cccd, cccd_back: docFiles.cccd_back, the3x4: docFiles.cccd_qr };
+      const docs = { cccd: !!uploadMap.cccd, cccd_back: !!uploadMap.cccd_back, the3x4: !!uploadMap.the3x4 };
       const created = await D.api.createStudent({ form, docs, profileComplete: false });
-      // Upload files after the row exists.
-      await Promise.all(Object.entries(docFiles).map(
+      await Promise.all(Object.entries(uploadMap).map(
         ([key, file]) => file ? D.api.uploadStudentDoc(created.id, key, file).catch((e) => {
           if (window.MGT_TOAST) window.MGT_TOAST(`Lỗi tải ảnh ${key}: ${e.message}`);
         }) : null
@@ -334,12 +370,54 @@ function GuestAddStudentModal({ open, onClose }) {
           <PhotoSlot label="CCCD mặt sau" file={docFiles.cccd_back}
                      onPick={(f) => pickPhoto("cccd_back", f)}/>
           <div style={{ gridColumn: "1 / -1" }}>
-            <PhotoSlot label="Ảnh thẻ 3×4" file={docFiles.the3x4}
-                       onPick={(f) => pickPhoto("the3x4", f)}/>
+            <QrSlot file={docFiles.cccd_qr} busy={qrBusy} ok={!!qrInfo?.idNumber}
+                    idNumber={qrInfo?.idNumber} onPick={scanQr}/>
+            {qrErr && (
+              <div style={{
+                marginTop: 8, padding: "8px 12px", borderRadius: 10,
+                fontFamily: "var(--font-mono)", fontSize: 12,
+                background: "color-mix(in oklab, var(--neon-pink) 12%, transparent)",
+                color: "var(--neon-pink)", border: "1px solid var(--neon-pink)",
+              }}>{qrErr}</div>
+            )}
           </div>
         </div>
       </div>
     </Modal>
+  );
+}
+
+function QrSlot({ file, busy, ok, idNumber, onPick }) {
+  const inputRef = React.useRef(null);
+  const has = ok || !!file;
+  const color = busy ? "var(--neon-cyan)" : ok ? "var(--neon-lime)" : "var(--fg-2)";
+  const bg    = busy ? "color-mix(in oklab, var(--neon-cyan) 10%, transparent)"
+              : ok   ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)"
+              :       "var(--ink-2)";
+  const border = busy ? "var(--neon-cyan)" : ok ? "var(--neon-lime)" : "var(--glass-stroke-strong)";
+  return (
+    <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} style={{
+      width: "100%",
+      padding: "16px 12px", borderRadius: 12, cursor: busy ? "wait" : "pointer", textAlign: "center",
+      background: bg, border: `1px dashed ${border}`, color,
+      fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600,
+      minHeight: 110, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10,
+    }}>
+      <span>Mã QR trên CCCD</span>
+      <Icon name={ok ? "check" : "plus"} size={36} color={color}/>
+      {busy && (
+        <span style={{ ...LABEL_STYLE, fontSize: 9, color: "var(--neon-cyan)" }}>Đang quét…</span>
+      )}
+      {ok && idNumber && (
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-lime)",
+                       letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums" }}>
+          CCCD {idNumber}
+        </span>
+      )}
+      <input ref={inputRef} type="file" accept="image/*" capture="environment"
+             onChange={(e) => onPick(e.target.files?.[0])}
+             style={{ display: "none" }}/>
+    </button>
   );
 }
 

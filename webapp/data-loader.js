@@ -551,6 +551,20 @@
           if (!res.ok) throw new Error('ocr_failed: ' + res.status);
           return res.json();
         },
+        // Scan QR code on a Vietnamese CCCD image. Returns { fields, raw }
+        // on success; throws an Error whose .code property carries the
+        // server's structured error (qr_unreadable / qr_unrecognized / etc).
+        async cccdQr(file) {
+          const fd = new FormData(); fd.append('file', file);
+          const res = await fetch(API + '/ocr/cccd-qr', { method: 'POST', credentials: 'include', body: fd });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const e = new Error(body.message || 'qr_failed');
+            e.code = body.error || 'qr_failed';
+            throw e;
+          }
+          return body;
+        },
         async updateStudent(id, patch) {
           const raw = await api('/students/' + encodeURIComponent(id), { method: 'PATCH', body: patch });
           const ex = studentsById.get(id);

@@ -17,6 +17,8 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { createWorker } from 'tesseract.js';
+import sharp from 'sharp';
+import jsQR from 'jsqr';
 import { requireAuth } from '../auth.js';
 
 const router = Router();
@@ -189,6 +191,72 @@ router.post('/ocr/cccd', upload.single('file'), async (req, res) => {
     console.error('[ocr] failed:', e?.message || e);
     resetWorker();   // worker state may be corrupted — recreate next time
     res.status(500).json({ error: 'ocr_failed', message: String(e?.message || e) });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ocr/cccd-qr — read the QR code embedded on Vietnamese CCCDs
+// (the chip-card variant). QR payload format observed in production:
+//
+//   <CCCD>|<old CMND>|<full name>|<dob dd/MM/yyyy>|<gender>|<address>|<issue dd/MM/yyyy>
+//
+// jsQR works on RGBA pixels, so we use sharp to decode the upload and
+// scale it to a sane max width (large 12MP camera shots are slow to
+// process and the QR is recognizable at far smaller sizes).
+// ---------------------------------------------------------------------------
+function parseCccdQr(raw) {
+  if (!raw) return null;
+  const parts = String(raw).split('|').map(s => s.trim());
+  // Accept any payload that starts with a 12-digit CCCD; tolerate extra
+  // trailing fields for forward compatibility.
+  if (!/^\d{12}$/.test(parts[0] || '')) return null;
+  const [idNumber, oldId, name, dobRaw, gender, address, issueRaw] = parts;
+  const fmtDate = (s) => {
+    if (!s) return null;
+    // dd/MM/yyyy or ddMMyyyy (8 digits) — emit as dd/MM/yyyy.
+    const digits = s.replace(/\D+/g, '');
+    if (digits.length === 8) return `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+    return /^\d{2}\/\d{2}\/\d{4}$/.test(s) ? s : null;
+  };
+  return {
+    idNumber,
+    oldIdNumber: oldId || null,
+    name: name || null,
+    dob: fmtDate(dobRaw),
+    gender: /^n[ữu]/i.test(gender || '') ? 'Nữ' : (gender ? 'Nam' : null),
+    address: address || null,
+    ngayCapCCCD: fmtDate(issueRaw),
+  };
+}
+
+router.post('/ocr/cccd-qr', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'missing_file' });
+  if (!looksLikeImage(req.file.buffer)) {
+    return res.status(400).json({ error: 'not_an_image', message: 'Tệp không phải ảnh hợp lệ.' });
+  }
+  try {
+    // Resize: max width 1600px. Strips orientation EXIF so jsQR gets the
+    // pixels as displayed (camera rolls land sideways otherwise).
+    const { data, info } = await sharp(req.file.buffer)
+      .rotate()
+      .resize({ width: 1600, withoutEnlargement: true, fit: 'inside' })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const code = jsQR(new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength),
+                       info.width, info.height,
+                       { inversionAttempts: 'attemptBoth' });
+    if (!code || !code.data) {
+      return res.status(422).json({ error: 'qr_unreadable', message: 'QR chưa rõ. Hãy chụp rõ hơn.' });
+    }
+    const fields = parseCccdQr(code.data);
+    if (!fields) {
+      return res.status(422).json({ error: 'qr_unrecognized', message: 'Mã QR không phải CCCD Việt Nam hợp lệ.' });
+    }
+    res.json({ fields, raw: code.data });
+  } catch (e) {
+    console.error('[ocr/cccd-qr] failed:', e?.message || e);
+    res.status(500).json({ error: 'qr_failed', message: String(e?.message || e) });
   }
 });
 
