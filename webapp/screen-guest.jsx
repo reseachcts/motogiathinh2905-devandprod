@@ -397,6 +397,7 @@ function PhotoSlot({ label, file, existing, onPick }) {
   const has = justPicked || !!existing;
   return (
     <button type="button" onClick={() => inputRef.current?.click()} style={{
+      width: "100%",
       padding: "16px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
       background: has ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)" : "var(--ink-2)",
       border: "1px dashed",
