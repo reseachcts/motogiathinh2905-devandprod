@@ -37,10 +37,12 @@ function dump(table, mapRow) {
       } else if (table === 'accounts') {
         rows = db.prepare(`SELECT * FROM accounts WHERE id = ?`).all(req.user.id);
       } else if (table === 'classes') {
-        // All classes in the guest's branch — they need the full list to
-        // pick a current assignment from the eyebrow popover.
-        rows = req.user.branchId
-          ? db.prepare(`SELECT * FROM classes WHERE branchId = ?`).all(req.user.branchId)
+        // Just the guest's assigned class — they don't pick, they only
+        // need the row in MGT_DATA so D.getClass() resolves the code
+        // for the read-only subheading + footer chip.
+        const me = db.prepare('SELECT assignedClassId FROM accounts WHERE id = ?').get(req.user.id);
+        rows = me?.assignedClassId
+          ? db.prepare(`SELECT * FROM classes WHERE id = ?`).all(me.assignedClassId)
           : [];
       } else {
         rows = [];
