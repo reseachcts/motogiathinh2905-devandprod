@@ -1,9 +1,8 @@
 // ====================================================================
-// GuestApp — vertical mobile-style shell for kiosk users.
+// GuestApp — single-page vertical mobile shell for kiosk users.
 //
-// Guests have only two screens (Home / My students) and one action
-// (Add student). No sidebar, no tabs, no charts. Centred narrow column
-// to simulate a phone display even on desktop.
+// One page: a big "Thêm học viên" card at the top, then the operator's
+// student list below. Tap a row to open the detail/edit view.
 // ====================================================================
 
 const GUEST_MAX_WIDTH = 420;
@@ -18,7 +17,6 @@ function GuestApp() {
     return () => window.removeEventListener("mgt:datachanged", fn);
   }, []);
 
-  const [tab, setTab]       = React.useState("home");
   const [addOpen, setAddOpen] = React.useState(false);
   const [viewingId, setViewingId] = React.useState(null);
   const myStudents = D.students;  // server already scopes to guest's own
@@ -58,53 +56,34 @@ function GuestApp() {
         </header>
 
         {/* Body */}
-        <main style={{ flex: 1, overflowY: "auto", padding: "16px 18px 80px" }}>
+        <main style={{ flex: 1, overflowY: "auto", padding: "16px 18px 32px" }}>
           {viewing ? (
             <GuestStudentDetail student={viewing} onBack={() => setViewingId(null)}/>
-          ) : tab === "home" ? (
-            <GuestHome onAdd={() => setAddOpen(true)} onOpenList={() => setTab("list")} count={myStudents.length}/>
           ) : (
-            <GuestStudentList students={myStudents} onOpen={(id) => setViewingId(id)}/>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Create-profile card on top */}
+              <button onClick={() => setAddOpen(true)} style={{
+                padding: "22px 18px", borderRadius: 16, border: "none", cursor: "pointer",
+                background: "var(--neon-cyan)", color: "var(--ink-0)",
+                boxShadow: "0 0 28px var(--neon-cyan-haze), 0 0 0 1px var(--neon-cyan)",
+                display: "flex", alignItems: "center", gap: 14,
+                fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600,
+              }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(0,0,0,0.18)",
+                              display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon name="user-plus" size={22} color="var(--ink-0)"/>
+                </div>
+                <span style={{ flex: 1, textAlign: "left" }}>Thêm học viên</span>
+              </button>
+
+              <GuestStudentList students={myStudents} onOpen={(id) => setViewingId(id)}/>
+            </div>
           )}
         </main>
-
-        {/* Bottom nav */}
-        <nav style={{
-          position: "sticky", bottom: 0, padding: "10px 18px",
-          background: "var(--glass-2)", borderTop: "1px solid var(--ink-4)",
-          backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
-          display: "flex", gap: 10,
-        }}>
-          <GuestNavButton active={tab === "home"} onClick={() => setTab("home")} icon="home" label="Trang chủ"/>
-          <GuestNavButton active={tab === "list"} onClick={() => setTab("list")} icon="users" label="Học viên" badge={myStudents.length}/>
-        </nav>
       </div>
 
       <GuestAddStudentModal open={addOpen} onClose={() => setAddOpen(false)}/>
     </div>
-  );
-}
-
-function GuestNavButton({ active, onClick, icon, label, badge }) {
-  return (
-    <button onClick={onClick} style={{
-      flex: 1, background: active ? "var(--ink-2)" : "transparent",
-      border: "1px solid", borderColor: active ? "var(--neon-cyan)" : "var(--glass-stroke)",
-      color: active ? "var(--neon-cyan)" : "var(--fg-2)",
-      padding: "10px 8px", borderRadius: 12, cursor: "pointer",
-      display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-      fontFamily: "var(--font-ui)", fontSize: 11, fontWeight: 600,
-      boxShadow: active ? "0 0 14px var(--neon-cyan-haze)" : "none",
-      position: "relative",
-    }}>
-      <Icon name={icon} size={18}/>
-      <span>{label}</span>
-      {badge != null && badge > 0 && (
-        <span style={{ position: "absolute", top: 4, right: 10,
-                       background: "var(--neon-cyan)", color: "var(--ink-0)",
-                       fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 999 }}>{badge}</span>
-      )}
-    </button>
   );
 }
 
@@ -266,7 +245,6 @@ function GuestStudentDetail({ student, onBack }) {
         <Input label="Số điện thoại" value={phone} onChange={setPhone}
                digits maxDigits={10} format={window.fmtPhone}/>
 
-        <div style={{ ...LABEL_STYLE, paddingTop: 4 }}>Hình ảnh</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <PhotoSlot label="CCCD mặt trước"
                      file={newFiles.cccd}     existing={student.docs?.cccd}
@@ -275,7 +253,7 @@ function GuestStudentDetail({ student, onBack }) {
                      file={newFiles.cccd_back} existing={student.docs?.cccd_back}
                      onPick={(f) => pickPhoto("cccd_back", f)}/>
           <div style={{ gridColumn: "1 / -1" }}>
-            <PhotoSlot label="Ảnh 3×4 chân dung"
+            <PhotoSlot label="Ảnh thẻ 3×4"
                        file={newFiles.the3x4}  existing={student.docs?.the3x4}
                        onPick={(f) => pickPhoto("the3x4", f)}/>
           </div>
@@ -312,18 +290,19 @@ function GuestStudentDetail({ student, onBack }) {
 function GuestAddStudentModal({ open, onClose }) {
   const D = window.MGT_DATA;
   const [name,      setName]      = React.useState("");
-  const [idNumber,  setIdNumber]  = React.useState("");
+  const [phone,     setPhone]     = React.useState("");
   const [docFiles,  setDocFiles]  = React.useState({});  // { cccd, cccd_back, the3x4 }
   const [ocrToast,  setOcrToast]  = React.useState(null);
   const [ocrBusy,   setOcrBusy]   = React.useState(false);
-  const [extraForm, setExtraForm] = React.useState({});  // OCR-derived fields
+  // OCR-derived hidden fields (idNumber, dob, gender, address, ...).
+  const [extraForm, setExtraForm] = React.useState({});
   const [busy, setBusy] = React.useState(false);
   const [err,  setErr]  = React.useState(null);
   const busyRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!open) return;
-    setName(""); setIdNumber(""); setDocFiles({}); setOcrToast(null);
+    setName(""); setPhone(""); setDocFiles({}); setOcrToast(null);
     setOcrBusy(false); setExtraForm({}); setBusy(false); setErr(null);
     busyRef.current = false;
   }, [open]);
@@ -338,10 +317,9 @@ function GuestAddStudentModal({ open, onClose }) {
       const out = await D.api.ocrCccd(file);
       const f = out.fields || {};
       const applied = [];
-      if (f.idNumber && !idNumber) { setIdNumber(f.idNumber); applied.push("CCCD"); }
-      if (f.name     && !name)     { setName(f.name);         applied.push("tên"); }
+      if (f.name && !name) { setName(f.name); applied.push("tên"); }
       const extras = {};
-      ["dob", "gender", "queQuan", "address", "ngayCapCCCD"].forEach(k => {
+      ["idNumber", "dob", "gender", "queQuan", "address", "ngayCapCCCD"].forEach(k => {
         if (f[k]) { extras[k] = f[k]; applied.push(k); }
       });
       if (Object.keys(extras).length) setExtraForm(prev => ({ ...prev, ...extras }));
@@ -363,7 +341,7 @@ function GuestAddStudentModal({ open, onClose }) {
     busyRef.current = true;
     try {
       setBusy(true); setErr(null);
-      const form = { name: name.trim(), idNumber: idNumber.trim() || null, ...extraForm };
+      const form = { name: name.trim(), phone: phone.trim() || null, ...extraForm };
       const docs = { cccd: !!docFiles.cccd, cccd_back: !!docFiles.cccd_back, the3x4: !!docFiles.the3x4 };
       const created = await D.api.createStudent({ form, docs, profileComplete: false });
       // Upload files after the row exists.
@@ -384,7 +362,6 @@ function GuestAddStudentModal({ open, onClose }) {
   return (
     <Modal open={open} onClose={onClose} width={GUEST_MAX_WIDTH}
            title="Thêm học viên"
-           subtitle="Chỉ cần tên + CCCD"
            primaryAction={submit}
            primaryLabel={busy ? "Đang lưu…" : "Lưu học viên"}
            primaryIcon="check"
@@ -394,8 +371,8 @@ function GuestAddStudentModal({ open, onClose }) {
            ) : null}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Input label="Họ tên" value={name} onChange={setName} placeholder="Nguyễn Văn A"/>
-        <Input label="Số CCCD" value={idNumber} onChange={setIdNumber} placeholder="012345678901"
-               digits maxDigits={12} mono format={window.fmtCCCD}/>
+        <Input label="Số điện thoại" value={phone} onChange={setPhone} placeholder="090 123 4567"
+               digits maxDigits={10} format={window.fmtPhone}/>
 
         {ocrToast && (
           <div style={{
@@ -411,14 +388,13 @@ function GuestAddStudentModal({ open, onClose }) {
           }}>{ocrBusy ? "⏳ " : ""}{ocrToast.msg}</div>
         )}
 
-        <div style={{ ...LABEL_STYLE, paddingTop: 4 }}>Hình ảnh</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <PhotoSlot label="CCCD mặt trước" hint="OCR tự điền" file={docFiles.cccd}
                      onPick={(f) => handlePhoto("cccd", f)} accent={ocrBusy ? "cyan-spin" : "cyan"}/>
           <PhotoSlot label="CCCD mặt sau" file={docFiles.cccd_back}
                      onPick={(f) => handlePhoto("cccd_back", f)}/>
           <div style={{ gridColumn: "1 / -1" }}>
-            <PhotoSlot label="Ảnh 3×4 chân dung" file={docFiles.the3x4}
+            <PhotoSlot label="Ảnh thẻ 3×4" file={docFiles.the3x4}
                        onPick={(f) => handlePhoto("the3x4", f)}/>
           </div>
         </div>
@@ -427,33 +403,23 @@ function GuestAddStudentModal({ open, onClose }) {
   );
 }
 
-function PhotoSlot({ label, hint, file, existing, onPick, accent }) {
+function PhotoSlot({ label, file, existing, onPick }) {
   const inputRef = React.useRef(null);
   const justPicked = !!file;
   const has = justPicked || !!existing;
-  const cyan = accent === "cyan" || accent === "cyan-spin";
-  const status = justPicked ? "Đã chọn ảnh mới"
-              :  existing   ? "Đã có ảnh · bấm để thay"
-              :              (hint || "Bấm để chọn ảnh");
   return (
     <button type="button" onClick={() => inputRef.current?.click()} style={{
-      padding: "14px 12px", borderRadius: 12, cursor: "pointer", textAlign: "left",
-      background: has  ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)"
-                : cyan ? "color-mix(in oklab, var(--neon-cyan) 8%, transparent)"
-                :        "var(--ink-2)",
+      padding: "16px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
+      background: has ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)" : "var(--ink-2)",
       border: "1px dashed",
-      borderColor: has ? "var(--neon-lime)" : cyan ? "var(--neon-cyan)" : "var(--glass-stroke-strong)",
-      color: "var(--fg-1)", fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600,
-      minHeight: 84, display: "flex", flexDirection: "column", justifyContent: "center", gap: 4,
+      borderColor: has ? "var(--neon-lime)" : "var(--glass-stroke-strong)",
+      color: has ? "var(--neon-lime)" : "var(--fg-2)",
+      fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600,
+      minHeight: 110, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Icon name={has ? "check" : "plus"} size={14}
-              color={has ? "var(--neon-lime)" : cyan ? "var(--neon-cyan)" : "var(--fg-3)"}/>
-        <span>{label}</span>
-      </div>
-      <div style={{ ...LABEL_STYLE, fontSize: 9, color: has ? "var(--neon-lime)" : "var(--fg-3)" }}>
-        {status}
-      </div>
+      <span>{label}</span>
+      <Icon name={has ? "check" : "plus"} size={36}
+            color={has ? "var(--neon-lime)" : "var(--fg-3)"}/>
       <input ref={inputRef} type="file" accept="image/*" capture="environment"
              onChange={(e) => onPick(e.target.files?.[0])}
              style={{ display: "none" }}/>
