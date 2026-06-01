@@ -254,10 +254,12 @@ function GuestStudentDetail({ student, onBack }) {
       }}>
         <Avatar name={student.name} size={56} glow/>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <GuestClassChip variant="eyebrow"/>
           <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600, color: "var(--fg-1)",
-                        letterSpacing: "-0.02em", marginTop: 2,
+                        letterSpacing: "-0.02em",
                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{student.name}</div>
+          <div style={{ marginTop: 4 }}>
+            <GuestClassChip variant="subheading"/>
+          </div>
         </div>
       </div>
 
@@ -624,14 +626,14 @@ function GuestClassChip({ variant = "button" }) {
 
   const label = cls?.code || "Chưa chọn lớp";
 
-  // --- Trigger styling: eyebrow (mono uppercase tiny) or button (chip) ---
-  const triggerStyle = variant === "eyebrow"
+  // --- Trigger styling: subheading (small ui-font line under the
+  // student name) or button (rounded chip beside the primary action) ---
+  const triggerStyle = variant === "subheading"
     ? {
         background: "transparent", border: "none", padding: 0, cursor: "pointer",
-        ...LABEL_STYLE,
+        fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 500,
         color: cls ? "var(--neon-cyan)" : "var(--fg-3)",
-        display: "inline-flex", alignItems: "center", gap: 4,
-        textTransform: "uppercase",
+        display: "inline-flex", alignItems: "center", gap: 6,
       }
     : {
         background: cls
@@ -649,9 +651,11 @@ function GuestClassChip({ variant = "button" }) {
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
       <button type="button" onClick={() => setOpen(v => !v)} style={triggerStyle}>
-        {variant === "eyebrow"
-          ? <><Icon name="calendar" size={10}/>{label}</>
-          : <><Icon name="calendar" size={12}/>{label}</>}
+        <Icon name="calendar" size={variant === "subheading" ? 13 : 12}/>
+        <span>{label}</span>
+        <Icon name="arrow-down" size={variant === "subheading" ? 11 : 12}
+              style={{ opacity: 0.6, transition: "transform 160ms var(--ease-out)",
+                       transform: open ? "rotate(180deg)" : "none" }}/>
       </button>
       {open && (
         <div style={{
