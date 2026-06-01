@@ -43,7 +43,7 @@ function GuestApp() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 600, color: "var(--fg-1)",
                           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.name}</div>
-            <div style={{ ...LABEL_STYLE, fontSize: 9 }}>Cộng tác viên · {myStudents.length} học viên</div>
+            <div style={{ ...LABEL_STYLE, fontSize: 9 }}>Cộng tác viên · {myStudents.length} hồ sơ</div>
           </div>
           <button onClick={async () => {
             try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
