@@ -1,21 +1,43 @@
-// Native picker stub — replaced in Phase 5 with the actual @capacitor/camera
-// implementation. pickPhoto.js dynamic-imports this file; with no export
-// here, it falls through to the web fallback (programmatic <input>).
+// Native picker — Capacitor Camera plugin. The `import` resolves only
+// when the app runs inside a Capacitor shell (web has no @capacitor/core
+// module path at runtime in the Vite dev server). When this module loads
+// and `Capacitor.isNativePlatform()` is false, we still export the
+// function — pickPhoto.js calls it and the plugin will throw, and pickPhoto
+// is wrapped to catch that and fall through to the web path.
 //
-// In Phase 5 this file becomes:
-//
-//   import { Camera, CameraSource, CameraResultType } from '@capacitor/camera';
-//   export async function pickPhotoNative({ source }) {
-//     const photo = await Camera.getPhoto({
-//       quality: 85,
-//       resultType: CameraResultType.Uri,
-//       source: source === 'camera' ? CameraSource.Camera
-//             : source === 'library' ? CameraSource.Photos
-//             : CameraSource.Prompt,
-//     });
-//     const resp = await fetch(photo.webPath);
-//     const blob = await resp.blob();
-//     return new File([blob], `photo-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
-//   }
+// Inside an APK, `Camera.getPhoto({source: CameraSource.Prompt})` shows
+// the OS action sheet labelled per capacitor.config.json:
+//   "Chụp ảnh mới"  → CameraSource.Camera
+//   "Chọn từ thư viện" → CameraSource.Photos
+// User cancellation throws a `User cancelled photos app` error — caught
+// by pickPhoto.js and converted to a `null` resolution.
 
-export {};
+import { Capacitor } from '@capacitor/core';
+import { Camera, CameraSource, CameraResultType } from '@capacitor/camera';
+
+const sourceMap = {
+  camera:  CameraSource.Camera,
+  library: CameraSource.Photos,
+  prompt:  CameraSource.Prompt,
+};
+
+export async function pickPhotoNative({ source = 'prompt' } = {}) {
+  if (!Capacitor.isNativePlatform()) {
+    // Running in a browser (Vite dev / preview). Throw so pickPhoto.js
+    // falls back to the web <input> path.
+    throw new Error('not_native');
+  }
+  const photo = await Camera.getPhoto({
+    quality: 85,
+    allowEditing: false,
+    resultType: CameraResultType.Uri,
+    source: sourceMap[source] || CameraSource.Prompt,
+    saveToGallery: false,
+  });
+  // photo.webPath is a blob:// URL we can fetch + convert to a File
+  // matching the contract the multipart uploader expects (POST /api/students/:id/docs/:key).
+  const resp = await fetch(photo.webPath);
+  const blob = await resp.blob();
+  const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+  return new File([blob], `photo-${Date.now()}.${ext}`, { type: blob.type || 'image/jpeg' });
+}

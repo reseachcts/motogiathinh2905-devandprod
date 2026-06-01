@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MOTOGIATHINH Cộng tác viên</string>
+    <string name="title_activity_main">MOTOGIATHINH Cộng tác viên</string>
+    <string name="package_name">vn.motogiathinh.guest</string>
+    <string name="custom_url_scheme">vn.motogiathinh.guest</string>
+</resources>

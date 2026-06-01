@@ -2,9 +2,24 @@ node_modules/
 dist/
 .vite/
 
-# Capacitor adds these in Phase 5
-android/
+# Capacitor — keep the android/ shell (source of truth) but ignore
+# the build artefacts and the synced web bundle (regenerated on every
+# `cap sync` from dist/, so committing it just creates drift).
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
 ios/
+
+# Release signing — NEVER commit these
+release.keystore
+*.keystore
+*.jks
+keystore.properties
 
 # Local env overrides
 .env.local

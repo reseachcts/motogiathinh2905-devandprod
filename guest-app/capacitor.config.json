@@ -1,0 +1,20 @@
+{
+  "appId": "vn.motogiathinh.guest",
+  "appName": "MOTOGIATHINH Cộng tác viên",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "Camera": {
+      "promptLabelHeader":  "Ảnh học viên",
+      "promptLabelCancel":  "Hủy",
+      "promptLabelPhoto":   "Chọn từ thư viện",
+      "promptLabelPicture": "Chụp ảnh mới"
+    }
+  }
+}
