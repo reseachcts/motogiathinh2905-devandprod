@@ -265,8 +265,7 @@ function GuestStudentDetail({ student, onBack }) {
         <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
           <Input label="Số điện thoại" value={phone} onChange={setPhone}
                  digits maxDigits={10} format={window.fmtPhone}/>
-          <Select label="Hạng bằng" value={licence} onChange={setLicence}
-                  options={[{ value: "A1", label: "A1" }, { value: "A", label: "A" }]}/>
+          <LicencePill value={licence} onChange={setLicence}/>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -415,8 +414,7 @@ function GuestAddStudentModal({ open, onClose }) {
         <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
           <Input label="Số điện thoại" value={phone} onChange={setPhone} placeholder="090 123 4567"
                  digits maxDigits={10} format={window.fmtPhone}/>
-          <Select label="Hạng bằng" value={licence} onChange={setLicence}
-                  options={[{ value: "A1", label: "A1" }, { value: "A", label: "A" }]}/>
+          <LicencePill value={licence} onChange={setLicence}/>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -580,6 +578,38 @@ function GuestThemeToggle() {
           : (<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>)}
       </svg>
     </button>
+  );
+}
+
+// Segmented pill for "Hạng bằng" — sits in the SĐT + Hạng bằng row
+// of the guest create / detail forms. Renders like a labelled Select
+// (eyebrow on top, capsule below) so it aligns visually with the
+// adjacent Input atom.
+function LicencePill({ value, onChange, options = [{ id: "A1", label: "A1" }, { id: "A", label: "A" }] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <label style={LABEL_STYLE}>Hạng bằng</label>
+      <div style={{
+        display: "inline-flex", padding: 3, gap: 3,
+        background: "var(--ink-2)", border: "1px solid var(--glass-stroke)",
+        borderRadius: 10, height: 40, alignItems: "stretch",
+      }}>
+        {options.map(o => {
+          const active = o.id === value;
+          return (
+            <button key={o.id} type="button" onClick={() => onChange(o.id)} style={{
+              flex: 1, padding: "0 14px", borderRadius: 8, cursor: "pointer",
+              background: active ? "var(--neon-cyan)" : "transparent",
+              color: active ? "var(--ink-0)" : "var(--fg-2)",
+              border: "none",
+              fontFamily: "var(--font-ui)", fontSize: 14, fontWeight: 600,
+              boxShadow: active ? "0 0 12px var(--neon-cyan-haze)" : "none",
+              transition: "all 140ms var(--ease-out)",
+            }}>{o.label}</button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
