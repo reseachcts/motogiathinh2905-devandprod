@@ -158,32 +158,63 @@ function GuestStudentDetail({ student, onBack }) {
   const [name,  setName]  = React.useState(student.name  || "");
   const [phone, setPhone] = React.useState(student.phone || "");
   // newFiles tracks photos the user picked this session; existing photo
-  // status comes from student.docs.{cccd,cccd_back,the3x4}.
+  // status comes from student.docs.{cccd,cccd_back,cccd_qr}.
   const [newFiles, setNewFiles] = React.useState({});
+  // QR re-scan state. When the operator picks a NEW QR photo we must
+  // re-validate it through /api/ocr/cccd-qr before allowing save; the
+  // existing QR on the student row is assumed already-valid since it
+  // was gated at create time.
+  const [qrInfo,  setQrInfo]  = React.useState(null);
+  const [qrErr,   setQrErr]   = React.useState(null);
+  const [qrBusy,  setQrBusy]  = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [err,  setErr]  = React.useState(null);
   const busyRef = React.useRef(false);
 
   const fieldsDirty = (name  !== (student.name  || "")) || (phone !== (student.phone || ""));
-  const photosDirty = !!(newFiles.cccd || newFiles.cccd_back || newFiles.the3x4);
-  const isDirty = fieldsDirty || photosDirty;
+  // Non-QR photos are unrestricted; the QR slot is gated below.
+  const otherPhotosDirty = !!(newFiles.cccd || newFiles.cccd_back);
+  const qrReplaced       = !!newFiles.cccd_qr;
+  const isDirty = fieldsDirty || otherPhotosDirty || qrReplaced;
 
   const pickPhoto = (key, file) => { if (file) setNewFiles(prev => ({ ...prev, [key]: file })); };
 
+  // Same scanQr logic as the create dialog.
+  const scanQr = async (file) => {
+    if (!file) return;
+    setQrBusy(true); setQrErr(null);
+    try {
+      const out = await D.api.cccdQr(file);
+      setQrInfo(out.fields);
+      setNewFiles(prev => ({ ...prev, cccd_qr: file }));
+    } catch (e) {
+      setQrInfo(null);
+      setNewFiles(prev => { const { cccd_qr, ...rest } = prev; return rest; });
+      setQrErr(e.code === 'qr_unreadable' || e.code === 'qr_failed'
+        ? "QR chưa rõ. Hãy chụp rõ hơn."
+        : (e.message || "QR chưa rõ. Hãy chụp rõ hơn."));
+    } finally {
+      setQrBusy(false);
+    }
+  };
+
+  // Save is blocked if the operator picked a new QR but it didn't scan.
+  // Picking another photo first re-arms qrInfo via scanQr success path.
+  const canSubmit = !busy && isDirty && (!qrReplaced || !!qrInfo?.idNumber);
+
   const submit = async () => {
-    if (busyRef.current || !isDirty) return;
+    if (busyRef.current || !canSubmit) return;
     busyRef.current = true;
     try {
       setBusy(true); setErr(null);
-      // 1) PATCH the text fields if changed.
-      if (fieldsDirty) {
-        const patch = {};
-        if (name  !== (student.name  || "")) patch.name  = name  || null;
-        if (phone !== (student.phone || "")) patch.phone = phone || null;
-        await D.api.updateStudent(student.id, patch);
-      }
-      // 2) Upload any new photos. Each upload flips docs_<key> = true on
-      //    the server and the in-memory row.
+      // 1) PATCH text fields + (if QR was re-scanned) the new idNumber
+      //    pulled from the QR payload.
+      const patch = {};
+      if (name  !== (student.name  || "")) patch.name  = name  || null;
+      if (phone !== (student.phone || "")) patch.phone = phone || null;
+      if (qrReplaced && qrInfo?.idNumber)  patch.idNumber = qrInfo.idNumber;
+      if (Object.keys(patch).length) await D.api.updateStudent(student.id, patch);
+      // 2) Upload any new photos.
       const uploads = Object.entries(newFiles).filter(([, f]) => !!f);
       for (const [key, file] of uploads) {
         try { await D.api.uploadStudentDoc(student.id, key, file); }
@@ -191,7 +222,7 @@ function GuestStudentDetail({ student, onBack }) {
           if (window.MGT_TOAST) window.MGT_TOAST(`Lỗi tải ảnh ${key}: ${e.message}`);
         }
       }
-      setNewFiles({});
+      setNewFiles({}); setQrInfo(null);
       if (window.MGT_TOAST) window.MGT_TOAST("Đã lưu thay đổi.");
     } catch (e) {
       setErr(e?.message || String(e));
@@ -238,9 +269,19 @@ function GuestStudentDetail({ student, onBack }) {
                      file={newFiles.cccd_back} existing={student.docs?.cccd_back}
                      onPick={(f) => pickPhoto("cccd_back", f)}/>
           <div style={{ gridColumn: "1 / -1" }}>
-            <PhotoSlot label="Ảnh thẻ 3×4"
-                       file={newFiles.the3x4}  existing={student.docs?.the3x4}
-                       onPick={(f) => pickPhoto("the3x4", f)}/>
+            <QrSlot file={newFiles.cccd_qr}
+                    busy={qrBusy}
+                    ok={qrReplaced ? !!qrInfo?.idNumber : !!student.docs?.cccd_qr}
+                    idNumber={qrInfo?.idNumber || (qrReplaced ? null : student.idNumber)}
+                    onPick={scanQr}/>
+            {qrErr && (
+              <div style={{
+                marginTop: 8, padding: "8px 12px", borderRadius: 10,
+                fontFamily: "var(--font-mono)", fontSize: 12,
+                background: "color-mix(in oklab, var(--neon-pink) 12%, transparent)",
+                color: "var(--neon-pink)", border: "1px solid var(--neon-pink)",
+              }}>{qrErr}</div>
+            )}
           </div>
         </div>
       </div>
@@ -249,18 +290,18 @@ function GuestStudentDetail({ student, onBack }) {
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-pink)" }}>Lỗi: {err}</span>
       )}
 
-      <button onClick={submit} disabled={!isDirty || busy} style={{
+      <button onClick={submit} disabled={!canSubmit} style={{
         padding: "14px 16px", borderRadius: 14, border: "none",
-        cursor: (!isDirty || busy) ? "not-allowed" : "pointer",
-        background: isDirty ? "var(--neon-cyan)" : "var(--glass-2)",
-        color: isDirty ? "var(--ink-0)" : "var(--fg-3)",
-        boxShadow: isDirty ? "0 0 0 1px var(--neon-cyan), 0 0 18px var(--neon-cyan-haze)" : "none",
+        cursor: canSubmit ? "pointer" : "not-allowed",
+        background: canSubmit ? "var(--neon-cyan)" : "var(--glass-2)",
+        color: canSubmit ? "var(--ink-0)" : "var(--fg-3)",
+        boxShadow: canSubmit ? "0 0 0 1px var(--neon-cyan), 0 0 18px var(--neon-cyan-haze)" : "none",
         fontFamily: "var(--font-ui)", fontSize: 14, fontWeight: 600,
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
         opacity: busy ? 0.6 : 1,
       }}>
         <Icon name="check" size={16}/>
-        {busy ? "Đang lưu…" : isDirty ? "Lưu thay đổi" : "Không có thay đổi"}
+        {busy ? "Đang lưu…" : !isDirty ? "Không có thay đổi" : (qrReplaced && !qrInfo?.idNumber) ? "Chờ QR hợp lệ" : "Lưu thay đổi"}
       </button>
     </div>
   );
