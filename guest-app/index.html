@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="vi" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0A0C13" />
+    <title>MOTOGIATHINH · Cộng tác viên</title>
+    <style>
+      /* Reset + the four keyframes the Modal/atoms reference. The full
+         token system lives in src/styles.css; this inline block is just
+         the framework-level rules that need to apply before React hydrates. */
+      html, body { height: 100%; margin: 0; background: var(--ink-1, #0A0C13); }
+      #root { min-height: 100%; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: var(--glass-stroke); border-radius: 999px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes mgt-fly-down {
+        0%   { opacity: 0; transform: translateY(-12px) scaleY(0.94); max-height: 0; }
+        100% { opacity: 1; transform: translateY(0)    scaleY(1);     max-height: 1200px; }
+      }
+      @keyframes mgt-fly-up {
+        0%   { opacity: 1; transform: translateY(0)    scaleY(1);     max-height: 1200px; }
+        100% { opacity: 0; transform: translateY(-12px) scaleY(0.94); max-height: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
