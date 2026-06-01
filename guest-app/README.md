@@ -95,39 +95,38 @@ The CCCD QR slot additionally gates submission on a successful `/api/ocr/cccd-qr
 
 ## Release signing
 
+`android/app/build.gradle` already reads from `android/keystore.properties` if it exists. Without that file, the release build is unsigned (fine for code inspection, won't install on a device). Three one-time steps:
+
 ```bash
-# 1. Generate a keystore (one-time, keep this file safe + back it up)
-keytool -genkey -v -keystore release.keystore -alias guest-key \
-        -keyalg RSA -keysize 2048 -validity 10000
+# 1. Copy the template, fill in passwords
+cp android/keystore.properties.template android/keystore.properties
+# Edit it. storeFile is RELATIVE to the android/ folder.
 
-# 2. Add signing config to android/app/build.gradle in the `android {}` block:
-#
-#    signingConfigs {
-#      release {
-#        storeFile file("../../release.keystore")
-#        storePassword System.getenv("MGT_KEYSTORE_PASSWORD")
-#        keyAlias "guest-key"
-#        keyPassword System.getenv("MGT_KEY_PASSWORD")
-#      }
-#    }
-#    buildTypes {
-#      release {
-#        signingConfig signingConfigs.release
-#        minifyEnabled false
-#      }
-#    }
+# 2. Generate the keystore (alias must match keystore.properties)
+keytool -genkey -v -keystore android/release.keystore \
+        -alias guest-key -keyalg RSA -keysize 2048 -validity 10000
 
-# 3. Build the signed APK
+# 3. Build
 npm run android:sync:prod
-cd android && ./gradlew assembleRelease
+cd android && ./gradlew assembleRelease     # signed APK
 # → android/app/build/outputs/apk/release/app-release.apk
 
-# Or AAB for Play Store
-cd android && ./gradlew bundleRelease
+# OR for Play Store
+cd android && ./gradlew bundleRelease       # signed AAB
 # → android/app/build/outputs/bundle/release/app-release.aab
 ```
 
-Never commit `release.keystore` or the passwords. Add to `.gitignore`.
+`release.keystore`, `keystore.properties`, `*.jks` are all gitignored. Keep them backed up — losing the keystore means you can't push updates to Play Store under the same package id.
+
+## App icon (optional)
+
+Capacitor ships placeholder C-logo icons. To replace:
+
+```bash
+mkdir -p resources && cp <your-1024px-icon.png> resources/icon.png
+npm install --save-dev @capacitor/assets
+npx capacitor-assets generate --android
+```
 
 ## Common tasks
 
