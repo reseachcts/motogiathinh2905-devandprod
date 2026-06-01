@@ -591,46 +591,20 @@ function GuestThemeToggle() {
 }
 
 // --------------------------------------------------------------------
-// GuestClassChip — surfaces the guest's CURRENT assignedClassId on
-// two places that both read identically: an eyebrow above the student
-// name in the detail hero, and a chip in the create modal footer.
-// Tap either to open a popover that lists the guest's branch classes
-// (server scopes /api/classes to the branch); selecting one POSTs to
-// /api/me/assigned-class and patches the in-memory user. The chip is
-// the ONLY way to write the assignment — admin has no UI for it.
+// GuestClassChip — read-only display of the guest's assigned class.
+// Surfaces in two places: a subheading under the student name in the
+// detail hero, and a chip beside the primary action in the create
+// modal footer. The assignment is written by admin via the Tổ chức
+// account dialog — guest has no edit affordance anywhere.
 // --------------------------------------------------------------------
 function GuestClassChip({ variant = "button" }) {
   const D = window.MGT_DATA;
   const me = D.currentUser;
   const cls = me?.assignedClassId ? D.getClass(me.assignedClassId) : null;
-  const classes = D.classes || [];
-  const [open, setOpen]   = React.useState(false);
-  const [busy, setBusy]   = React.useState(false);
-  const ref = React.useRef(null);
-  React.useEffect(() => {
-    if (!open) return;
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+  const label = cls?.code || "Chưa được gán lớp";
 
-  const pick = async (classId) => {
-    setBusy(true);
-    try {
-      await D.api.setMyAssignedClass(classId);
-      setOpen(false);
-    } catch (e) {
-      if (window.MGT_TOAST) window.MGT_TOAST("Lỗi gán lớp: " + (e.message || e));
-    } finally { setBusy(false); }
-  };
-
-  const label = cls?.code || "Chưa chọn lớp";
-
-  // --- Trigger styling: subheading (small ui-font line under the
-  // student name) or button (rounded chip beside the primary action) ---
-  const triggerStyle = variant === "subheading"
+  const baseStyle = variant === "subheading"
     ? {
-        background: "transparent", border: "none", padding: 0, cursor: "pointer",
         fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 500,
         color: cls ? "var(--neon-cyan)" : "var(--fg-3)",
         display: "inline-flex", alignItems: "center", gap: 6,
@@ -642,69 +616,17 @@ function GuestClassChip({ variant = "button" }) {
         border: "1px solid",
         borderColor: cls ? "var(--neon-cyan)" : "var(--glass-stroke-strong)",
         color: cls ? "var(--neon-cyan)" : "var(--fg-3)",
-        padding: "6px 12px", borderRadius: 999, cursor: "pointer",
+        padding: "6px 12px", borderRadius: 999,
         display: "inline-flex", alignItems: "center", gap: 6,
         fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600,
         whiteSpace: "nowrap",
       };
 
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
-      <button type="button" onClick={() => setOpen(v => !v)} style={triggerStyle}>
-        <Icon name="calendar" size={variant === "subheading" ? 13 : 12}/>
-        <span>{label}</span>
-        <Icon name="arrow-down" size={variant === "subheading" ? 11 : 12}
-              style={{ opacity: 0.6, transition: "transform 160ms var(--ease-out)",
-                       transform: open ? "rotate(180deg)" : "none" }}/>
-      </button>
-      {open && (
-        <div style={{
-          position: "absolute",
-          bottom: variant === "button" ? "calc(100% + 6px)" : "auto",
-          top:    variant === "button" ? "auto" : "calc(100% + 6px)",
-          left: 0, zIndex: 50, minWidth: 220, maxHeight: 280, overflowY: "auto",
-          padding: 4, borderRadius: 12,
-          background: "var(--glass-3)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
-          border: "1px solid var(--glass-stroke-strong)", boxShadow: "var(--shadow-3)",
-        }}>
-          <div style={{ ...LABEL_STYLE, padding: "8px 10px 4px" }}>Lớp đang gán</div>
-          {classes.length === 0 && (
-            <div style={{ padding: "10px 10px 12px", fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-3)", fontStyle: "italic" }}>
-              Chưa có lớp nào trong chi nhánh.
-            </div>
-          )}
-          {classes.map(c => {
-            const isMine = c.id === me?.assignedClassId;
-            return (
-              <button key={c.id} type="button" disabled={busy} onClick={() => pick(c.id)} style={{
-                display: "flex", alignItems: "center", gap: 8, width: "100%",
-                padding: "10px 10px", borderRadius: 8, cursor: busy ? "wait" : "pointer",
-                background: isMine ? "color-mix(in oklab, var(--neon-cyan) 14%, transparent)" : "transparent",
-                border: "none", color: isMine ? "var(--neon-cyan)" : "var(--fg-1)",
-                fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: isMine ? 600 : 500, textAlign: "left",
-              }}
-              onMouseEnter={(e) => { if (!isMine) e.currentTarget.style.background = "var(--glass-2)"; }}
-              onMouseLeave={(e) => { if (!isMine) e.currentTarget.style.background = "transparent"; }}>
-                <Icon name={isMine ? "check" : "calendar"} size={12}/>
-                <span style={{ flex: 1 }}>{c.code}</span>
-              </button>
-            );
-          })}
-          {cls && (
-            <button type="button" disabled={busy} onClick={() => pick(null)} style={{
-              display: "flex", alignItems: "center", gap: 8, width: "100%",
-              padding: "8px 10px", borderRadius: 8, cursor: busy ? "wait" : "pointer",
-              background: "transparent", border: "none", color: "var(--fg-3)",
-              fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase",
-              textAlign: "left", marginTop: 4, borderTop: "1px solid var(--ink-4)",
-            }}>
-              <Icon name="x" size={11}/>
-              Bỏ chọn
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+    <span style={baseStyle} title={cls ? `Lớp được giao: ${cls.code}` : "Admin chưa gán lớp"}>
+      <Icon name="calendar" size={variant === "subheading" ? 13 : 12}/>
+      <span>{label}</span>
+    </span>
   );
 }
 
