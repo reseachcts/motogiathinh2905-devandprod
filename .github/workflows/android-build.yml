@@ -78,9 +78,27 @@ jobs:
         working-directory: guest-app/android
         run: chmod +x gradlew
 
-      - name: Build debug APK
+      - name: Build debug APK (verbose + captured)
         working-directory: guest-app/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          set +e
+          ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee /tmp/gradle.log
+          STATUS=$?
+          echo "===== gradle exit: $STATUS ====="
+          if [ $STATUS -ne 0 ]; then
+            echo "::error::gradle assembleDebug failed"
+            echo "--- tail of gradle.log ---"
+            tail -200 /tmp/gradle.log
+            exit $STATUS
+          fi
+
+      - name: Upload gradle log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-log
+          path: /tmp/gradle.log
+          if-no-files-found: warn
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
