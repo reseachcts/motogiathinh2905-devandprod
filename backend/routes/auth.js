@@ -65,7 +65,9 @@ router.get('/me', requireAuth, (req, res) => {
 router.post('/auth/password', requireAuth, (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
   if (!currentPassword || !newPassword) return res.status(400).json({ error: 'missing_fields' });
-  const pol = passwordPolicy(newPassword);
+  // Guests use the simple policy (any non-empty string) to match the
+  // simplified login flow; admin/staff get full complexity.
+  const pol = passwordPolicy(newPassword, { simple: req.user.role === 'guest' });
   if (!pol.ok) return res.status(400).json({ error: pol.code, message: pol.message });
   if (!verifyPassword(currentPassword, req.user.passwordHash)) {
     return res.status(401).json({ error: 'invalid_credentials' });
