@@ -554,6 +554,14 @@
         // Scan QR code on a Vietnamese CCCD image. Returns { fields, raw }
         // on success; throws an Error whose .code property carries the
         // server's structured error (qr_unreadable / qr_unrecognized / etc).
+        // Guest-only: change the caller's assignedClassId. Updates the
+        // local accounts row so MGT_DATA.currentUser reflects immediately.
+        async setMyAssignedClass(classId) {
+          const out = await api('/me/assigned-class', { method: 'POST', body: { assignedClassId: classId || null } });
+          const me = accountsById.get(this.currentUserId) || this.currentUser;
+          if (me) me.assignedClassId = out.assignedClassId;
+          this._bump(); return out;
+        },
         async cccdQr(file) {
           const fd = new FormData(); fd.append('file', file);
           const res = await fetch(API + '/ocr/cccd-qr', { method: 'POST', credentials: 'include', body: fd });

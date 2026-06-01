@@ -555,6 +555,25 @@ function makeAdminPatcher(table) {
 }
 
 router.patch('/accounts/:id',   requireAdmin, makeAdminPatcher('accounts'));
+
+// Guest self-assignment of their current class. Narrow endpoint: the
+// caller can only update their own assignedClassId, no other fields,
+// and only when role==='guest'. Used by the kiosk's class-eyebrow
+// picker on the student profile screen.
+router.post('/me/assigned-class', (req, res) => {
+  if (req.user.role !== 'guest') return bad(res, 403, 'guest_only');
+  const { assignedClassId } = req.body || {};
+  if (assignedClassId) {
+    const cls = db.prepare('SELECT id, branchId FROM classes WHERE id = ?').get(assignedClassId);
+    if (!cls) return bad(res, 400, 'invalid_classId');
+    if (req.user.branchId && cls.branchId !== req.user.branchId) {
+      return bad(res, 403, 'wrong_branch');
+    }
+  }
+  db.prepare('UPDATE accounts SET assignedClassId = ? WHERE id = ?').run(assignedClassId || null, req.user.id);
+  logActivity(req.user.id, 'account.assign_class', assignedClassId || '(cleared)');
+  res.json({ ok: true, assignedClassId: assignedClassId || null });
+});
 router.patch('/fee-plans/:id',  requireAdmin, makeAdminPatcher('fee_plans'));
 router.patch('/promotions/:id', requireAdmin, makeAdminPatcher('promotions'));
 router.patch('/teachers/:id',   requireAdmin, makeAdminPatcher('teachers'));

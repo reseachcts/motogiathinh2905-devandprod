@@ -37,9 +37,10 @@ function dump(table, mapRow) {
       } else if (table === 'accounts') {
         rows = db.prepare(`SELECT * FROM accounts WHERE id = ?`).all(req.user.id);
       } else if (table === 'classes') {
-        const me = db.prepare('SELECT assignedClassId FROM accounts WHERE id = ?').get(req.user.id);
-        rows = me?.assignedClassId
-          ? db.prepare(`SELECT * FROM classes WHERE id = ?`).all(me.assignedClassId)
+        // All classes in the guest's branch — they need the full list to
+        // pick a current assignment from the eyebrow popover.
+        rows = req.user.branchId
+          ? db.prepare(`SELECT * FROM classes WHERE branchId = ?`).all(req.user.branchId)
           : [];
       } else {
         rows = [];
