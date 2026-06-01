@@ -22,6 +22,7 @@ function GuestApp() {
   const myStudents = D.students;  // server already scopes to guest's own
   const viewing = viewingId ? D.getStudent(viewingId) : null;
 
+
   return (
     <div style={{
       minHeight: "100vh", display: "flex", flexDirection: "column",
@@ -38,13 +39,10 @@ function GuestApp() {
         <header style={{
           padding: "18px 18px 14px", display: "flex", alignItems: "center", gap: 10,
           borderBottom: "1px solid var(--ink-4)",
+          position: "relative",
         }}>
-          <Avatar name={me.name} size={36}/>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 600, color: "var(--fg-1)",
-                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.name}</div>
-            <div style={{ ...LABEL_STYLE, fontSize: 9 }}>Cộng tác viên · {myStudents.length} hồ sơ</div>
-          </div>
+          <GuestUserChip me={me} count={myStudents.length}/>
+          <div style={{ flex: 1 }}/>
           <GuestThemeToggle/>
         </header>
 
@@ -415,8 +413,64 @@ function PhotoSlot({ label, file, existing, onPick }) {
   );
 }
 
+// Avatar + name + role chip. Tapping it pops a small menu with a
+// logout action (the only explicit way for a guest to sign out).
+function GuestUserChip({ me, count }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const logout = async () => {
+    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
+    window.location.reload();
+  };
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 10,
+                             flex: 1, minWidth: 0, maxWidth: 280 }}>
+      <button onClick={() => setOpen(v => !v)} style={{
+        display: "inline-flex", alignItems: "center", gap: 10,
+        background: open ? "var(--ink-2)" : "transparent",
+        border: "1px solid", borderColor: open ? "var(--glass-stroke-strong)" : "transparent",
+        borderRadius: 12, padding: "4px 8px 4px 4px", cursor: "pointer",
+        flex: 1, minWidth: 0, textAlign: "left", fontFamily: "inherit",
+        transition: "background 140ms var(--ease-out), border-color 140ms var(--ease-out)",
+      }}>
+        <Avatar name={me.name} size={36}/>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 600, color: "var(--fg-1)",
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.name}</div>
+          <div style={{ ...LABEL_STYLE, fontSize: 9 }}>Cộng tác viên · {count} hồ sơ</div>
+        </div>
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 40,
+          minWidth: 200, padding: 4, borderRadius: 12,
+          background: "var(--glass-3)", backdropFilter: "var(--glass-blur)", WebkitBackdropFilter: "var(--glass-blur)",
+          border: "1px solid var(--glass-stroke-strong)", boxShadow: "var(--shadow-3)",
+        }}>
+          <button onClick={logout} style={{
+            display: "flex", alignItems: "center", gap: 10, width: "100%",
+            padding: "10px 12px", borderRadius: 8, cursor: "pointer",
+            background: "transparent", border: "none", color: "var(--neon-pink)",
+            fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600, textAlign: "left",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = "color-mix(in oklab, var(--neon-pink) 12%, transparent)"}
+          onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+            <Icon name="logout" size={14}/>
+            Đăng xuất
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Compact theme toggle for the guest top bar — sun ↔ moon icon button.
-// No logout button: guests stay signed-in indefinitely (kiosk role).
 function GuestThemeToggle() {
   const [theme, setTheme] = window.useTheme();
   const isLight = theme === "light";
