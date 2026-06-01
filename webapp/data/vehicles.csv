@@ -1,7 +1,1 @@
 id,name,licence,plate,year,branchId,status,price
-xe-1,Honda Wave Alpha,A1,1,2022,br-1,đang hoạt động,20000
-xe-2,Honda CB250R,A,2,2023,br-2,đang hoạt động,50000
-xe-3,Yamaha Sirius,A1,3,2021,br-3,đang hoạt động,20000
-xe-4,Honda CB300F,A,4,2024,br-1,đang hoạt động,60000
-xe-5,Yamaha YZF-R3,A,5,2023,br-2,đang bảo trì,80000
-xe-6,Honda Wave RSX,A1,6,2022,br-3,đang hoạt động,25000
