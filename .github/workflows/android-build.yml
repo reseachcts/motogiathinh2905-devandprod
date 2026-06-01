@@ -36,9 +36,43 @@ jobs:
         working-directory: guest-app
         run: npm run build:dev
 
-      - name: Sync Capacitor android
+      - name: Diagnose pre-sync state
         working-directory: guest-app
-        run: npx cap sync android
+        if: always()
+        run: |
+          echo "=== pwd ==="
+          pwd
+          echo "=== dist/ exists? ==="
+          ls -la dist/ | head -20 || echo "NO DIST"
+          echo "=== capacitor.config.json ==="
+          cat capacitor.config.json
+          echo "=== android/ top level ==="
+          ls -la android/ | head -20
+          echo "=== node_modules/@capacitor ==="
+          ls node_modules/@capacitor/ || true
+          echo "=== npx cap --version ==="
+          npx cap --version || true
+
+      - name: Sync Capacitor android (verbose + captured)
+        working-directory: guest-app
+        run: |
+          set +e
+          npx cap sync android --verbose 2>&1 | tee /tmp/cap-sync.log
+          STATUS=$?
+          echo "===== exit status: $STATUS ====="
+          if [ $STATUS -ne 0 ]; then
+            echo "::error::cap sync failed with status $STATUS"
+            cat /tmp/cap-sync.log
+            exit $STATUS
+          fi
+
+      - name: Upload cap-sync log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cap-sync-log
+          path: /tmp/cap-sync.log
+          if-no-files-found: warn
 
       - name: Make gradlew executable
         working-directory: guest-app/android
