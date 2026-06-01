@@ -274,51 +274,20 @@ function GuestStudentDetail({ student, onBack }) {
 // --------------------------------------------------------------------
 function GuestAddStudentModal({ open, onClose }) {
   const D = window.MGT_DATA;
-  const [name,      setName]      = React.useState("");
-  const [phone,     setPhone]     = React.useState("");
-  const [docFiles,  setDocFiles]  = React.useState({});  // { cccd, cccd_back, the3x4 }
-  const [ocrToast,  setOcrToast]  = React.useState(null);
-  const [ocrBusy,   setOcrBusy]   = React.useState(false);
-  // OCR-derived hidden fields (idNumber, dob, gender, address, ...).
-  const [extraForm, setExtraForm] = React.useState({});
+  const [name,     setName]     = React.useState("");
+  const [phone,    setPhone]    = React.useState("");
+  const [docFiles, setDocFiles] = React.useState({});  // { cccd, cccd_back, the3x4 }
   const [busy, setBusy] = React.useState(false);
   const [err,  setErr]  = React.useState(null);
   const busyRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!open) return;
-    setName(""); setPhone(""); setDocFiles({}); setOcrToast(null);
-    setOcrBusy(false); setExtraForm({}); setBusy(false); setErr(null);
+    setName(""); setPhone(""); setDocFiles({}); setBusy(false); setErr(null);
     busyRef.current = false;
   }, [open]);
 
-  const handlePhoto = async (key, file) => {
-    if (!file) return;
-    setDocFiles(prev => ({ ...prev, [key]: file }));
-    if (key !== "cccd") return;
-    setOcrBusy(true);
-    setOcrToast({ kind: "info", msg: "Đang quét CCCD…" });
-    try {
-      const out = await D.api.ocrCccd(file);
-      const f = out.fields || {};
-      const applied = [];
-      if (f.name && !name) { setName(f.name); applied.push("tên"); }
-      const extras = {};
-      ["idNumber", "dob", "gender", "queQuan", "address", "ngayCapCCCD"].forEach(k => {
-        if (f[k]) { extras[k] = f[k]; applied.push(k); }
-      });
-      if (Object.keys(extras).length) setExtraForm(prev => ({ ...prev, ...extras }));
-      setOcrToast({
-        kind: applied.length ? "ok" : "warn",
-        msg: applied.length ? `OCR điền ${applied.length} trường` : "Không trích xuất được — kiểm tra ảnh",
-      });
-    } catch (e) {
-      setOcrToast({ kind: "err", msg: "OCR thất bại: " + (e.message || e) });
-    } finally {
-      setOcrBusy(false);
-      setTimeout(() => setOcrToast(null), 3500);
-    }
-  };
+  const pickPhoto = (key, file) => { if (file) setDocFiles(prev => ({ ...prev, [key]: file })); };
 
   const canSubmit = !busy && name.trim();
   const submit = async () => {
@@ -326,7 +295,7 @@ function GuestAddStudentModal({ open, onClose }) {
     busyRef.current = true;
     try {
       setBusy(true); setErr(null);
-      const form = { name: name.trim(), phone: phone.trim() || null, ...extraForm };
+      const form = { name: name.trim(), phone: phone.trim() || null };
       const docs = { cccd: !!docFiles.cccd, cccd_back: !!docFiles.cccd_back, the3x4: !!docFiles.the3x4 };
       const created = await D.api.createStudent({ form, docs, profileComplete: false });
       // Upload files after the row exists.
@@ -359,28 +328,14 @@ function GuestAddStudentModal({ open, onClose }) {
         <Input label="Số điện thoại" value={phone} onChange={setPhone} placeholder="090 123 4567"
                digits maxDigits={10} format={window.fmtPhone}/>
 
-        {ocrToast && (
-          <div style={{
-            padding: "8px 12px", borderRadius: 10, fontSize: 12,
-            fontFamily: "var(--font-mono)",
-            background: ocrToast.kind === "err"  ? "color-mix(in oklab, var(--neon-pink) 12%, transparent)"
-                     :  ocrToast.kind === "ok"   ? "color-mix(in oklab, var(--neon-lime) 12%, transparent)"
-                     :                            "color-mix(in oklab, var(--neon-cyan) 12%, transparent)",
-            color:      ocrToast.kind === "err"  ? "var(--neon-pink)"
-                     :  ocrToast.kind === "ok"   ? "var(--neon-lime)"
-                     :                            "var(--neon-cyan)",
-            border: "1px solid currentColor",
-          }}>{ocrBusy ? "⏳ " : ""}{ocrToast.msg}</div>
-        )}
-
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <PhotoSlot label="CCCD mặt trước" hint="OCR tự điền" file={docFiles.cccd}
-                     onPick={(f) => handlePhoto("cccd", f)} accent={ocrBusy ? "cyan-spin" : "cyan"}/>
+          <PhotoSlot label="CCCD mặt trước" file={docFiles.cccd}
+                     onPick={(f) => pickPhoto("cccd", f)}/>
           <PhotoSlot label="CCCD mặt sau" file={docFiles.cccd_back}
-                     onPick={(f) => handlePhoto("cccd_back", f)}/>
+                     onPick={(f) => pickPhoto("cccd_back", f)}/>
           <div style={{ gridColumn: "1 / -1" }}>
             <PhotoSlot label="Ảnh thẻ 3×4" file={docFiles.the3x4}
-                       onPick={(f) => handlePhoto("the3x4", f)}/>
+                       onPick={(f) => pickPhoto("the3x4", f)}/>
           </div>
         </div>
       </div>
