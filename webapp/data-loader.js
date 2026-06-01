@@ -551,24 +551,29 @@
           if (!res.ok) throw new Error('ocr_failed: ' + res.status);
           return res.json();
         },
-        // Scan QR code on a Vietnamese CCCD image. Returns { fields, raw }
-        // on success; throws an Error whose .code property carries the
-        // server's structured error (qr_unreadable / qr_unrecognized / etc).
         // Re-pull /api/accounts + /api/classes and patch the in-memory
         // maps. Used by the guest kiosk when opening the add dialog so
         // the footer chip reflects admin's latest assignedClassId
-        // without a full page reload.
+        // without a full page reload. Promise.all is atomic — if either
+        // endpoint fails, no in-memory state is mutated.
         async refreshMe() {
           const [accs, fresh] = await Promise.all([api('/accounts'), api('/classes')]);
-          for (const a of accs) accountsById.set(a.id, a);
-          classes.length = 0; classesById.clear();
-          for (const raw of fresh) {
-            const c = { ...raw, _openMs: parseDT(raw.openDate), _examMs: parseDT(raw.examDate) };
-            setClassStatus(c);
-            classes.push(c); classesById.set(c.id, c);
+          if (Array.isArray(accs)) {
+            for (const a of accs) accountsById.set(a.id, a);
+          }
+          if (Array.isArray(fresh)) {
+            classes.length = 0; classesById.clear();
+            for (const raw of fresh) {
+              const c = { ...raw, _openMs: parseDT(raw.openDate), _examMs: parseDT(raw.examDate) };
+              setClassStatus(c);
+              classes.push(c); classesById.set(c.id, c);
+            }
           }
           this._bump();
         },
+        // Scan QR code on a Vietnamese CCCD image. Returns { fields, raw }
+        // on success; throws an Error whose .code property carries the
+        // server's structured error (qr_unreadable / qr_unrecognized / etc).
         async cccdQr(file) {
           const fd = new FormData(); fd.append('file', file);
           const res = await fetch(API + '/ocr/cccd-qr', { method: 'POST', credentials: 'include', body: fd });
