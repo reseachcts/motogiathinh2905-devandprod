@@ -45,7 +45,7 @@ function GuestApp() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 600, color: "var(--fg-1)",
                           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.name}</div>
-            <div style={{ ...LABEL_STYLE, fontSize: 9 }}>Khách · {myStudents.length} học viên</div>
+            <div style={{ ...LABEL_STYLE, fontSize: 9 }}>Cộng tác viên · {myStudents.length} học viên</div>
           </div>
           <button onClick={async () => {
             try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
@@ -185,42 +185,48 @@ function GuestStudentList({ students, onOpen }) {
 }
 
 // --------------------------------------------------------------------
-// GuestStudentDetail — view + edit a single student's basic fields.
-// All inputs save via PATCH /api/students/:id on tap of the Save button.
+// GuestStudentDetail — edit only Họ tên, SĐT, and the three photos
+// (CCCD front, CCCD back, 3×4 portrait). Mirrors the create dialog.
 // --------------------------------------------------------------------
 function GuestStudentDetail({ student, onBack }) {
   const D = window.MGT_DATA;
-  const [draft, setDraft] = React.useState({
-    name:        student.name        || "",
-    idNumber:    student.idNumber    || "",
-    phone:       student.phone       || "",
-    dob:         student.dob         || "",
-    gender:      student.gender      || "",
-    queQuan:     student.queQuan     || "",
-    address:     student.address     || "",
-    ngayCapCCCD: student.ngayCapCCCD || "",
-    noiCapCCCD:  student.noiCapCCCD  || "",
-    notes:       student.notes       || "",
-  });
-  const set = (k, v) => setDraft(prev => ({ ...prev, [k]: v }));
+  const [name,  setName]  = React.useState(student.name  || "");
+  const [phone, setPhone] = React.useState(student.phone || "");
+  // newFiles tracks photos the user picked this session; existing photo
+  // status comes from student.docs.{cccd,cccd_back,the3x4}.
+  const [newFiles, setNewFiles] = React.useState({});
   const [busy, setBusy] = React.useState(false);
   const [err,  setErr]  = React.useState(null);
   const busyRef = React.useRef(false);
-  // dirty flag — only Save what changed.
-  const isDirty = Object.keys(draft).some(k => (draft[k] || "") !== (student[k] || ""));
+
+  const fieldsDirty = (name  !== (student.name  || "")) || (phone !== (student.phone || ""));
+  const photosDirty = !!(newFiles.cccd || newFiles.cccd_back || newFiles.the3x4);
+  const isDirty = fieldsDirty || photosDirty;
+
+  const pickPhoto = (key, file) => { if (file) setNewFiles(prev => ({ ...prev, [key]: file })); };
 
   const submit = async () => {
     if (busyRef.current || !isDirty) return;
     busyRef.current = true;
     try {
       setBusy(true); setErr(null);
-      const patch = {};
-      Object.keys(draft).forEach(k => {
-        const before = student[k] || "";
-        const after  = draft[k] || "";
-        if (before !== after) patch[k] = after || null;
-      });
-      await D.api.updateStudent(student.id, patch);
+      // 1) PATCH the text fields if changed.
+      if (fieldsDirty) {
+        const patch = {};
+        if (name  !== (student.name  || "")) patch.name  = name  || null;
+        if (phone !== (student.phone || "")) patch.phone = phone || null;
+        await D.api.updateStudent(student.id, patch);
+      }
+      // 2) Upload any new photos. Each upload flips docs_<key> = true on
+      //    the server and the in-memory row.
+      const uploads = Object.entries(newFiles).filter(([, f]) => !!f);
+      for (const [key, file] of uploads) {
+        try { await D.api.uploadStudentDoc(student.id, key, file); }
+        catch (e) {
+          if (window.MGT_TOAST) window.MGT_TOAST(`Lỗi tải ảnh ${key}: ${e.message}`);
+        }
+      }
+      setNewFiles({});
       if (window.MGT_TOAST) window.MGT_TOAST("Đã lưu thay đổi.");
     } catch (e) {
       setErr(e?.message || String(e));
@@ -251,27 +257,29 @@ function GuestStudentDetail({ student, onBack }) {
           <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600, color: "var(--fg-1)",
                         letterSpacing: "-0.02em",
                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{student.name}</div>
-          <div style={{ ...LABEL_STYLE, marginTop: 4 }}>{student.maHV} · {student.licence || "—"}</div>
+          <div style={{ ...LABEL_STYLE, marginTop: 4 }}>{student.maHV}</div>
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <Input label="Họ tên"  value={draft.name}     onChange={(v) => set("name", v)}/>
-        <Input label="CCCD"    value={draft.idNumber} onChange={(v) => set("idNumber", v)}
-               digits maxDigits={12} mono format={window.fmtCCCD}/>
-        <Input label="Số điện thoại" value={draft.phone} onChange={(v) => set("phone", v)}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <Input label="Họ tên" value={name} onChange={setName}/>
+        <Input label="Số điện thoại" value={phone} onChange={setPhone}
                digits maxDigits={10} format={window.fmtPhone}/>
-        <Input label="Ngày sinh (dd/mm/yyyy)" value={draft.dob} onChange={(v) => set("dob", v)}
-               digits maxDigits={8} format={window.fmtDateInput} storeFormatted/>
-        <Select label="Giới tính" value={draft.gender || ""} onChange={(v) => set("gender", v)}
-                options={[{ value: "", label: "—" }, { value: "Nam", label: "Nam" }, { value: "Nữ", label: "Nữ" }]}/>
-        <Input label="Quê quán" value={draft.queQuan} onChange={(v) => set("queQuan", v)}/>
-        <Input label="Địa chỉ"  value={draft.address} onChange={(v) => set("address", v)}/>
-        <Input label="Ngày cấp CCCD (dd/mm/yyyy)" value={draft.ngayCapCCCD}
-               onChange={(v) => set("ngayCapCCCD", v)}
-               digits maxDigits={8} format={window.fmtDateInput} storeFormatted/>
-        <Input label="Nơi cấp CCCD" value={draft.noiCapCCCD} onChange={(v) => set("noiCapCCCD", v)}/>
-        <Input label="Ghi chú"  value={draft.notes}   onChange={(v) => set("notes", v)}/>
+
+        <div style={{ ...LABEL_STYLE, paddingTop: 4 }}>Hình ảnh</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <PhotoSlot label="CCCD mặt trước"
+                     file={newFiles.cccd}     existing={student.docs?.cccd}
+                     onPick={(f) => pickPhoto("cccd", f)}/>
+          <PhotoSlot label="CCCD mặt sau"
+                     file={newFiles.cccd_back} existing={student.docs?.cccd_back}
+                     onPick={(f) => pickPhoto("cccd_back", f)}/>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <PhotoSlot label="Ảnh 3×4 chân dung"
+                       file={newFiles.the3x4}  existing={student.docs?.the3x4}
+                       onPick={(f) => pickPhoto("the3x4", f)}/>
+          </div>
+        </div>
       </div>
 
       {err && (
@@ -419,28 +427,32 @@ function GuestAddStudentModal({ open, onClose }) {
   );
 }
 
-function PhotoSlot({ label, hint, file, onPick, accent }) {
+function PhotoSlot({ label, hint, file, existing, onPick, accent }) {
   const inputRef = React.useRef(null);
-  const filled = !!file;
+  const justPicked = !!file;
+  const has = justPicked || !!existing;
   const cyan = accent === "cyan" || accent === "cyan-spin";
+  const status = justPicked ? "Đã chọn ảnh mới"
+              :  existing   ? "Đã có ảnh · bấm để thay"
+              :              (hint || "Bấm để chọn ảnh");
   return (
     <button type="button" onClick={() => inputRef.current?.click()} style={{
       padding: "14px 12px", borderRadius: 12, cursor: "pointer", textAlign: "left",
-      background: filled ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)"
-                : cyan  ? "color-mix(in oklab, var(--neon-cyan) 8%, transparent)"
-                :         "var(--ink-2)",
+      background: has  ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)"
+                : cyan ? "color-mix(in oklab, var(--neon-cyan) 8%, transparent)"
+                :        "var(--ink-2)",
       border: "1px dashed",
-      borderColor: filled ? "var(--neon-lime)" : cyan ? "var(--neon-cyan)" : "var(--glass-stroke-strong)",
+      borderColor: has ? "var(--neon-lime)" : cyan ? "var(--neon-cyan)" : "var(--glass-stroke-strong)",
       color: "var(--fg-1)", fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600,
       minHeight: 84, display: "flex", flexDirection: "column", justifyContent: "center", gap: 4,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <Icon name={filled ? "check" : "plus"} size={14}
-              color={filled ? "var(--neon-lime)" : cyan ? "var(--neon-cyan)" : "var(--fg-3)"}/>
+        <Icon name={has ? "check" : "plus"} size={14}
+              color={has ? "var(--neon-lime)" : cyan ? "var(--neon-cyan)" : "var(--fg-3)"}/>
         <span>{label}</span>
       </div>
-      <div style={{ ...LABEL_STYLE, fontSize: 9, color: filled ? "var(--neon-lime)" : "var(--fg-3)" }}>
-        {filled ? "Đã chọn ảnh" : hint || "Bấm để chọn ảnh"}
+      <div style={{ ...LABEL_STYLE, fontSize: 9, color: has ? "var(--neon-lime)" : "var(--fg-3)" }}>
+        {status}
       </div>
       <input ref={inputRef} type="file" accept="image/*" capture="environment"
              onChange={(e) => onPick(e.target.files?.[0])}
