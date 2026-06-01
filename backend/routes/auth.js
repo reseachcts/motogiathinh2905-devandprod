@@ -50,7 +50,13 @@ router.post('/auth/logout', (req, res) => {
   res.json({ ok: true });
 });
 
+// /api/me — also acts as a session refresh: on every page load the
+// frontend hits this endpoint, we re-sign the JWT and reset the cookie
+// so the TTL window slides forward. Equivalent to "session restart on
+// reload" without forcing the user to log in again.
 router.get('/me', requireAuth, (req, res) => {
+  const fresh = signToken(req.user);
+  res.cookie(COOKIE_NAME, fresh, cookieOptions(req.user));
   res.json({ user: publicAccount(req.user) });
 });
 
