@@ -21,6 +21,12 @@
 
 const GUEST_MAX_WIDTH = 420;
 
+// Single seam for user-facing toast. On web this delegates to the
+// shared window.MGT_TOAST bus (data-loader.js). On a native port,
+// swap the function body to call the platform toast/snackbar — the
+// rest of this file calls only `toast()`, never the global directly.
+const toast = (msg) => { if (window.MGT_TOAST) window.MGT_TOAST(msg); };
+
 // Shared inline-error banner style (the pink QR error chip). Used in
 // both the create modal and the detail screen.
 const ERROR_BANNER_STYLE = {
@@ -212,11 +218,11 @@ function GuestStudentDetail({ student, onBack }) {
       for (const [key, file] of uploads) {
         try { await D.api.uploadStudentDoc(student.id, key, file); }
         catch (e) {
-          if (window.MGT_TOAST) window.MGT_TOAST(`Lỗi tải ảnh ${key}: ${e.message}`);
+          toast(`Lỗi tải ảnh ${key}: ${e.message}`);
         }
       }
       setNewFiles({}); setQrInfo(null);
-      if (window.MGT_TOAST) window.MGT_TOAST("Đã lưu thay đổi.");
+      toast("Đã lưu thay đổi.");
     } catch (e) {
       setErr(e?.message || String(e));
     } finally {
@@ -371,10 +377,10 @@ function GuestAddStudentModal({ open, onClose }) {
       const created = await D.api.createStudent({ form, docs, profileComplete: false });
       await Promise.all(Object.entries(uploadMap).map(
         ([key, file]) => file ? D.api.uploadStudentDoc(created.id, key, file).catch((e) => {
-          if (window.MGT_TOAST) window.MGT_TOAST(`Lỗi tải ảnh ${key}: ${e.message}`);
+          toast(`Lỗi tải ảnh ${key}: ${e.message}`);
         }) : null
       ));
-      if (window.MGT_TOAST) window.MGT_TOAST(`Đã thêm học viên: ${form.name}`);
+      toast(`Đã thêm học viên: ${form.name}`);
       onClose();
     } catch (e) {
       setErr(e?.message || String(e));
