@@ -29,7 +29,7 @@ router.post('/auth/login', (req, res) => {
 
   clearLoginFailures(email);
   const token = signToken(account);
-  res.cookie(COOKIE_NAME, token, cookieOptions());
+  res.cookie(COOKIE_NAME, token, cookieOptions(account));
   logActivity(account.id, 'auth.login', account.email);
   res.json({ user: publicAccount(account) });
 });

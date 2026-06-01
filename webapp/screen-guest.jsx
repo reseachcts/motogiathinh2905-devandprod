@@ -45,14 +45,7 @@ function GuestApp() {
                           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.name}</div>
             <div style={{ ...LABEL_STYLE, fontSize: 9 }}>Cộng tác viên · {myStudents.length} hồ sơ</div>
           </div>
-          <button onClick={async () => {
-            try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
-            window.location.reload();
-          }} style={{
-            background: "transparent", border: "1px solid var(--glass-stroke)",
-            color: "var(--fg-3)", padding: "6px 10px", borderRadius: 8, cursor: "pointer",
-            fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase",
-          }}>Thoát</button>
+          <GuestThemeToggle/>
         </header>
 
         {/* Body */}
@@ -149,14 +142,9 @@ function GuestStudentList({ students, onOpen }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "var(--font-ui)", fontSize: 14, fontWeight: 600, color: "var(--fg-1)",
                           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
-            <div style={{ ...LABEL_STYLE, fontSize: 9, marginTop: 2 }}>{s.maHV} · {s.createdAt?.split(" ")[0] || ""}</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-3)",
+                          fontVariantNumeric: "tabular-nums", marginTop: 2 }}>{window.fmtPhone ? window.fmtPhone(s.phone || "") : (s.phone || "")}</div>
           </div>
-          {s.idNumber && (
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", textAlign: "right" }}>
-              CCCD<br/>{s.idNumber.slice(-4)}
-            </div>
-          )}
-          <Icon name="arrow-right" size={14} color="var(--fg-3)"/>
         </button>
       ))}
     </div>
@@ -423,6 +411,32 @@ function PhotoSlot({ label, file, existing, onPick }) {
       <input ref={inputRef} type="file" accept="image/*" capture="environment"
              onChange={(e) => onPick(e.target.files?.[0])}
              style={{ display: "none" }}/>
+    </button>
+  );
+}
+
+// Compact theme toggle for the guest top bar — sun ↔ moon icon button.
+// No logout button: guests stay signed-in indefinitely (kiosk role).
+function GuestThemeToggle() {
+  const [theme, setTheme] = window.useTheme();
+  const isLight = theme === "light";
+  return (
+    <button onClick={() => setTheme(isLight ? "dark" : "light")}
+            title={isLight ? "Chuyển sang Dark" : "Chuyển sang Light"}
+            style={{
+              width: 36, height: 36, borderRadius: 999, cursor: "pointer",
+              background: "var(--glass-2)", border: "1px solid var(--glass-stroke)",
+              color: isLight ? "#D97500" : "var(--neon-cyan)",
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              transition: "all 160ms var(--ease-out)",
+              boxShadow: isLight ? "0 0 12px rgba(217,117,0,0.35)" : "0 0 12px var(--neon-cyan-haze)",
+            }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        {isLight
+          ? (<g><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></g>)
+          : (<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>)}
+      </svg>
     </button>
   );
 }

@@ -20,11 +20,16 @@ if (IS_PROD && !JWT_SECRET) {
 // Dev fallback — clearly insecure, only used when NODE_ENV !== "production".
 const SECRET = JWT_SECRET || 'dev-only-do-not-use-in-prod';
 
+// Guest tokens never expire (kiosk role — no session timeout). Other
+// roles keep the configured JWT_DAYS window (default 14).
+const GUEST_DAYS = 365 * 50;   // effectively never
+
 export function signToken(account) {
+  const days = account.role === 'guest' ? GUEST_DAYS : JWT_DAYS;
   return jwt.sign(
     { sub: account.id, role: account.role, branchId: account.branchId || null },
     SECRET,
-    { expiresIn: `${JWT_DAYS}d` }
+    { expiresIn: `${days}d` }
   );
 }
 
@@ -33,12 +38,13 @@ export function verifyToken(token) {
   catch { return null; }
 }
 
-export function cookieOptions() {
+export function cookieOptions(account) {
+  const days = account?.role === 'guest' ? GUEST_DAYS : JWT_DAYS;
   return {
     httpOnly: true,
     sameSite: 'lax',
     secure: IS_PROD,
-    maxAge: JWT_DAYS * 24 * 60 * 60 * 1000,
+    maxAge: days * 24 * 60 * 60 * 1000,
     path: '/',
   };
 }
