@@ -31,3 +31,9 @@ COMMIT_MSG.txt
 # editor
 .vscode/
 .idea/
+
+# runtime uploads — student CCCD scans / receipts (PII; never commit, esp. public repo)
+backend/data/uploads/
+
+# LAN test launcher runtime state
+scripts/.lan-pids.txt
