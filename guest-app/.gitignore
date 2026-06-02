@@ -12,6 +12,9 @@ android/local.properties
 android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
+
+# iOS — CI re-generates ios/ on every build via `npx cap add ios`,
+# so the entire ios/ folder is build output, not source-of-truth.
 ios/
 
 # Release signing — NEVER commit these

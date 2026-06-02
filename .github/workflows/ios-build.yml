@@ -1,0 +1,162 @@
+name: Build iOS IPA (unsigned)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write       # required for the gh-release step
+
+jobs:
+  build:
+    # macos-14 = Sonoma; comes with Xcode 15.x preinstalled, which is what
+    # Capacitor 8 + iOS 17 SDK expects.
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        # Capacitor 8 CLI requires Node >= 22 (the install fails with a
+        # fatal log otherwise).
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: guest-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: guest-app
+        run: npm ci
+
+      - name: Build web bundle
+        working-directory: guest-app
+        # build:dev bakes in the LAN backend URL from .env.development so the
+        # sideloaded IPA talks to the dev box on the same Wi-Fi.
+        run: npm run build:dev
+
+      - name: Add iOS platform (idempotent)
+        working-directory: guest-app
+        shell: bash
+        # On a fresh CI runner the ios/ folder doesn't exist yet, so `cap add`
+        # generates it. If a future checkout already has it committed, we
+        # swallow the "already exists" error and let `cap sync` do the work.
+        run: npx cap add ios || echo "ios platform already present, continuing"
+
+      - name: Sync Capacitor iOS
+        working-directory: guest-app
+        run: npx cap sync ios
+
+      - name: Install CocoaPods deps
+        working-directory: guest-app/ios/App
+        run: pod install
+
+      - name: Build unsigned .app via xcodebuild
+        working-directory: guest-app/ios/App
+        shell: bash
+        # pipefail so an xcodebuild failure isn't masked by tee's exit code.
+        # We tee to a log so the next step can attach it to a ci-debug-ios
+        # release on failure (mirrors the Android diagnostic pattern).
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -derivedDataPath build \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            build 2>&1 | tee xcodebuild.log
+
+      - name: Repackage .app into unsigned .ipa
+        working-directory: guest-app/ios/App
+        shell: bash
+        # IPA = zip of Payload/<AppName>.app, nothing more. No signing here;
+        # Sideloadly handles signing on the user's Windows box with their
+        # free Apple ID cert.
+        run: |
+          set -euo pipefail
+          mkdir -p Payload
+          cp -r build/Build/Products/Debug-iphoneos/App.app Payload/
+          zip -r ../../app-debug-ios.ipa Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: centersai-guest-debug-ios
+          path: guest-app/app-debug-ios.ipa
+          if-no-files-found: error
+          retention-days: 60
+
+      - name: Publish xcodebuild log on failure (ci-debug-ios)
+        # Only runs when an earlier step failed. Lets us read the full
+        # xcodebuild output from a release page without having to dig into
+        # Actions logs (which expire / get truncated for long builds).
+        if: failure()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ci-debug-ios
+          name: "iOS CI diagnostic log"
+          body: |
+            xcodebuild failed on commit `${{ github.sha }}`.
+            Download `xcodebuild.log` below for the full output.
+          files: guest-app/ios/App/xcodebuild.log
+          fail_on_unmatched_files: false
+          prerelease: true
+
+      - name: Publish to GitHub Release (rolling "latest-ios")
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-ios
+          name: "MOTOGIATHINH Cộng tác viên · latest iOS debug build"
+          body: |
+            Automated **unsigned** debug IPA from commit `${{ github.sha }}`.
+
+            ## Install (Windows → iPhone via Sideloadly)
+            1. **Download `app-debug-ios.ipa`** below to your Windows PC.
+            2. Install **Sideloadly** from <https://sideloadly.io> (free).
+            3. Plug your iPhone in via USB, trust the computer.
+            4. Open Sideloadly, drag the `.ipa` onto it.
+            5. Enter your **Apple ID** (a free account works — no paid dev
+               account needed). Sideloadly re-signs the app locally with a
+               7-day personal provisioning profile.
+            6. Click **Start**. When it finishes, on the iPhone go to
+               Settings → General → VPN & Device Management → trust your
+               Apple ID profile.
+            7. Launch **App** from the home screen.
+
+            ## ⚠️ 7-day expiry
+            Free Apple ID certificates expire after **7 days**. When the app
+            stops launching, just re-run Sideloadly with the same IPA to
+            refresh the signature. (Paid Apple Developer accounts get 1
+            year — not required for personal use.)
+
+            ## First-run checklist
+            - This build calls the **LAN dev backend** at
+              `http://192.168.1.6:3001`. The backend must be running,
+              Windows Firewall must allow TCP 3001 inbound, and the iPhone
+              must be on the same Wi-Fi.
+            - Verify by opening `http://192.168.1.6:3001/api/health` in
+              Safari on the iPhone first — should return `{"ok":true,...}`.
+            - iOS blocks plain HTTP by default; the Capacitor config should
+              already whitelist the LAN IP via `NSAppTransportSecurity`.
+              If the app shows a blank screen, that's the first thing to
+              check.
+
+            ## Login
+            - `viet@motogiathinh.centersai` / `viet`
+            - (also seeded: `tuan` / `thaianh` / `tannhan`)
+
+            ## Smoke test (~2 min)
+            1. Login screen appears with SF Pro fonts.
+            2. Tap **Thêm học viên** → modal opens.
+            3. Tap **CCCD mặt trước** → native iOS sheet appears with
+               "Chụp ảnh mới" / "Chọn từ thư viện" / "Hủy".
+            4. Fill Họ tên + SĐT → tap **Lưu học viên** → student created.
+          files: guest-app/app-debug-ios.ipa
+          fail_on_unmatched_files: true
+          prerelease: true

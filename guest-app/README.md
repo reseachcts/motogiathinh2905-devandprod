@@ -149,6 +149,39 @@ npx capacitor-assets generate --android
 rm -rf android/ && npx cap add android && npx cap sync android
 ```
 
+## iOS — sideload via Sideloadly (Windows)
+
+No Mac required. CI produces an unsigned `.ipa`; Sideloadly re-signs it on your Windows box with your free Apple ID cert and pushes it to the iPhone over USB.
+
+### Prerequisites (Windows host)
+
+- **Sideloadly** — free, <https://sideloadly.io>
+- **iTunes for Windows** — required for Apple Mobile Device Service (the USB driver). The Microsoft Store build works.
+- **Apple ID** — any email; a regular free account is fine (no $99 Developer Program needed for sideload).
+- **Lightning or USB-C cable** matching your iPhone.
+
+### Build pipeline
+
+Every push to `main` produces a fresh unsigned `.ipa` at <https://github.com/reseachcts/motogiathinh2905-devandprod/releases/download/latest-ios/app-debug-ios.ipa> (URL goes live after the first iOS CI run completes).
+
+### Install steps
+
+1. Connect the iPhone via cable. On the phone, tap **Trust this computer**.
+2. Open Sideloadly. Drag the `.ipa` into the window (or use the file picker).
+3. Enter your Apple ID and an **app-specific password** — create one at <https://appleid.apple.com> under *Sign-In and Security → App-Specific Passwords*. Never paste your real Apple ID password.
+4. Click **Start**. Sideloadly re-signs the IPA and uploads it over USB.
+5. On the iPhone: **Settings → General → VPN & Device Management → tap the developer name → Trust**.
+6. Launch the app from the home screen.
+
+> **7-day expiry** — free Apple ID certs expire after 7 days and the app stops opening. To extend, just re-run Sideloadly with the same IPA (no rebuild needed). A paid **Apple Developer Program** account ($99/yr) gives 1-year certs and unlocks TestFlight for proper beta distribution.
+
+> **Security note** — the IPA is unsigned at build time but signed at install time with *your* real Apple cert. iOS treats it as a fully trusted enterprise sideload once you complete the device-management Trust step. Nothing leaves your machine except the signed binary over USB.
+
+### Alternatives
+
+- **AltStore** — same idea as Sideloadly with a more polished UI and auto-refresh daemon. <https://altstore.io>
+- **Apple Configurator 2** (Mac only) — for organisations with MDM doing bulk deployment.
+
 ## Phase status
 
 - ✅ Phase 1+2 — Standalone Vite bundle, lean store + API client
