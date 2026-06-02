@@ -21,7 +21,6 @@ mkdirSync(UPLOAD_ROOT, { recursive: true });
 
 const DOC_KEYS = ['cccd', 'cccd_back', 'cccd_qr', 'gksk', 'donDeNghi', 'the3x4'];
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
-const MAX_BYTES = 8 * 1024 * 1024;  // 8MB
 
 // Sniff the first 16 bytes of `absPath` and return the canonical mime, or null
 // if the magic doesn't match anything in ALLOWED_MIME. The browser-supplied
@@ -90,7 +89,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: MAX_BYTES, files: 1 },
+  // file-size cap removed — modern phone photos can be 10–15 MB.
+  // `files: 1` still keeps each upload to a single attachment.
+  limits: { files: 1 },
   fileFilter(_req, file, cb) {
     if (!ALLOWED_MIME.has(file.mimetype)) return cb(new Error('unsupported_mime: ' + file.mimetype));
     cb(null, true);

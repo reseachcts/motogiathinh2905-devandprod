@@ -84,10 +84,12 @@ function looksLikeImage(buf) {
 }
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const MAX_BYTES = 8 * 1024 * 1024;
 const upload = multer({
   storage: multer.memoryStorage(),     // OCR consumes the buffer directly
-  limits: { fileSize: MAX_BYTES, files: 1 },
+  // file-size cap removed — modern phone photos can be 10–15 MB and
+  // the OCR pipeline downsamples to width 1600 anyway. `files: 1`
+  // still constrains the upload to a single attachment.
+  limits: { files: 1 },
   fileFilter(_req, file, cb) {
     if (!ALLOWED_MIME.has(file.mimetype)) return cb(new Error('unsupported_mime: ' + file.mimetype));
     cb(null, true);
