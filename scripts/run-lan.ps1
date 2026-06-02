@@ -40,15 +40,10 @@ function Port-Listening($port) {
   return [bool](Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
 }
 
-# --- teardown: kill whatever listens on our ports, plus recorded PIDs ------
+# --- teardown: kill recorded PIDs (incl. node --watch supervisors) FIRST so a
+#     supervisor can't respawn its worker, then sweep whatever still listens.
 if ($Stop) {
   $killed = @()
-  foreach ($c in (Get-NetTCPConnection -State Listen -LocalPort @($WebPortA,$WebPortB,$GuestPort) -ErrorAction SilentlyContinue)) {
-    $procId = [int]$c.OwningProcess
-    if ($procId -and $killed -notcontains $procId) {
-      try { Stop-Process -Id $procId -Force -ErrorAction Stop; Write-Host "Stopped PID $procId (port $($c.LocalPort))"; $killed += $procId } catch {}
-    }
-  }
   if (Test-Path $pidFile) {
     foreach ($line in Get-Content $pidFile) {
       $procId = 0
@@ -57,6 +52,12 @@ if ($Stop) {
       }
     }
     Remove-Item $pidFile -Force
+  }
+  foreach ($c in (Get-NetTCPConnection -State Listen -LocalPort @($WebPortA,$WebPortB,$GuestPort) -ErrorAction SilentlyContinue)) {
+    $procId = [int]$c.OwningProcess
+    if ($procId -and $killed -notcontains $procId) {
+      try { Stop-Process -Id $procId -Force -ErrorAction Stop; Write-Host "Stopped PID $procId (port $($c.LocalPort))"; $killed += $procId } catch {}
+    }
   }
   if (-not $killed) { Write-Host "Nothing was running on $WebPortA, $WebPortB, $GuestPort." }
   return
