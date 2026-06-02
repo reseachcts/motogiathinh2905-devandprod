@@ -339,6 +339,10 @@ function GuestAddStudentModal({ open, onClose }) {
   const [qrBusy,   setQrBusy]   = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [err,  setErr]  = React.useState(null);
+  // After a successful save we replace the form with a congrats popup
+  // (animated check + 3 pills) until the user taps Đóng. Frozen snapshot
+  // of the saved fields so the pills don't disappear when state resets.
+  const [success, setSuccess] = React.useState(null);  // { name, licence, classCode } | null
   const busyRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -348,6 +352,7 @@ function GuestAddStudentModal({ open, onClose }) {
     setDocFiles({});
     setQrInfo(null); setQrErr(null); setQrBusy(false);
     setBusy(false); setErr(null);
+    setSuccess(null);
     busyRef.current = false;
   }, [open]);
 
@@ -401,8 +406,13 @@ function GuestAddStudentModal({ open, onClose }) {
           toast(`Lỗi tải ảnh ${key}: ${e.message}`);
         }) : null
       ));
-      toast(`Đã thêm học viên: ${form.name}`);
-      onClose();
+      // Freeze the saved values for the congrats popup. classCode resolves
+      // via D.getClass — that map was repopulated by createStudent above.
+      setSuccess({
+        name: form.name,
+        licence: form.licence,
+        classCode: D.getClass(form.classId)?.code || '—',
+      });
     } catch (e) {
       setErr(e?.message || String(e));
     } finally {
@@ -412,13 +422,13 @@ function GuestAddStudentModal({ open, onClose }) {
 
   return (
     <Modal open={open} onClose={onClose} width={GUEST_MAX_WIDTH}
-           title="Thêm học viên"
-           primaryAction={submit}
-           primaryLabel={busy ? "Đang lưu…" : "Lưu học viên"}
-           primaryIcon="check"
-           primaryDisabled={!canSubmit}
+           title={success ? undefined : "Thêm học viên"}
+           primaryAction={success ? onClose : submit}
+           primaryLabel={success ? "Đóng" : (busy ? "Đang lưu…" : "Lưu học viên")}
+           primaryIcon={success ? "x" : "check"}
+           primaryDisabled={success ? false : !canSubmit}
            secondary={null}
-           footerStart={
+           footerStart={success ? null : (
              <div style={{ minWidth: 0, flex: 1, maxWidth: 180 }}>
                <Select
                  value={classId}
@@ -427,7 +437,8 @@ function GuestAddStudentModal({ open, onClose }) {
                  options={D.classes.map(c => ({ value: c.id, label: c.code }))}
                />
              </div>
-           }>
+           )}>
+      {success ? <SuccessView info={success}/> : (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {err && (
           <div style={{
@@ -455,7 +466,61 @@ function GuestAddStudentModal({ open, onClose }) {
           </div>
         </div>
       </div>
+      )}
     </Modal>
+  );
+}
+
+// SuccessView — the congrats popup shown inside GuestAddStudentModal
+// after a successful POST /students. Centered animated check, headline,
+// and 3 stacked pills (name, licence, class).
+function SuccessView({ info }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
+                  gap: 18, padding: "12px 8px 6px" }}>
+      {/* Check badge — pop animation on mount + a slow lime glow loop */}
+      <div style={{
+        width: 88, height: 88, borderRadius: "50%",
+        background: "var(--neon-lime)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        animation: "mgt-success-pop 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both, "
+                 + "mgt-success-glow 2.6s ease-in-out 460ms infinite",
+      }}>
+        <Icon name="check" size={48} color="var(--ink-0)"/>
+      </div>
+
+      <h3 style={{
+        margin: 0, fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700,
+        color: "var(--neon-lime)", letterSpacing: "0.04em", textAlign: "center",
+        textShadow: "0 0 16px var(--neon-lime-glow)",
+      }}>TẠO HỒ SƠ MỚI THÀNH CÔNG!</h3>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8,
+                    alignItems: "center", width: "100%" }}>
+        <SuccessPill icon="users"    text={info.name}             delay="180ms"/>
+        <SuccessPill icon="bike"     text={`Hạng ${info.licence}`} delay="300ms"/>
+        <SuccessPill icon="calendar" text={info.classCode}         delay="420ms"/>
+      </div>
+    </div>
+  );
+}
+
+function SuccessPill({ icon, text, delay }) {
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: 8,
+      padding: "8px 14px", borderRadius: 999,
+      background: "color-mix(in oklab, var(--neon-lime) 12%, transparent)",
+      border: "1px solid color-mix(in oklab, var(--neon-lime) 36%, transparent)",
+      color: "var(--neon-lime)",
+      fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600,
+      maxWidth: "90%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      opacity: 0,
+      animation: `mgt-success-pill-in 320ms cubic-bezier(0.22, 1, 0.36, 1) ${delay} both`,
+    }}>
+      <Icon name={icon} size={14}/>
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{text}</span>
+    </div>
   );
 }
 

@@ -23,6 +23,22 @@
         0%   { opacity: 1; transform: translateY(0)    scaleY(1);     max-height: 1200px; }
         100% { opacity: 0; transform: translateY(-12px) scaleY(0.94); max-height: 0; }
       }
+      /* Success-popup choreography. The check pops in with a slight
+         overshoot, a lime ring breathes around it, and each pill rises
+         on a staggered delay underneath. */
+      @keyframes mgt-success-pop {
+        0%   { opacity: 0; transform: scale(0.2)  rotate(-12deg); }
+        55%  { opacity: 1; transform: scale(1.18) rotate(4deg);  }
+        100% { opacity: 1; transform: scale(1)    rotate(0deg);  }
+      }
+      @keyframes mgt-success-glow {
+        0%, 100% { box-shadow: 0 0 0 1px var(--neon-lime), 0 0 24px var(--neon-lime-glow); }
+        50%      { box-shadow: 0 0 0 1px var(--neon-lime), 0 0 44px var(--neon-lime-glow); }
+      }
+      @keyframes mgt-success-pill-in {
+        0%   { opacity: 0; transform: translateY(10px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
     </style>
   </head>
   <body>
