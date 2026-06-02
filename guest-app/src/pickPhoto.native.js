@@ -28,7 +28,12 @@ export async function pickPhotoNative({ source = 'prompt' } = {}) {
     throw new Error('not_native');
   }
   const photo = await Camera.getPhoto({
-    quality: 85,
+    // quality:100 prevents the Camera plugin from re-encoding a clear
+    // QR photo down to JPEG q=85 — which can shave just enough fidelity
+    // off a borderline-clear photo for jsQR to fail decode. The plugin
+    // still resizes if width is set; we leave it unset so the original
+    // resolution is preserved.
+    quality: 100,
     allowEditing: false,
     resultType: CameraResultType.Uri,
     source: sourceMap[source] || CameraSource.Prompt,

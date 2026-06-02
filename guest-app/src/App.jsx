@@ -370,9 +370,18 @@ function GuestAddStudentModal({ open, onClose }) {
     } catch (e) {
       setQrInfo(null);
       setDocFiles(prev => { const { cccd_qr, ...rest } = prev; return rest; });
-      setQrErr(e.code === 'qr_unreadable' || e.code === 'qr_failed'
-        ? "QR chưa rõ. Hãy chụp rõ hơn."
-        : (e.message || "QR chưa rõ. Hãy chụp rõ hơn."));
+      // Friendly mapping for the two expected backend failures; everything
+      // else falls through with the raw code+message so we can actually
+      // diagnose the next bug instead of hiding it as "QR chưa rõ".
+      const friendly = {
+        qr_unreadable:    "QR chưa rõ. Hãy chụp rõ hơn.",
+        qr_unrecognized:  "Mã QR không phải CCCD hợp lệ.",
+        qr_failed:        "QR chưa rõ. Hãy chụp rõ hơn.",
+        unsupported_mime: "Định dạng ảnh không hỗ trợ (cần JPG/PNG/WebP).",
+        not_an_image:     "Tệp không phải ảnh hợp lệ.",
+        missing_file:     "Chưa chọn ảnh.",
+      };
+      setQrErr(friendly[e.code] || `Lỗi: ${e.code || e.status || '?'} — ${e.message || e}`);
     } finally {
       setQrBusy(false);
     }
