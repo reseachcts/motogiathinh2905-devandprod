@@ -48,9 +48,45 @@ jobs:
         working-directory: guest-app
         run: npx cap sync ios
 
-      - name: Install CocoaPods deps
+      - name: Diagnose iOS environment
+        if: always()
+        working-directory: guest-app
+        shell: bash
+        run: |
+          {
+            echo "=== ios/App tree ==="
+            ls -la ios/App/ 2>&1 | head -30
+            echo ""
+            echo "=== Podfile content ==="
+            cat ios/App/Podfile 2>&1
+            echo ""
+            echo "=== pod --version ==="
+            pod --version 2>&1
+            echo "=== ruby --version ==="
+            ruby --version 2>&1
+            echo "=== xcodebuild -version ==="
+            xcodebuild -version 2>&1
+          } | tee /tmp/ios-diag.log
+
+      - name: Install CocoaPods deps (verbose + captured)
         working-directory: guest-app/ios/App
-        run: pod install
+        shell: bash
+        run: |
+          set -o pipefail
+          pod install --verbose 2>&1 | tee /tmp/pod-install.log
+
+      - name: Upload diagnostic logs on failure (ci-debug-ios)
+        if: failure()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ci-debug-ios
+          name: "iOS CI diagnostic"
+          body: "Build failure on commit `${{ github.sha }}` — see attached logs."
+          files: |
+            /tmp/ios-diag.log
+            /tmp/pod-install.log
+          fail_on_unmatched_files: false
+          prerelease: true
 
       - name: Build unsigned .app via xcodebuild
         working-directory: guest-app/ios/App
