@@ -257,7 +257,20 @@ function GuestStudentDetail({ student, onBack }) {
                         letterSpacing: "-0.02em",
                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{student.name}</div>
           <div style={{ marginTop: 4 }}>
-            <GuestClassChip variant="subheading"/>
+            {(() => {
+              const cls = D.getClass(student.classId);
+              const subheadingStyle = {
+                fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 500,
+                color: cls ? "var(--neon-cyan)" : "var(--fg-3)",
+                display: "inline-flex", alignItems: "center", gap: 6,
+              };
+              return (
+                <span style={subheadingStyle}>
+                  <Icon name="calendar" size={13}/>
+                  {cls?.code || 'Chưa có lớp'}
+                </span>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -319,6 +332,7 @@ function GuestAddStudentModal({ open, onClose }) {
   const [name,     setName]     = React.useState("");
   const [phone,    setPhone]    = React.useState("");
   const [licence,  setLicence]  = React.useState("A1");    // hạng bằng — A or A1
+  const [classId,  setClassId]  = React.useState(D.currentUser?.assignedClassId || D.classes[0]?.id || '');
   const [docFiles, setDocFiles] = React.useState({});      // { cccd, cccd_back, cccd_qr }
   const [qrInfo,   setQrInfo]   = React.useState(null);    // { idNumber, name, ... } after a successful scan
   const [qrErr,    setQrErr]    = React.useState(null);    // "QR chưa rõ. Hãy chụp rõ hơn." etc
@@ -329,7 +343,9 @@ function GuestAddStudentModal({ open, onClose }) {
 
   React.useEffect(() => {
     if (!open) return;
-    setName(""); setPhone(""); setLicence("A1"); setDocFiles({});
+    setName(""); setPhone(""); setLicence("A1");
+    setClassId(D.currentUser?.assignedClassId || D.classes[0]?.id || '');
+    setDocFiles({});
     setQrInfo(null); setQrErr(null); setQrBusy(false);
     setBusy(false); setErr(null);
     busyRef.current = false;
@@ -357,8 +373,9 @@ function GuestAddStudentModal({ open, onClose }) {
     }
   };
 
-  // Submit blocked until the QR returns a CCCD number.
-  const canSubmit = !busy && name.trim() && !!qrInfo?.idNumber;
+  // Submit blocked until the QR returns a CCCD number AND a class is picked
+  // (backend will 400 with invalid_classId otherwise).
+  const canSubmit = !busy && name.trim() && !!qrInfo?.idNumber && !!classId;
   const submit = async () => {
     if (busyRef.current || !canSubmit) return;
     busyRef.current = true;
@@ -369,6 +386,7 @@ function GuestAddStudentModal({ open, onClose }) {
         name: name.trim(),
         phone: phone.trim() || null,
         licence,
+        classId: classId || null,
         idNumber: qrInfo.idNumber,
         ...(qrInfo.dob         && { dob: qrInfo.dob }),
         ...(qrInfo.gender      && { gender: qrInfo.gender }),
@@ -400,7 +418,16 @@ function GuestAddStudentModal({ open, onClose }) {
            primaryIcon="check"
            primaryDisabled={!canSubmit}
            secondary={null}
-           footerStart={<GuestClassChip variant="button"/>}>
+           footerStart={
+             <div style={{ minWidth: 0, flex: 1, maxWidth: 180 }}>
+               <Select
+                 value={classId}
+                 onChange={setClassId}
+                 placeholder="Lớp..."
+                 options={D.classes.map(c => ({ value: c.id, label: c.code }))}
+               />
+             </div>
+           }>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {err && (
           <div style={{
@@ -573,45 +600,6 @@ function GuestThemeToggle() {
           : (<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>)}
       </svg>
     </button>
-  );
-}
-
-// --------------------------------------------------------------------
-// GuestClassChip — read-only display of the guest's assigned class.
-// Surfaces in two places: a subheading under the student name in the
-// detail hero, and a chip beside the primary action in the create
-// modal footer. The assignment is written by admin via the Tổ chức
-// account dialog — guest has no edit affordance anywhere.
-// --------------------------------------------------------------------
-function GuestClassChip({ variant = "button" }) {
-  const me = D.currentUser;
-  const cls = me?.assignedClassId ? D.getClass(me.assignedClassId) : null;
-  const label = cls?.code || "Chưa được gán lớp";
-
-  const baseStyle = variant === "subheading"
-    ? {
-        fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 500,
-        color: cls ? "var(--neon-cyan)" : "var(--fg-3)",
-        display: "inline-flex", alignItems: "center", gap: 6,
-      }
-    : {
-        background: cls
-          ? "color-mix(in oklab, var(--neon-cyan) 12%, transparent)"
-          : "var(--ink-2)",
-        border: "1px solid",
-        borderColor: cls ? "var(--neon-cyan)" : "var(--glass-stroke-strong)",
-        color: cls ? "var(--neon-cyan)" : "var(--fg-3)",
-        padding: "6px 12px", borderRadius: 999,
-        display: "inline-flex", alignItems: "center", gap: 6,
-        fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600,
-        whiteSpace: "nowrap",
-      };
-
-  return (
-    <span style={baseStyle} title={cls ? `Lớp được giao: ${cls.code}` : "Admin chưa gán lớp"}>
-      <Icon name="calendar" size={variant === "subheading" ? 13 : 12}/>
-      <span>{label}</span>
-    </span>
   );
 }
 
