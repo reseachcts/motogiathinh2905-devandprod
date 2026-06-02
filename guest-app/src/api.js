@@ -59,7 +59,10 @@ export const api = {
   async listStudents()    { return request('/students'); },
 
   // Writes
-  async createStudent(form)            { return request('/students',      { method: 'POST',  body: form  }); },
+  // POST /students expects the body wrapped as { form, docs, profileComplete }.
+  // Guest app uploads docs via a separate endpoint after create — the upload
+  // route auto-sets the docs_<key> = 1 flags — so we only ship `form` here.
+  async createStudent(form)            { return request('/students',      { method: 'POST',  body: { form } }); },
   async updateStudent(id, patch)       { return request('/students/' + id, { method: 'PATCH', body: patch }); },
 
   // Uploads
