@@ -101,21 +101,16 @@ export const D = {
   getStudent: (id) => studentsById.get(id),
 
   api: {
-    // Match the create/update contracts the ported App.jsx expects:
-    // createStudent({ form, docs }) — multipart docs uploaded after create.
+    // createStudent only writes the row. File uploads are the caller's
+    // responsibility (App.jsx fires them in a Promise.all right after).
+    // The `docs` field in the payload is a boolean-flag hint for the
+    // backend's docs_<key> columns — NOT the File objects. Earlier code
+    // confused the two and tried to upload `true` as the file body, which
+    // failed the mime check and aborted before App.jsx's real upload
+    // pass ever ran.
     async createStudent(payload) {
       const form = payload?.form || payload;
-      const docs = payload?.docs || {};
       const created = await api.createStudent(form);
-      for (const [key, file] of Object.entries(docs)) {
-        if (file) {
-          try { await api.uploadStudentDoc(created.id, key, file); } catch (e) {
-            // Surface upload failure to the caller; the student row is
-            // already in the DB though, so partial failures need user attention.
-            throw new Error(`upload_failed:${key}:${e.message}`);
-          }
-        }
-      }
       await reloadStudents();
       return created;
     },
