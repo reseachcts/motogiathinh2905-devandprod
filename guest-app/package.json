@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Cộng tác viên — mobile-first kiosk app for MOTOGIATHINH driving-school CRM. Wraps with Capacitor for Android.",
+  "description": "Cộng tác viên — mobile-first kiosk app for MOTOGIATHINH driving-school CRM. Wraps with Capacitor for Android and iOS.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,14 +12,16 @@
     "android:sync": "vite build --mode development && cap sync android",
     "android:sync:prod": "vite build && cap sync android",
     "android:open": "cap open android",
-    "android:run": "cap run android"
+    "android:run": "cap run android",
+    "ios:sync": "vite build --mode development && cap sync ios",
+    "ios:sync:prod": "vite build && cap sync ios",
+    "ios:open": "cap open ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",
     "@capacitor/camera": "^8.2.0",
     "@capacitor/core": "^8.3.4",
     "@capacitor/ios": "^8.3.4",
-    "@capacitor/preferences": "^8.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

@@ -6,20 +6,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write       # required for the gh-release step
+  contents: write       # required for the gh-release steps
 
 jobs:
   build:
-    # macos-14 = Sonoma; comes with Xcode 15.x preinstalled, which is what
-    # Capacitor 8 + iOS 17 SDK expects.
+    # macos-14 = Sonoma; Xcode 15.x + iOS 17 SDK, which Capacitor 8 expects.
     runs-on: macos-14
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node 22
-        # Capacitor 8 CLI requires Node >= 22 (the install fails with a
-        # fatal log otherwise).
+        # Capacitor 8 CLI requires Node >= 22.
         uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -30,7 +28,7 @@ jobs:
         working-directory: guest-app
         run: npm ci
 
-      - name: Build web bundle
+      - name: Build web bundle (LAN dev backend)
         working-directory: guest-app
         # build:dev bakes in the LAN backend URL from .env.development so the
         # sideloaded IPA talks to the dev box on the same Wi-Fi.
@@ -39,33 +37,53 @@ jobs:
       - name: Add iOS platform (idempotent)
         working-directory: guest-app
         shell: bash
-        # On a fresh CI runner the ios/ folder doesn't exist yet, so `cap add`
-        # generates it. If a future checkout already has it committed, we
-        # swallow the "already exists" error and let `cap sync` do the work.
+        # Fresh runner has no ios/ folder, so cap add generates it. If a future
+        # checkout commits ios/, swallow the "already exists" and let sync work.
         run: npx cap add ios || echo "ios platform already present, continuing"
 
       - name: Sync Capacitor iOS
         working-directory: guest-app
         run: npx cap sync ios
 
-      - name: Resolve SPM package dependencies
-        # Capacitor 8 uses Swift Package Manager (not CocoaPods, which was
-        # the convention through Capacitor 7). No Podfile, no .xcworkspace
-        # — just App.xcodeproj with package refs to CapApp-SPM/. Xcodebuild
-        # auto-resolves SPM deps, but we run it explicitly so failure
-        # surfaces here instead of inside the build step.
-        working-directory: guest-app/ios/App
+      - name: Configure iOS security (ATS + privacy usage strings)
+        working-directory: guest-app
+        shell: bash
+        # This is a Capacitor WKWebView app talking to a plain-HTTP LAN backend.
+        # We do NOT disable App Transport Security globally (NSAllowsArbitraryLoads).
+        # Instead ATS stays enforced for the public internet and we scope the
+        # exceptions to exactly what the LAN debug build needs:
+        #   - NSAllowsArbitraryLoadsInWebContent: the app's fetch() runs inside
+        #     the WKWebView, so this is what actually lets it reach http://<LAN>.
+        #   - NSAllowsLocalNetworking: permits private-range / local hosts.
+        # Plus the privacy usage strings iOS REQUIRES — without them the app
+        # hard-crashes the instant the CCCD photo picker / camera is opened.
         run: |
-          xcodebuild -resolvePackageDependencies \
-            -project App.xcodeproj \
-            -scheme App
+          set -euo pipefail
+          PLIST="ios/App/App/Info.plist"
+          PB=/usr/libexec/PlistBuddy
+          # App Transport Security (scoped) — rebuild the dict cleanly.
+          $PB -c "Delete :NSAppTransportSecurity" "$PLIST" 2>/dev/null || true
+          $PB -c "Add :NSAppTransportSecurity dict" "$PLIST"
+          $PB -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoadsInWebContent bool true" "$PLIST"
+          $PB -c "Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true" "$PLIST"
+          # Privacy usage descriptions (Vietnamese, matches the in-app UX).
+          set_str() { $PB -c "Add :$1 string $2" "$PLIST" 2>/dev/null || $PB -c "Set :$1 $2" "$PLIST"; }
+          set_str NSCameraUsageDescription "Ứng dụng cần máy ảnh để chụp ảnh CCCD và chân dung học viên."
+          set_str NSPhotoLibraryUsageDescription "Ứng dụng cần truy cập thư viện ảnh để chọn ảnh CCCD và chân dung học viên."
+          echo "----- Info.plist after patch -----"
+          $PB -c "Print" "$PLIST"
+
+      - name: Resolve SPM package dependencies
+        # Capacitor 8 uses Swift Package Manager (no CocoaPods / no .xcworkspace).
+        # Run resolve explicitly so a dependency failure surfaces here.
+        working-directory: guest-app/ios/App
+        run: xcodebuild -resolvePackageDependencies -project App.xcodeproj -scheme App
 
       - name: Build unsigned .app via xcodebuild
         working-directory: guest-app/ios/App
         shell: bash
-        # pipefail so an xcodebuild failure isn't masked by tee's exit code.
-        # We tee to a log so the next step can attach it to a ci-debug-ios
-        # release on failure (mirrors the Android diagnostic pattern).
+        # pipefail so an xcodebuild failure isn't masked by tee. Tee to a log
+        # the failure step attaches to a ci-debug-ios release.
         run: |
           set -o pipefail
           xcodebuild \
@@ -83,9 +101,8 @@ jobs:
       - name: Repackage .app into unsigned .ipa
         working-directory: guest-app/ios/App
         shell: bash
-        # IPA = zip of Payload/<AppName>.app, nothing more. No signing here;
-        # Sideloadly handles signing on the user's Windows box with their
-        # free Apple ID cert.
+        # IPA = zip of Payload/<AppName>.app. No signing — Sideloadly signs on
+        # the user's Windows box with their free Apple ID cert.
         run: |
           set -euo pipefail
           mkdir -p Payload
@@ -101,9 +118,6 @@ jobs:
           retention-days: 60
 
       - name: Publish xcodebuild log on failure (ci-debug-ios)
-        # Only runs when an earlier step failed. Lets us read the full
-        # xcodebuild output from a release page without having to dig into
-        # Actions logs (which expire / get truncated for long builds).
         if: failure()
         uses: softprops/action-gh-release@v2
         with:
@@ -129,31 +143,26 @@ jobs:
             2. Install **Sideloadly** from <https://sideloadly.io> (free).
             3. Plug your iPhone in via USB, trust the computer.
             4. Open Sideloadly, drag the `.ipa` onto it.
-            5. Enter your **Apple ID** (a free account works — no paid dev
-               account needed). Sideloadly re-signs the app locally with a
-               7-day personal provisioning profile.
-            6. Click **Start**. When it finishes, on the iPhone go to
-               Settings → General → VPN & Device Management → trust your
-               Apple ID profile.
+            5. Enter your **Apple ID** (a free account works). Sideloadly
+               re-signs locally with a 7-day personal provisioning profile.
+            6. Click **Start**, then on the iPhone: Settings → General →
+               VPN & Device Management → trust your Apple ID profile.
             7. Launch **App** from the home screen.
 
             ## ⚠️ 7-day expiry
-            Free Apple ID certificates expire after **7 days**. When the app
-            stops launching, just re-run Sideloadly with the same IPA to
-            refresh the signature. (Paid Apple Developer accounts get 1
-            year — not required for personal use.)
+            Free Apple ID certs expire after **7 days**. When the app stops
+            launching, re-run Sideloadly with the same IPA to refresh.
 
             ## First-run checklist
-            - This build calls the **LAN dev backend** at
-              `http://192.168.1.6:3001`. The backend must be running,
-              Windows Firewall must allow TCP 3001 inbound, and the iPhone
-              must be on the same Wi-Fi.
-            - Verify by opening `http://192.168.1.6:3001/api/health` in
-              Safari on the iPhone first — should return `{"ok":true,...}`.
-            - iOS blocks plain HTTP by default; the Capacitor config should
-              already whitelist the LAN IP via `NSAppTransportSecurity`.
-              If the app shows a blank screen, that's the first thing to
-              check.
+            - This build calls the **LAN dev backend** at `http://192.168.1.6:3001`.
+              The backend must be running, Windows Firewall must allow TCP 3001
+              inbound, and the iPhone must be on the same Wi-Fi.
+            - App Transport Security is configured for LAN HTTP
+              (NSAllowsArbitraryLoadsInWebContent + NSAllowsLocalNetworking), so
+              the plain-HTTP backend is reachable while ATS stays on for the
+              public internet.
+            - Verify by opening `http://192.168.1.6:3001/api/health` in Safari on
+              the iPhone first — should return `{"ok":true,...}`.
 
             ## Login
             - `viet@motogiathinh.centersai` / `viet`

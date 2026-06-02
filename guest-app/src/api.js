@@ -1,7 +1,7 @@
 // Lean REST client for the guest kiosk app.
 //
 // Auth: Bearer <token> in the Authorization header (token persisted via the
-// `storage` shim — localStorage on web, Capacitor Preferences on native).
+// `storage` shim — localStorage, which persists inside the native WebView too).
 //
 // Every method throws a thin Error with .status + .code on non-2xx, so the
 // caller can branch on err.code (the stable `{ error: '<code>' }` field

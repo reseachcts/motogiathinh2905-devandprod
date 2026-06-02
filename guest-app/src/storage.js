@@ -1,26 +1,18 @@
-// Storage shim — token + ephemeral kv. Async API throughout so the web
-// branch (localStorage) and the native branch (Capacitor Preferences)
-// share one signature.
+// Storage shim — token + ephemeral kv. Async API throughout so call sites
+// (api.js) don't care about the backing store.
 //
-// We probe Capacitor at module-load time. On web (dev / Vite preview)
-// the @capacitor/preferences module is still resolvable (it's installed
-// as a regular dep), but `Capacitor.isNativePlatform()` returns false,
-// so we fall through to localStorage. Inside the Android APK that flips
-// and we use the platform's SharedPreferences-backed storage.
+// Single implementation: localStorage. It persists across launches in BOTH
+// WKWebView (iOS) and the Android System WebView, which is all the guest
+// kiosk needs for its bearer token.
+//
+// We dropped @capacitor/preferences: its 8.0.1 iOS Swift source fails to
+// compile against @capacitor/core 8.3.4 (8.0.1 is already the newest stable
+// preferences on npm — no fixed release exists), which broke every iOS CI
+// build. localStorage is functionally equivalent for token persistence and
+// keeps one code path for both platforms.
 
-import { Capacitor } from '@capacitor/core';
-import { Preferences } from '@capacitor/preferences';
-
-const useNative = Capacitor.isNativePlatform();
-
-export const storage = useNative
-  ? {
-      async get(key)  { const { value } = await Preferences.get({ key }); return value; },
-      async set(key, value) { await Preferences.set({ key, value: String(value) }); },
-      async del(key)  { await Preferences.remove({ key }); },
-    }
-  : {
-      async get(key)  { try { return localStorage.getItem(key); } catch { return null; } },
-      async set(key, v) { try { localStorage.setItem(key, v); } catch {} },
-      async del(key)  { try { localStorage.removeItem(key); } catch {} },
-    };
+export const storage = {
+  async get(key)        { try { return localStorage.getItem(key); } catch { return null; } },
+  async set(key, value) { try { localStorage.setItem(key, String(value)); } catch {} },
+  async del(key)        { try { localStorage.removeItem(key); } catch {} },
+};
