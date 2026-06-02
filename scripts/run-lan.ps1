@@ -87,7 +87,12 @@ function Wait-Health($url, $name) {
 function Start-Backend($port) {
   if (Port-Listening $port) { Write-Host "  [skip] port $port already in use - leaving it as is"; return }
   $env:NODE_ENV = "development"; $env:PORT = "$port"
-  $p = Start-Process node -ArgumentList "`"$backend`"" -WindowStyle Minimized -PassThru
+  # node --watch (Node 22+) auto-restarts the backend when its source changes,
+  # so you never restart it by hand. It watches only the imported module graph
+  # (server.js, db.js, routes/*, notifications.js, ...) - NOT the SQLite data
+  # dir, so DB writes don't trigger restart loops. Static webapp edits don't
+  # need a restart (served fresh in dev); just refresh the browser for those.
+  $p = Start-Process node -ArgumentList "--watch","`"$backend`"" -WindowStyle Minimized -PassThru
   $script:pids += $p.Id
   Wait-Health "http://127.0.0.1:$port/api/health" "webapp :$port" | Out-Null
 }
