@@ -31,7 +31,11 @@ router.post('/auth/login', (req, res) => {
   const token = signToken(account);
   res.cookie(COOKIE_NAME, token, cookieOptions(account));
   logActivity(account.id, 'auth.login', account.email);
-  res.json({ user: publicAccount(account) });
+  // `token` is also returned in the body for clients that can't forward
+  // the HttpOnly cookie (native mobile / Capacitor webview). The web admin
+  // app continues to use the cookie; the guest mobile app sends it back
+  // as `Authorization: Bearer <token>` (see auth.js requireAuth).
+  res.json({ user: publicAccount(account), token });
 });
 
 // Logout is idempotent: it always clears the cookie and returns 200, even on
