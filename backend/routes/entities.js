@@ -37,12 +37,12 @@ function dump(table, mapRow) {
       } else if (table === 'accounts') {
         rows = db.prepare(`SELECT * FROM accounts WHERE id = ?`).all(req.user.id);
       } else if (table === 'classes') {
-        // Just the guest's assigned class — they don't pick, they only
-        // need the row in MGT_DATA so D.getClass() resolves the code
-        // for the read-only subheading + footer chip.
-        const me = db.prepare('SELECT assignedClassId FROM accounts WHERE id = ?').get(req.user.id);
-        rows = me?.assignedClassId
-          ? db.prepare(`SELECT * FROM classes WHERE id = ?`).all(me.assignedClassId)
+        // All classes in the guest's branch — guest picks one per student
+        // in the create form. If admin hasn't assigned a branch yet, the
+        // list is empty and the kiosk shows nothing to choose from.
+        const me = db.prepare('SELECT branchId FROM accounts WHERE id = ?').get(req.user.id);
+        rows = me?.branchId
+          ? db.prepare(`SELECT * FROM classes WHERE branchId = ?`).all(me.branchId)
           : [];
       } else {
         rows = [];

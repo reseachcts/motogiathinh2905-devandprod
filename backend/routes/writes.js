@@ -57,17 +57,16 @@ router.post('/students', (req, res) => {
   const vErr = validateStudentForm(form, { isCreate: true, role: req.user.role });
   if (vErr) return badV(res, vErr);
 
-  // Guests don't pick a class — the server pulls accounts.assignedClassId
-  // from their own row. If admin hasn't assigned one, the student creates
-  // unscoped (classId=null, branchId=null) and admin can route it later.
-  let cls = null;
-  if (!isGuest) {
-    cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(form.classId);
-    if (!cls) return bad(res, 400, 'invalid_classId');
-  } else {
-    const me = db.prepare('SELECT assignedClassId FROM accounts WHERE id = ?').get(req.user.id);
-    if (me?.assignedClassId) {
-      cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(me.assignedClassId);
+  // Guests now pick a class per-student from the list of classes in their
+  // branch (entities.js scopes /classes to the guest's branchId). Server
+  // re-validates: classId must exist, and for guests the class's branch
+  // must match the guest's own accounts.branchId.
+  const cls = db.prepare('SELECT * FROM classes WHERE id = ?').get(form.classId);
+  if (!cls) return bad(res, 400, 'invalid_classId');
+  if (isGuest) {
+    const me = db.prepare('SELECT branchId FROM accounts WHERE id = ?').get(req.user.id);
+    if (!me?.branchId || cls.branchId !== me.branchId) {
+      return bad(res, 403, 'wrong_branch');
     }
   }
 
@@ -89,7 +88,7 @@ router.post('/students', (req, res) => {
   const totalFee = feePlan ? feePlan.amount - (promo?.discount || 0) : 0;
 
   // Branch-scoping: staff users can only enroll into their own branch.
-  // Guests are unscoped — server fills branchId = null.
+  // Guests were already gated above against accounts.branchId.
   if (req.user.role === 'staff' && cls.branchId !== req.user.branchId) {
     return bad(res, 403, 'wrong_branch');
   }
@@ -98,10 +97,12 @@ router.post('/students', (req, res) => {
   const maHV = nextMaHV();
   const createdAt = nowDdMmYyyyHHMMSS();
   const d = docs || {};
-  // Guests always own the records they create — no class, no branch.
-  const responsibleStaffId = isGuest ? req.user.id          : form.responsibleStaffId;
-  const branchId           = isGuest ? (cls?.branchId || null) : cls.branchId;
-  const classId            = isGuest ? (cls?.id || null)        : form.classId;
+  // Guests always own the records they create. classId/branchId now come
+  // from the validated `cls` row for everyone — guest's branch was checked
+  // above to equal their own accounts.branchId.
+  const responsibleStaffId = isGuest ? req.user.id : form.responsibleStaffId;
+  const branchId           = cls.branchId;
+  const classId            = cls.id;
 
   try {
     db.prepare(`
@@ -397,7 +398,7 @@ router.post('/accounts', requireAdmin, (req, res, next) => {
   if (!pol.ok) return bad(res, 400, pol.code, { message: pol.message });
   next();
 }, makeAdminCreator('accounts', 'u',
-  ['name', 'role', 'branchId', 'phone', 'email', 'assignedClassId'], {
+  ['name', 'role', 'branchId', 'phone', 'email'], {
     required: ['name', 'email', 'role'],
     preInsert: (row, req) => {
       row.passwordHash = hashPassword(req.body.password);
@@ -481,7 +482,7 @@ router.delete('/notifications/:id', (req, res) => {
 // ---------------------------------------------------------------------------
 
 const PATCHABLE = {
-  accounts:   ['name', 'role', 'branchId', 'phone', 'email', 'active', 'assignedClassId'],
+  accounts:   ['name', 'role', 'branchId', 'phone', 'email', 'active'],
   fee_plans:  ['name', 'licence', 'amount'],
   promotions: ['name', 'appliesTo', 'discount'],
   teachers:   ['name', 'phone', 'yearsExp', 'branchId', 'active'],
