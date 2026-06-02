@@ -314,24 +314,12 @@ function AccountsTab() {
   // EditRecordModal/RecordCreatorModal seed selects from options[0].id so
   // the first real branch is the default.
   const branchOpts = D.getBranchOpts();
-  // Class options for the "Lớp được giao" field. Scoped to the draft's
-  // currently-picked branch so admin doesn't accidentally assign a
-  // cross-branch class. Returned as a function so the field re-evaluates
-  // when branchId changes mid-dialog.
-  const classOptsForBranch = (draft) => D.classes
-    .filter(c => !draft.branchId || c.branchId === draft.branchId)
-    .map(c => ({ id: c.id, label: c.code }));
   const accountCreateFields = [
     { id: "name",     label: "Họ tên",                  type: "text",   placeholder: "Nguyễn Văn A", fullWidth: true },
     { id: "role",     label: "Vai trò",                 type: "select", options: [{ id: "staff", label: "Nhân viên" }, { id: "admin", label: "Admin" }, { id: "guest", label: "Cộng tác viên" }] },
     { id: "branchId", label: "Chi nhánh",               type: "select", options: branchOpts },
     { id: "email",    label: "Tên đăng nhập (Email)",   type: "text",   placeholder: "you@motogiathinh.vn" },
     { id: "phone",    label: "Số điện thoại",           type: "phone",  placeholder: "090 123 4567" },
-    // Guest-only — admin picks which class the kiosk drops new students
-    // into. Hidden for staff/admin via the `when` predicate.
-    { id: "assignedClassId", label: "Lớp được giao", type: "select",
-      options: classOptsForBranch, placeholder: "Chọn lớp…",
-      when: (draft) => draft.role === 'guest', fullWidth: true },
     // Guest accounts skip the complexity checklist — server uses the
     // simple "non-empty" policy for them.
     { id: "password", label: "Mật khẩu tạm thời",       type: "password", placeholder: "Mật khẩu mới",
