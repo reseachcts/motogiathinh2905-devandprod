@@ -10,8 +10,11 @@ permissions:
 
 jobs:
   build:
-    # macos-14 = Sonoma; Xcode 15.x + iOS 17 SDK, which Capacitor 8 expects.
-    runs-on: macos-14
+    # macos-15 = Sequoia; ships Xcode 16 / Swift 6. Capacitor 8's camera native
+    # lib (ion-ios-camera) uses Swift 6 language features — Xcode 15.4 on
+    # macos-14 fails to compile it (~72 errors/file, cascading into spurious
+    # CameraPlugin "no member viewController" errors). Xcode 16 compiles it.
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
