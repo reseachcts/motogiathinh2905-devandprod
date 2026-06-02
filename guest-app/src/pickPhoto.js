@@ -31,8 +31,14 @@ export async function pickPhoto({ source = 'prompt' } = {}) {
   if (native) {
     try { return await native({ source }); }
     catch (e) {
+      // User cancellation → resolve null (don't fall back).
       if (/cancel/i.test(e?.message || '')) return null;
-      throw e;
+      // Anything else (running in web preview where isNativePlatform() is
+      // false → "not_native"; Camera permission denied; blob-URL fetch
+      // failure; plugin not initialized; etc.) — silently degrade to the
+      // <input type="file"> path. Web preview is now functional and the
+      // APK gets a useful escape hatch when the Camera plugin can't run.
+      console.warn('[pickPhoto] native picker failed, falling back to web:', e?.message);
     }
   }
   return pickPhotoWeb({ source });
