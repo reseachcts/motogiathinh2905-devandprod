@@ -75,12 +75,25 @@ function GuestApp() {
         {/* Top bar */}
         <header style={{
           padding: "18px 18px 14px", display: "flex", alignItems: "center", gap: 10,
+          background: viewing ? "var(--glass-3)" : "var(--glass-2)",
           borderBottom: "1px solid var(--ink-4)",
           position: "relative",
         }}>
-          <GuestUserChip me={me} count={myStudents.length}/>
-          <div style={{ flex: 1 }}/>
-          <GuestThemeToggle/>
+          {viewing ? (
+            <button onClick={() => setViewingId(null)} style={{
+              display: "flex", alignItems: "center", gap: 12, width: "100%", alignSelf: "stretch",
+              background: "transparent", border: "none", cursor: "pointer", padding: 0,
+              color: "var(--fg-1)", fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 800,
+              letterSpacing: "0.02em", textAlign: "left",
+            }}>
+              <Icon name="arrow-up" size={28} style={{ transform: "rotate(-90deg)" }}/>
+              QUAY LẠI
+            </button>
+          ) : (<>
+            <GuestUserChip me={me} count={myStudents.length}/>
+            <div style={{ flex: 1 }}/>
+            <GuestThemeToggle/>
+          </>)}
         </header>
 
         {/* Body */}
@@ -156,7 +169,7 @@ function GuestStudentList({ students, onOpen }) {
 function GuestStudentDetail({ student, onBack }) {
   const [name,    setName]    = React.useState(student.name    || "");
   const [phone,   setPhone]   = React.useState(student.phone   || "");
-  const [licence, setLicence] = React.useState(student.licence || "A1");
+  const [licence, setLicence] = React.useState(student.licence || "");
   // newFiles tracks photos the user picked this session; existing photo
   // status comes from student.docs.{cccd,cccd_back,cccd_qr}.
   const [newFiles, setNewFiles] = React.useState({});
@@ -236,15 +249,6 @@ function GuestStudentDetail({ student, onBack }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <button onClick={onBack} style={{
-        background: "transparent", border: "none", color: "var(--fg-3)",
-        fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 500, cursor: "pointer",
-        display: "inline-flex", alignItems: "center", gap: 6, padding: 0, alignSelf: "flex-start",
-      }}>
-        <Icon name="arrow-up" size={14} style={{ transform: "rotate(-90deg)" }}/>
-        Danh sách
-      </button>
-
       {/* Hero */}
       <div style={{
         padding: "18px 16px", borderRadius: 16,
@@ -276,7 +280,20 @@ function GuestStudentDetail({ student, onBack }) {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Input label="Họ tên" value={name} onChange={setName}/>
+<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={LABEL_STYLE}>Họ tên</label>
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+            minHeight: 40, padding: "0 14px", borderRadius: 10,
+            background: "color-mix(in oklab, var(--neon-lime) 10%, transparent)",
+            border: "1px solid var(--neon-lime)",
+          }}>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, color: "var(--fg-1)",
+                           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{student.name || "—"}</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-2)",
+                           whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{student.dob || "—"}</span>
+          </div>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
           <Input label="Số điện thoại" value={phone} onChange={setPhone}
                  digits maxDigits={10} format={fmtPhone}/>
@@ -285,18 +302,23 @@ function GuestStudentDetail({ student, onBack }) {
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <PhotoSlot label="CCCD mặt trước"
-                     file={newFiles.cccd}     existing={student.docs?.cccd}
+                     file={newFiles.cccd}     existing={student.docs_cccd_url}
                      onPick={(f) => pickPhoto("cccd", f)}/>
           <PhotoSlot label="CCCD mặt sau"
-                     file={newFiles.cccd_back} existing={student.docs?.cccd_back}
+                     file={newFiles.cccd_back} existing={student.docs_cccd_back_url}
                      onPick={(f) => pickPhoto("cccd_back", f)}/>
           <div style={{ gridColumn: "1 / -1" }}>
-            <QrSlot file={newFiles.cccd_qr}
+            <QrSlot file={newFiles.cccd_qr} existing={student.docs_cccd_qr_url}
                     busy={qrBusy}
-                    ok={qrReplaced ? !!qrInfo?.idNumber : !!student.docs?.cccd_qr}
+                    ok={qrReplaced ? !!qrInfo?.idNumber : !!student.docs_cccd_qr_url}
                     idNumber={qrInfo?.idNumber || (qrReplaced ? null : student.idNumber)}
                     onPick={scanQr}/>
             {qrErr && <div style={ERROR_BANNER_STYLE}>{qrErr}</div>}
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <PhotoSlot label="Ảnh chân dung"
+                       file={newFiles.the3x4} existing={student.docs_the3x4_url}
+                       onPick={(f) => pickPhoto("the3x4", f)}/>
           </div>
         </div>
       </div>
@@ -331,8 +353,8 @@ function GuestStudentDetail({ student, onBack }) {
 function GuestAddStudentModal({ open, onClose }) {
   const [name,     setName]     = React.useState("");
   const [phone,    setPhone]    = React.useState("");
-  const [licence,  setLicence]  = React.useState("A1");    // hạng bằng — A or A1
-  const [classId,  setClassId]  = React.useState(D.currentUser?.assignedClassId || D.classes[0]?.id || '');
+  const [licence,  setLicence]  = React.useState("");      // hạng bằng — A or A1 (no default; force pick)
+  const [classId,  setClassId]  = React.useState('');   // no default — force "CHỌN LỚP"
   const [docFiles, setDocFiles] = React.useState({});      // { cccd, cccd_back, cccd_qr }
   const [qrInfo,   setQrInfo]   = React.useState(null);    // { idNumber, name, ... } after a successful scan
   const [qrErr,    setQrErr]    = React.useState(null);    // "QR chưa rõ. Hãy chụp rõ hơn." etc
@@ -347,8 +369,8 @@ function GuestAddStudentModal({ open, onClose }) {
 
   React.useEffect(() => {
     if (!open) return;
-    setName(""); setPhone(""); setLicence("A1");
-    setClassId(D.currentUser?.assignedClassId || D.classes[0]?.id || '');
+    setName(""); setPhone(""); setLicence("");
+    setClassId('');
     setDocFiles({});
     setQrInfo(null); setQrErr(null); setQrBusy(false);
     setBusy(false); setErr(null);
@@ -366,9 +388,11 @@ function GuestAddStudentModal({ open, onClose }) {
     try {
       const out = await D.api.cccdQr(file);
       setQrInfo(out.fields);
+      setName(out.fields.name || "");   // auto-fill name from the QR payload
       setDocFiles(prev => ({ ...prev, cccd_qr: file }));
     } catch (e) {
       setQrInfo(null);
+      setName("");
       setDocFiles(prev => { const { cccd_qr, ...rest } = prev; return rest; });
       // Friendly mapping for the two expected backend failures; everything
       // else falls through with the raw code+message so we can actually
@@ -389,7 +413,9 @@ function GuestAddStudentModal({ open, onClose }) {
 
   // Submit blocked until the QR returns a CCCD number AND a class is picked
   // (backend will 400 with invalid_classId otherwise).
-  const canSubmit = !busy && name.trim() && !!qrInfo?.idNumber && !!classId;
+  // Force-pick everything: name+dob (QR), phone, hạng bằng, lớp, and all 4 photos.
+  const canSubmit = !busy && name.trim() && phone.trim() && !!licence && !!classId
+    && !!qrInfo?.idNumber && !!docFiles.cccd && !!docFiles.cccd_back && !!docFiles.the3x4;
   const submit = async () => {
     if (busyRef.current || !canSubmit) return;
     busyRef.current = true;
@@ -407,8 +433,8 @@ function GuestAddStudentModal({ open, onClose }) {
         ...(qrInfo.address     && { address: qrInfo.address }),
         ...(qrInfo.ngayCapCCCD && { ngayCapCCCD: qrInfo.ngayCapCCCD }),
       };
-      const uploadMap = { cccd: docFiles.cccd, cccd_back: docFiles.cccd_back, cccd_qr: docFiles.cccd_qr };
-      const docs = { cccd: !!uploadMap.cccd, cccd_back: !!uploadMap.cccd_back, cccd_qr: !!uploadMap.cccd_qr };
+      const uploadMap = { cccd: docFiles.cccd, cccd_back: docFiles.cccd_back, cccd_qr: docFiles.cccd_qr, the3x4: docFiles.the3x4 };
+      const docs = { cccd: !!uploadMap.cccd, cccd_back: !!uploadMap.cccd_back, cccd_qr: !!uploadMap.cccd_qr, the3x4: !!uploadMap.the3x4 };
       const created = await D.api.createStudent({ form, docs, profileComplete: false });
       await Promise.all(Object.entries(uploadMap).map(
         ([key, file]) => file ? D.api.uploadStudentDoc(created.id, key, file).catch((e) => {
@@ -433,16 +459,16 @@ function GuestAddStudentModal({ open, onClose }) {
     <Modal open={open} onClose={onClose} width={GUEST_MAX_WIDTH}
            title={success ? undefined : "Thêm học viên"}
            primaryAction={success ? onClose : submit}
-           primaryLabel={success ? "Đóng" : (busy ? "Đang lưu…" : "Lưu học viên")}
-           primaryIcon={success ? "x" : "check"}
+           primaryLabel={success ? "Đóng" : (busy ? "…" : "THÊM")}
+           primaryIcon={success ? "x" : null}
            primaryDisabled={success ? false : !canSubmit}
            secondary={null}
            footerStart={success ? null : (
-             <div style={{ minWidth: 0, flex: 1, maxWidth: 180 }}>
+             <div style={{ minWidth: 0, flex: 1 }}>
                <Select
                  value={classId}
                  onChange={setClassId}
-                 placeholder="Lớp..."
+                 placeholder="CHỌN LỚP"
                  options={D.classes.map(c => ({ value: c.id, label: c.code }))}
                />
              </div>
@@ -456,7 +482,24 @@ function GuestAddStudentModal({ open, onClose }) {
             color: "var(--neon-pink)", border: "1px solid var(--neon-pink)",
           }}>Lỗi: {err}</div>
         )}
-        <Input label="Họ tên" value={name} onChange={setName} placeholder="Nguyễn Văn A"/>
+<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={LABEL_STYLE}>Họ tên</label>
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+            minHeight: 40, padding: "0 14px", borderRadius: 10,
+            background: qrInfo ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)" : "var(--ink-2)",
+            border: `1px solid ${qrInfo ? "var(--neon-lime)" : "var(--glass-stroke)"}`,
+          }}>
+            {qrInfo ? (<>
+              <span style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, color: "var(--fg-1)",
+                             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name || "—"}</span>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-2)",
+                             whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{qrInfo.dob || "—"}</span>
+            </>) : (
+              <span style={{ ...LABEL_STYLE, fontSize: 11, color: "var(--fg-3)" }}>Quét mã QR để tự điền</span>
+            )}
+          </div>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
           <Input label="Số điện thoại" value={phone} onChange={setPhone} placeholder="090 123 4567"
                  digits maxDigits={10} format={fmtPhone}/>
@@ -472,6 +515,10 @@ function GuestAddStudentModal({ open, onClose }) {
             <QrSlot file={docFiles.cccd_qr} busy={qrBusy} ok={!!qrInfo?.idNumber}
                     idNumber={qrInfo?.idNumber} onPick={scanQr}/>
             {qrErr && <div style={ERROR_BANNER_STYLE}>{qrErr}</div>}
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <PhotoSlot label="Ảnh chân dung" file={docFiles.the3x4}
+                       onPick={(f) => pickPhoto("the3x4", f)}/>
           </div>
         </div>
       </div>
@@ -536,38 +583,61 @@ function SuccessPill({ icon, text, delay }) {
 // Tap to pick → asks pickPhoto() for a File. On native this surfaces the
 // OS action sheet (Chụp ảnh / Chọn từ thư viện); on web it falls back to
 // a hidden <input type="file">.
-function QrSlot({ file, busy, ok, idNumber, onPick }) {
-  const color = busy ? "var(--neon-cyan)" : ok ? "var(--neon-lime)" : "var(--fg-2)";
-  const bg    = busy ? "color-mix(in oklab, var(--neon-cyan) 10%, transparent)"
-              : ok   ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)"
-              :       "var(--ink-2)";
-  const border = busy ? "var(--neon-cyan)" : ok ? "var(--neon-lime)" : "var(--glass-stroke-strong)";
+function QrSlot({ file, existing, busy, ok, idNumber, onPick }) {
+  const hasPhoto = !!file || !!existing;
   const open = async () => {
     if (busy) return;
     const f = await pickPhoto({ source: 'prompt' });
     if (f) onPick(f);
   };
+  // Thicker solid lime border on success so it's obvious; cyan while scanning.
+  const border = busy ? "2px solid var(--neon-cyan)"
+               : ok   ? "3px solid var(--neon-lime)"
+               :        "1px dashed var(--glass-stroke-strong)";
+  const chip = { position: "absolute", left: 8, bottom: 6, zIndex: 1, padding: "2px 8px", borderRadius: 8,
+                 background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 10, fontWeight: 600 };
   return (
     <button type="button" onClick={open} disabled={busy} style={{
-      width: "100%",
-      padding: "16px 12px", borderRadius: 12, cursor: busy ? "wait" : "pointer", textAlign: "center",
-      background: bg, border: `1px dashed ${border}`, color,
+      position: "relative", overflow: "hidden", width: "100%",
+      padding: hasPhoto ? 0 : "16px 12px", borderRadius: 12, cursor: busy ? "wait" : "pointer", textAlign: "center",
+      background: "var(--ink-2)", border, color: ok ? "var(--neon-lime)" : "var(--fg-2)",
       fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600,
       minHeight: 110, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10,
     }}>
-      <span>Mã QR trên CCCD</span>
-      <Icon name={ok ? "check" : "plus"} size={36} color={color}/>
-      {busy && (
-        <span style={{ ...LABEL_STYLE, fontSize: 9, color: "var(--neon-cyan)" }}>Đang quét…</span>
+      {hasPhoto ? (
+        <AuthedImage file={file} src={existing}
+                     style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover",
+                              opacity: busy ? 0.4 : 1 }}/>
+      ) : (<>
+        <span>Mã QR trên CCCD</span>
+        <Icon name="plus" size={36} color="var(--fg-3)"/>
+      </>)}
+      {busy && <span style={{ ...chip, fontFamily: "var(--font-mono)", letterSpacing: "0.08em" }}>ĐANG QUÉT…</span>}
+      {!busy && ok && idNumber && (
+        <span style={{ ...chip, fontFamily: "var(--font-mono)", letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums" }}>CCCD {idNumber}</span>
       )}
-      {ok && idNumber && (
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--neon-lime)",
-                       letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums" }}>
-          CCCD {idNumber}
-        </span>
-      )}
+      {!busy && hasPhoto && !idNumber && <span style={chip}>Mã QR</span>}
     </button>
   );
+}
+
+// Renders an image from a freshly-picked File (local preview) OR an
+// auth-protected server URL (fetched with the Bearer token → blob URL, since
+// /api/files/* requires auth so a plain <img src> would 401).
+function AuthedImage({ file, src, style }) {
+  const [url, setUrl] = React.useState(null);
+  React.useEffect(() => {
+    let obj = null, cancelled = false;
+    if (file) { obj = URL.createObjectURL(file); setUrl(obj); }
+    else if (src) {
+      D.api.fileBlobUrl(src)
+        .then(u => { if (cancelled) URL.revokeObjectURL(u); else { obj = u; setUrl(u); } })
+        .catch(() => {});
+    } else { setUrl(null); }
+    return () => { cancelled = true; if (obj) URL.revokeObjectURL(obj); };
+  }, [file, src]);
+  if (!url) return null;
+  return <img src={url} alt="" style={style}/>;
 }
 
 function PhotoSlot({ label, file, existing, onPick }) {
@@ -578,18 +648,27 @@ function PhotoSlot({ label, file, existing, onPick }) {
   };
   return (
     <button type="button" onClick={open} style={{
-      width: "100%",
-      padding: "16px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
-      background: has ? "color-mix(in oklab, var(--neon-lime) 10%, transparent)" : "var(--ink-2)",
-      border: "1px dashed",
-      borderColor: has ? "var(--neon-lime)" : "var(--glass-stroke-strong)",
+      position: "relative", overflow: "hidden", width: "100%",
+      padding: has ? 0 : "16px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
+      background: "var(--ink-2)",
+      border: has ? "3px solid var(--neon-lime)" : "1px dashed var(--glass-stroke-strong)",
       color: has ? "var(--neon-lime)" : "var(--fg-2)",
       fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: 600,
       minHeight: 110, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10,
     }}>
-      <span>{label}</span>
-      <Icon name={has ? "check" : "plus"} size={36}
-            color={has ? "var(--neon-lime)" : "var(--fg-3)"}/>
+      {has ? (
+        <>
+          <AuthedImage file={file} src={existing}
+                       style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}/>
+          <span style={{ position: "absolute", left: 8, bottom: 6, zIndex: 1, padding: "2px 8px", borderRadius: 8,
+                         background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: 10, fontWeight: 600 }}>{label}</span>
+        </>
+      ) : (
+        <>
+          <span>{label}</span>
+          <Icon name="plus" size={36} color="var(--fg-3)"/>
+        </>
+      )}
     </button>
   );
 }
@@ -611,21 +690,25 @@ function GuestUserChip({ me, count }) {
     // re-renders the login form. No reload needed.
   };
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 10,
-                             flex: 1, minWidth: 0, maxWidth: 280 }}>
+    <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center",
+                             width: "80%", minWidth: 0 }}>
       <button onClick={() => setOpen(v => !v)} style={{
-        display: "inline-flex", alignItems: "center", gap: 10,
+        display: "flex", alignItems: "center", gap: 12, width: "100%",
         background: open ? "var(--ink-2)" : "transparent",
         border: "1px solid", borderColor: open ? "var(--glass-stroke-strong)" : "transparent",
-        borderRadius: 12, padding: "4px 8px 4px 4px", cursor: "pointer",
+        borderRadius: 14, padding: "10px 14px", cursor: "pointer",
         flex: 1, minWidth: 0, textAlign: "left", fontFamily: "inherit",
         transition: "background 140ms var(--ease-out), border-color 140ms var(--ease-out)",
       }}>
         <Avatar name={me.name} size={36}/>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 14, fontWeight: 600, color: "var(--fg-1)",
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600, color: "var(--neon-cyan)", textShadow: "0 0 14px var(--neon-cyan-glow)",
                         whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{me.name}</div>
-          <div style={{ ...LABEL_STYLE, fontSize: 9 }}>Cộng tác viên · {count} hồ sơ</div>
+          <div style={{ ...LABEL_STYLE, fontSize: 10, letterSpacing: "0.12em", display: "flex",
+                        justifyContent: "space-between", alignItems: "baseline", gap: 8, marginTop: 3 }}>
+            <span style={{ whiteSpace: "nowrap" }}>Cộng tác viên</span>
+            <span style={{ whiteSpace: "nowrap" }}>{count} hồ sơ</span>
+          </div>
         </div>
       </button>
       {open && (

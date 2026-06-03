@@ -72,6 +72,18 @@ export const api = {
     return request(`/students/${studentId}/docs/${key}`, { method: 'POST', body: fd });
   },
 
+  // Fetch an auth-protected uploaded file as an object URL (for <img>).
+  // Doc URLs come back as "/api/files/..." — served behind requireAuth, so a
+  // plain <img src> would 401; we fetch with the Bearer token and blob it.
+  async fileBlobUrl(relUrl) {
+    const token = await getToken();
+    const res = await fetch((import.meta.env.VITE_API_BASE || '') + relUrl, {
+      headers: token ? { Authorization: 'Bearer ' + token } : {},
+    });
+    if (!res.ok) throw new Error('file ' + res.status);
+    return URL.createObjectURL(await res.blob());
+  },
+
   // OCR
   async cccdQr(file) {
     const fd = new FormData();

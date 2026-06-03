@@ -123,6 +123,7 @@ export const D = {
     },
     uploadStudentDoc: api.uploadStudentDoc,
     cccdQr:           api.cccdQr,
+    fileBlobUrl:      api.fileBlobUrl,
     refreshMe,
     async logout() {
       await api.logout();
