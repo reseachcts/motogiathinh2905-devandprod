@@ -1,0 +1,7 @@
+providers = ["node"]
+
+[phases.install]
+cmds = ["npm install --omit=dev"]
+
+[start]
+cmd = "npm start"
