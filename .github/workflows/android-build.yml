@@ -36,7 +36,16 @@ jobs:
         working-directory: guest-app
         run: npm ci
 
-      - name: Build web bundle
+      - name: Point Android build at the LAN IP (Android can't resolve .local)
+        working-directory: guest-app
+        # Android's resolver doesn't do mDNS/.local for app HTTP requests (unlike
+        # iOS Bonjour), so the APK must use the PC's IP. .env.development.local
+        # overrides .env.development (which keeps .local for the iOS build).
+        # NOTE: update this IP if the dev box's DHCP address changes — or set a
+        # DHCP reservation / deploy HTTPS (Task #1) to stop the drift for good.
+        run: echo "VITE_API_BASE=http://192.168.1.25:3001" > .env.development.local
+
+      - name: Build web bundle (LAN dev backend)
         working-directory: guest-app
         run: npm run build:dev
 
