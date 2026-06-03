@@ -1,4 +1,9 @@
 {
+  "name": "motogiathinh-crm",
+  "scripts": {
+    "start": "node backend/seed/seed-from-csv.js && node backend/server.js",
+    "postinstall": "npm install --prefix backend --omit=dev"
+  },
   "dependencies": {
     "@capacitor/android": "^8.3.4",
     "@capacitor/camera": "^8.2.0",
