@@ -13,7 +13,17 @@ import bcrypt from 'bcryptjs';
 import { db, ENTITY_TABLES, countAll, nowDdMmYyyyHHMMSS } from '../db.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = resolve(HERE, '..', 'webapp', 'data');
+
+function findDataDir() {
+  let dir = HERE;
+  for (let i = 0; i < 6; i++) {
+    const candidate = resolve(dir, 'webapp', 'data');
+    if (existsSync(resolve(candidate, 'branches.csv'))) return candidate;
+    dir = resolve(dir, '..');
+  }
+  throw new Error('Cannot find webapp/data/branches.csv - searched up from ' + HERE);
+}
+const DATA_DIR = findDataDir();
 
 const RESET = process.argv.includes('--reset');
 

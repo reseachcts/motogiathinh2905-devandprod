@@ -40,7 +40,16 @@ loadDotEnv();
 
 const PORT      = Number(process.env.PORT) || 3000;
 const NODE_ENV  = process.env.NODE_ENV || 'development';
-const WEBAPP_DIR = resolve(HERE, 'webapp');
+function findWebappDir() {
+  let dir = HERE;
+  for (let i = 0; i < 6; i++) {
+    const candidate = resolve(dir, 'webapp');
+    if (existsSync(resolve(candidate, 'index.html'))) return candidate;
+    dir = resolve(dir, '..');
+  }
+  return resolve(HERE, 'webapp');
+}
+const WEBAPP_DIR = findWebappDir();
 
 const app = express();
 app.disable('x-powered-by');
