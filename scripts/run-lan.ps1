@@ -104,7 +104,9 @@ Write-Host ""
 Write-Host "Starting MOTOGIATHINH LAN instances..."
 
 Start-Backend $WebPortA
-Start-Backend $WebPortB
+# Single backend only — two node:sqlite backends on one DB file deadlock
+# (synchronous DB call blocks the event loop). Use different browsers on :3001
+# for separate simultaneous logins.
 
 if (Port-Listening $GuestPort) {
   Write-Host "  [skip] port $GuestPort already in use - leaving it as is"
@@ -120,8 +122,7 @@ if (Port-Listening $GuestPort) {
 if ($script:pids.Count -gt 0) { $script:pids | Set-Content $pidFile }
 
 Write-Host "------------------------------------------------------------"
-Write-Host "  Webapp (admin dashboard) : http://${LanIp}:${WebPortA}/"
-Write-Host "  Webapp (admin dashboard) : http://${LanIp}:${WebPortB}/"
+Write-Host "  Webapp (admin dashboard) : http://${LanIp}:${WebPortA}/  (use different browsers for separate logins)"
 Write-Host "  Guest app (collaborator) : http://${LanIp}:${GuestPort}/"
 Write-Host "------------------------------------------------------------"
 Write-Host "Open each in a DIFFERENT browser (or incognito) to keep logins separate."
