@@ -157,14 +157,14 @@ jobs:
             launching, re-run Sideloadly with the same IPA to refresh.
 
             ## First-run checklist
-            - This build calls the **LAN dev backend** at `http://192.168.1.6:3001`.
+            - This build calls the **LAN dev backend** at `http://DESKTOP-L0C7R5A.local:3001`.
               The backend must be running, Windows Firewall must allow TCP 3001
               inbound, and the iPhone must be on the same Wi-Fi.
             - App Transport Security is configured for LAN HTTP
               (NSAllowsArbitraryLoadsInWebContent + NSAllowsLocalNetworking), so
               the plain-HTTP backend is reachable while ATS stays on for the
               public internet.
-            - Verify by opening `http://192.168.1.6:3001/api/health` in Safari on
+            - Verify by opening `http://DESKTOP-L0C7R5A.local:3001/api/health` in Safari on
               the iPhone first — should return `{"ok":true,...}`.
 
             ## Login
