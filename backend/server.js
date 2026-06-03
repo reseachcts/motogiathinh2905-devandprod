@@ -40,7 +40,7 @@ loadDotEnv();
 
 const PORT      = Number(process.env.PORT) || 3000;
 const NODE_ENV  = process.env.NODE_ENV || 'development';
-const WEBAPP_DIR = resolve(HERE, '..', 'webapp');
+const WEBAPP_DIR = resolve(HERE, 'webapp');
 
 const app = express();
 app.disable('x-powered-by');

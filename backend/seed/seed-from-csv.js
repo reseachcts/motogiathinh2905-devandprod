@@ -13,7 +13,7 @@ import bcrypt from 'bcryptjs';
 import { db, ENTITY_TABLES, countAll, nowDdMmYyyyHHMMSS } from '../db.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = resolve(HERE, '..', '..', 'webapp', 'data');
+const DATA_DIR = resolve(HERE, '..', 'webapp', 'data');
 
 const RESET = process.argv.includes('--reset');
 
